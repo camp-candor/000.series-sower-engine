@@ -22,7 +22,7 @@
 │       └── 995.library/     # [IMMUTABLE] Core Blessed Curses engine
 │
 └── packages/
-    └── 000.agent/           # Core Agent Domain & Terminal Cockpit
+    └── 100.agent/           # Core Agent Domain & Terminal Cockpit
         ├── BEE.ts           # Unit registration & state manifest
         ├── src/cascade.ts   # 4-tier endpoint resolution cascade & WS derivation
         ├── 00.agent.unit/   # Agent core actions, reducers, WS connections
@@ -53,7 +53,7 @@ npm ci
 ### 2. Configure Environment
 
 ```bash
-# Root environment (used by packages/000.agent and CI scripts)
+# Root environment (used by packages/100.agent and CI scripts)
 cp .env.example .env
 
 # Worker environment (used by local wrangler dev)
