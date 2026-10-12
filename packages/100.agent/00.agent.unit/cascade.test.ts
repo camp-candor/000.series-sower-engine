@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { getBaseUrl, getBaseWsUrl } from '../src/cascade.js'
 
-describe('4-Tier Resolution Cascade & Protocol Derivation (000.agent)', () => {
+describe('4-Tier Resolution Cascade & Protocol Derivation (100.agent)', () => {
     const originalEnv = { ...process.env }
 
     beforeEach(() => {

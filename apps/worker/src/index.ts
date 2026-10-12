@@ -58,7 +58,7 @@ const app = new Hono<{ Bindings: Env }>()
 // Root Health & Verification Endpoint
 app.get('/', (c) => c.text('REPO-BOT EDGE CONTROL PLANE IS LIVE'))
 
-// Structured Diagnostics Endpoint (Satisfies packages/000.agent switchboard probe)
+// Structured Diagnostics Endpoint (Satisfies packages/100.agent switchboard probe)
 app.get('/health', (c) =>
     c.json(
         {

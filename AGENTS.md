@@ -46,7 +46,7 @@ Before writing code, orient yourself in this order:
   shell built-ins (`test -z`, `export`, `rm -rf`).
 - **Template Generalization Law:** Never hardcode repository identity (e.g.
   `"REPO-BOT"`, `"SERIES-SOWER-ENGINE"`). Derive names/versions dynamically --
-  see `packages/000.agent/src/identity.ts` (`getRepoIdentity`).
+  see `packages/100.agent/src/identity.ts` (`getRepoIdentity`).
 - **HARNESS IMMUTABILITY BOUNDARY (`apps/995.library`):**
   `apps/995.library/995.library/**` is the canonical upstream terminal harness
   and is **STRICTLY IMMUTABLE**. Never add, modify, or delete models, reducers,
@@ -75,7 +75,7 @@ Before writing code, orient yourself in this order:
 │       └── 995.library/        # [IMMUTABLE] Core Blessed Curses engine
 │
 ├── packages/
-│   └── 000.agent/              # Core Agent Domain & Terminal Cockpit (@camp_candor/000.agent)
+│   └── 100.agent/              # Core Agent Domain & Terminal Cockpit (@camp_candor/100.agent)
 │       ├── BEE.ts              # Unit registration & state manifest
 │       ├── src/cascade.ts      # 4-tier endpoint resolution cascade & WS derivation
 │       ├── src/identity.ts     # Dynamic repo identity (name/version from root package.json)
@@ -237,7 +237,7 @@ npm run check:all
 | `npm run tui`          | Launch the Blessed terminal cockpit             |
 | `npm run worker:dev`   | Run the Worker locally via Wrangler (port 8787) |
 | `npm run test:worker`  | Worker unit suites (vitest-pool-workers)        |
-| `npm run test:agent`   | `000.agent` vitest suites                       |
+| `npm run test:agent`   | `100.agent` vitest suites                       |
 | `npm run test:library` | `995.library` AVA suites                        |
 | `npm run verify:local` | Boot local worker and run the live HTTP audit   |
 | `npm run fix`          | Auto-fix prettier + eslint                      |
