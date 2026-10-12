@@ -1,15 +1,14 @@
-import NetBit from './net.bit'
+import type NetBit from './net.bit'
 
-export default interface GridBit {
-    idx: string
-    src?: string
-    lst?: any[]
-    val?: number
-    dat?: any
-    slv?: Function
-
-    x?: number
-    y?: number
-    xSpan?: number
-    ySpan?: number
+export default interface GridBit<TDat = NetBit, TLst = unknown> {
+    idx?: string;
+    src?: string;
+    lst?: TLst[];
+    val?: number;
+    dat?: TDat;
+    slv?: (result: { grdBit: Partial<GridBit<TDat, TLst>> }) => void;
+    x?: number;
+    y?: number;
+    xSpan?: number;
+    ySpan?: number;
 }

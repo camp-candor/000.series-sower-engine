@@ -12,42 +12,59 @@ const exec = promisify(execCb)
 
 // 1. Setup CLI
 program.option('--first').option('-t, --separator <char>')
-
 program.parse(process.argv)
 const options = program.opts()
 
-const PACKAGES_CONFIG: Record<
-    string,
-    { globalKey: string; menuTitle: string; menuDesc: string }
-> = {
-    '822.cloudflare': {
-        globalKey: 'CLOUDFLARE',
-        menuTitle: 'CLOUDFLARE MENU',
-        menuDesc: 'Open the Cloudflare menu\nto manage cloudflare.',
-    },
+export interface PackageTerminalMetadata {
+    name: string
+    globalKey: string
+    menuTitle: string
+    menuDesc: string
+    targetDir: string
 }
 
-const getExistingPackages = () => {
+/**
+ * Sweeps packages/ for valid TypeScript packages and extracts Schema-Driven metadata.
+ */
+export const getExistingPackages = (): PackageTerminalMetadata[] => {
     const packagesDir = path.resolve(import.meta.dirname, '../../packages')
     if (!fs.existsSync(packagesDir)) return []
 
     const entries = fs.readdirSync(packagesDir, { withFileTypes: true })
-    const results: Array<{
-        name: string
-        globalKey: string
-        menuTitle: string
-        menuDesc: string
-    }> = []
+    const results: PackageTerminalMetadata[] = []
 
     for (const entry of entries) {
         if (!entry.isDirectory() || entry.name === 'dist') continue
-        const tsconfigPath = path.join(packagesDir, entry.name, 'tsconfig.json')
+        const targetDir = path.join(packagesDir, entry.name)
+        const tsconfigPath = path.join(targetDir, 'tsconfig.json')
         if (!fs.existsSync(tsconfigPath)) continue
 
-        const known = PACKAGES_CONFIG[entry.name]
-        if (known) {
-            results.push({ name: entry.name, ...known })
+        const pkgJsonPath = path.join(targetDir, 'package.json')
+        let terminalMeta: any = null
+
+        if (fs.existsSync(pkgJsonPath)) {
+            try {
+                const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf8'))
+                if (pkgJson.terminal) {
+                    terminalMeta = pkgJson.terminal
+                }
+            } catch {
+                // Ignore parse errors on intermediate files
+            }
+        }
+
+        if (terminalMeta && terminalMeta.globalKey && terminalMeta.menuTitle) {
+            results.push({
+                name: entry.name,
+                globalKey: terminalMeta.globalKey,
+                menuTitle: terminalMeta.menuTitle,
+                menuDesc:
+                    terminalMeta.menuDesc ||
+                    `Open ${entry.name} management console.`,
+                targetDir,
+            })
         } else {
+            // Heuristic Fallback
             const domain = entry.name.includes('.')
                 ? entry.name.split('.').slice(1).join('.')
                 : entry.name
@@ -57,6 +74,7 @@ const getExistingPackages = () => {
                 globalKey: upper,
                 menuTitle: `${upper} MENU`,
                 menuDesc: `Open the ${domain} menu\nto manage ${domain}.`,
+                targetDir,
             })
         }
     }
@@ -73,7 +91,7 @@ const getRootIdentity = () => {
                 const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'))
                 if (pkg.workspaces || fs.existsSync(path.join(curr, '.git'))) {
                     const rawName =
-                        pkg.name || path.basename(curr) || 'series-sower-engine'
+                        pkg.name || path.basename(curr) || '995.library'
                     const name = String(rawName).replace(/^@[^/]+\//, '').trim()
                     const rawVersion = pkg.version
                         ? String(pkg.version).replace(/^v/, '')
@@ -86,17 +104,18 @@ const getRootIdentity = () => {
         curr = path.dirname(curr)
     }
     return {
-        name: 'series-sower-engine',
+        name: '995.library',
         version: 'v0.1.0',
-        titleBanner: 'series-sower-engine v0.1.0',
+        titleBanner: '995.library v0.1.0',
     }
 }
 
-// 2. Logic to run AFTER build
+// 2. Post-Build Initialization Logic
 const init = async () => {
-    console.log('>> Initialization started...')
+    console.log('>> [INIT] Bootstrapping Terminal Orchestrator...')
 
     global.window = global as any
+    ;(global as any).PIVOTS = (global as any).PIVOTS || {}
 
     const idx = options.separator
     if (idx) console.log(`   Targeting: ${idx}`)
@@ -128,7 +147,10 @@ const init = async () => {
         })
         const logWidget = cnsBit?.cnsBit?.dat?.bit
         if (logWidget && Array.isArray(logWidget.logLines)) {
-            const libPkgPath = path.resolve(import.meta.dirname, './package.json')
+            const libPkgPath = path.resolve(
+                import.meta.dirname,
+                './package.json',
+            )
             const libPkg = fs.existsSync(libPkgPath)
                 ? JSON.parse(fs.readFileSync(libPkgPath, 'utf8'))
                 : { version: '1.0.12' }
@@ -148,11 +170,26 @@ const init = async () => {
 
         await new Promise((resolve) => setTimeout(resolve, 10))
 
-        await LIBRARY.hunt(MENU_ACTION_LIBRARY.PRINT_MENU, {
-            src: '[OK] Init complete',
+        await LIBRARY.hunt(CONSOLE_ACTION_LIBRARY.UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: '>> [OK] Master Bus Initialized',
         })
 
-        // Register each active package into the Blessed Menu registry
+        // 3. Dynamic Package Injection & Bus Wiring
+        const packagesDist = path.resolve(
+            import.meta.dirname,
+            '../../packages/dist',
+        )
+        if (fs.existsSync(packagesDist)) {
+            const distPkgJson = path.join(packagesDist, 'package.json')
+            if (!fs.existsSync(distPkgJson)) {
+                fs.writeFileSync(
+                    distPkgJson,
+                    JSON.stringify({ type: 'commonjs' }, null, 2),
+                )
+            }
+        }
+
         for (const pkg of existingPackages) {
             try {
                 let pkgDistPath = path.resolve(
@@ -166,15 +203,40 @@ const init = async () => {
                     )
                     if (fs.existsSync(localDist)) {
                         pkgDistPath = localDist
+                    } else {
+                        pkgDistPath = pkg.targetDir
                     }
                 }
-                const MODULE = require(path.join(pkgDistPath, 'hunt'))
-                ;(global as any)[pkg.globalKey] = MODULE.default || MODULE
 
-                const MENU_ACTION = require(
-                    path.join(pkgDistPath, '98.menu.unit/menu.action'),
+                const huntModulePath = path.join(pkgDistPath, 'hunt')
+                const MODULE = require(huntModulePath)
+                const instance = MODULE.default || MODULE
+
+                // Inject into global namespace & central pivot registry
+                ;(global as any)[pkg.globalKey] = instance
+                ;(global as any).PIVOTS[pkg.name] = instance
+                ;(global as any).PIVOTS[pkg.globalKey] = instance
+
+                const menuActionPath = path.join(
+                    pkgDistPath,
+                    '98.menu.unit/menu.action',
                 )
+                if (
+                    !fs.existsSync(menuActionPath + '.js') &&
+                    !fs.existsSync(menuActionPath + '.ts') &&
+                    !fs.existsSync(menuActionPath)
+                ) {
+                    // Headless pivot without visual menu unit
+                    await LIBRARY.hunt(CONSOLE_ACTION_LIBRARY.UPDATE_CONSOLE, {
+                        idx: 'cns00',
+                        src: `>> [INFO] Mounted headless pivot: [${pkg.name}] as global.${pkg.globalKey}`,
+                    })
+                    continue
+                }
 
+                const MENU_ACTION = require(menuActionPath)
+
+                // Mount sub-menu into root Blessed navigation
                 await LIBRARY.hunt(MENU_ACTION_LIBRARY.ROUTE_MENU, {
                     idx: pkg.menuTitle,
                     src: pkg.menuDesc,
@@ -192,23 +254,30 @@ const init = async () => {
                         })
                     },
                 })
-            } catch (err) {
-                console.error(`exec error loading ${pkg.name}: ${err}`)
-                throw err
+
+                await LIBRARY.hunt(CONSOLE_ACTION_LIBRARY.UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `>> [OK] Mounted UI Pivot: [${pkg.name}] -> ${pkg.menuTitle}`,
+                })
+            } catch (err: any) {
+                await LIBRARY.hunt(CONSOLE_ACTION_LIBRARY.UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `:: [WARN] Skipping pivot [${pkg.name}]: ${err.message}`,
+                })
             }
         }
 
         await LIBRARY.hunt(MENU_ACTION_LIBRARY.OPEN_MENU, { src: '' })
-    } catch (err) {
-        console.error('[FAIL] Runtime Error:', err)
+    } catch (err: any) {
+        console.error(':: [FAIL] Terminal Runtime Panic:', err)
         process.exit(1)
     }
 }
 
-// 3. Main Execution Flow: Build library and any active packages
+// 4. Main Build & Startup Pipeline
 const main = async () => {
     try {
-        console.log('>> Building TypeScript...')
+        console.log('>> [BUILD] Compiling Monorepo TypeScript References...')
         const existingPackages = getExistingPackages()
         const buildTargets = [
             '995.library',
@@ -224,7 +293,7 @@ const main = async () => {
 
         await init()
     } catch (err: any) {
-        console.error('[FAIL] Build Failed:')
+        console.error(':: [FAIL] Build Failed:')
         console.error(err.stdout || err.message)
         process.exit(1)
     }

@@ -1,10 +1,10 @@
-export default interface InputBit {
-    idx: string
-    src?: string
-    lst?: any[]
-    val?: number
-    txt?: string
-    dat?: any
-    net?: any
-    slv?: Function
+export default interface InputBit<TDat = { clr0?: string; clr1?: string; [key: string]: any }, TLst = string> {
+    idx?: string;
+    src?: string;
+    lst?: TLst[];
+    val?: number;
+    txt?: string;
+    dat?: TDat;
+    net?: any;
+    slv?: (result: { putBit: Partial<InputBit<TDat, TLst>> }) => void;
 }
