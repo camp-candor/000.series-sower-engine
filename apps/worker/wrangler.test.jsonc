@@ -1,19 +1,24 @@
 {
-    "$schema": "node_modules/wrangler/config-schema.json",
-    "name": "series-sower-engine-test",
-    "main": "src/index.ts",
-    "compatibility_date": "2026-01-07",
-    "compatibility_flags": ["nodejs_compat"],
-
-    "observability": {
-        "enabled": false,
-    },
-    "alias": {
-        "ajv": "../../node_modules/@funtuantw/pi-agent-cf/stubs/ajv.js",
-    },
-    "env": {
-        "staging": {
-            "name": "series-sower-engine-staging",
-        },
-    },
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "worker-sower-engine-test",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-14",
+  "compatibility_flags": ["nodejs_compat"],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "SOWER_SESSION",
+        "class_name": "SowerSessionDO"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["SowerSessionDO"]
+    }
+  ],
+  "observability": {
+    "enabled": false
+  }
 }
