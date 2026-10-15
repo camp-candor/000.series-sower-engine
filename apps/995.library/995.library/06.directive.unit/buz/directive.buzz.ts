@@ -143,7 +143,7 @@ export const createDirective = async (
             })
         }
 
-        // 1. Calculate the next monotonic sequential index prefix
+        // 1. Calculate the next monotonic sequential index prefix (< 800 boundary reserved)
         const existingEntries = await fs.readdir(targetDayDir)
         let maxPrefix = -1
 
@@ -151,7 +151,7 @@ export const createDirective = async (
             const match = entry.match(/^(\d{3})\./)
             if (match) {
                 const num = parseInt(match[1], 10)
-                if (num > maxPrefix) {
+                if (num < 800 && num > maxPrefix) {
                     maxPrefix = num
                 }
             }
@@ -447,14 +447,14 @@ export const phaseDirective = async (
             const prefixMatch = filename.match(/^(\d{3})\./)
             if (prefixMatch) {
                 const prefixNum = parseInt(prefixMatch[1], 10)
-                if (prefixNum > maxPrefix) {
+                if (prefixNum < 800 && prefixNum > maxPrefix) {
                     maxPrefix = prefixNum
                 }
 
                 // Check if this file represents a phase directive
                 const phaseMatch = filename.match(/^(\d{3})\.phase-([a-zA-Z0-9]+)\./i)
                 if (phaseMatch) {
-                    if (prefixNum > highestPhaseFilePrefix) {
+                    if (prefixNum < 800 && prefixNum > highestPhaseFilePrefix) {
                         highestPhaseFilePrefix = prefixNum
                         lastPhaseWord = phaseMatch[2]
                     }

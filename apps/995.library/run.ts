@@ -267,6 +267,58 @@ const init = async () => {
             }
         }
 
+        // Direct target dispatch if specified via -t / --separator
+        if (idx) {
+            const target = existingPackages.find(
+                (p) =>
+                    p.name.toLowerCase() === idx.toLowerCase() ||
+                    p.globalKey.toLowerCase() === idx.toLowerCase() ||
+                    p.menuTitle.toLowerCase() === idx.toLowerCase() ||
+                    p.name.endsWith(`.${idx.toLowerCase()}`) ||
+                    p.name.split('.')[1]?.toLowerCase() === idx.toLowerCase(),
+            )
+            if (target) {
+                let pkgDistPath = path.resolve(
+                    import.meta.dirname,
+                    `../../packages/dist/${target.name}`,
+                )
+                if (!fs.existsSync(pkgDistPath)) {
+                    const localDist = path.resolve(
+                        import.meta.dirname,
+                        `../../packages/${target.name}/dist`,
+                    )
+                    if (fs.existsSync(localDist)) {
+                        pkgDistPath = localDist
+                    } else {
+                        pkgDistPath = target.targetDir
+                    }
+                }
+                const menuActionPath = path.join(
+                    pkgDistPath,
+                    '98.menu.unit/menu.action',
+                )
+                if (
+                    fs.existsSync(menuActionPath + '.js') ||
+                    fs.existsSync(menuActionPath + '.ts') ||
+                    fs.existsSync(menuActionPath)
+                ) {
+                    const TARGET_ACTION = require(menuActionPath)
+                    await (global as any)[target.globalKey].hunt(
+                        TARGET_ACTION.INIT_MENU,
+                        {
+                            slv: async () => {
+                                await LIBRARY.hunt(
+                                    MENU_ACTION_LIBRARY.OPEN_MENU,
+                                    { src: '' },
+                                )
+                            },
+                        },
+                    )
+                    return
+                }
+            }
+        }
+
         await LIBRARY.hunt(MENU_ACTION_LIBRARY.OPEN_MENU, { src: '' })
     } catch (err: any) {
         console.error(':: [FAIL] Terminal Runtime Panic:', err)

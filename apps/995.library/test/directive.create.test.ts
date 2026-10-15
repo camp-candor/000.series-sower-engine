@@ -212,3 +212,57 @@ test.serial(
         t.true(await fs.pathExists(path.join(day003Dir, '008.phase-one.ag-test.md')))
     },
 )
+
+test.serial(
+    'createDirective [BOUNDARY_RESERVATION] -- ignores boundary files >= 800 (refinement and checklist)',
+    async (t) => {
+        const scratchRoot = path.resolve(process.cwd(), 'scratch_test_boundary_reserve')
+        await fs.ensureDir(scratchRoot)
+
+        const day001Dir = path.join(scratchRoot, 'data', 'directive', 'day-001')
+        await fs.ensureDir(day001Dir)
+
+        // Seed 000 templates and 800/900 boundary files as provisioned by dayDirective
+        await fs.writeFile(path.join(day001Dir, '000.focus.cpn'), '// Focus template')
+        await fs.writeFile(path.join(day001Dir, '800.refinement.cpn'), '// Refinement')
+        await fs.writeFile(path.join(day001Dir, '900.check-list.cpn'), '// Checklist')
+
+        await fs.writeJson(path.join(scratchRoot, 'package.json'), {
+            name: 'test-monorepo',
+            workspaces: ['apps/*', 'packages/*'],
+        })
+        await fs.ensureDir(path.join(scratchRoot, 'apps'))
+        await fs.ensureDir(path.join(scratchRoot, 'packages'))
+
+        t.teardown(async () => {
+            await fs.remove(scratchRoot).catch(() => {})
+        })
+
+        let resolvedResult: any = null
+        const bal = {
+            src: 'day-001',
+            idx: 'facts-ledger',
+            val: 2,
+            slv: (res: any) => {
+                resolvedResult = res
+            },
+        }
+
+        const originalCwd = process.cwd
+        process.cwd = () => scratchRoot
+
+        try {
+            await createDirective(new DirectiveModel(), bal as any, null as any)
+        } finally {
+            process.cwd = originalCwd
+        }
+
+        t.truthy(resolvedResult)
+        // Must start at 001, not 901
+        t.true(await fs.pathExists(path.join(day001Dir, '001.facts-ledger.cpn')))
+        t.true(await fs.pathExists(path.join(day001Dir, '002.phase-one.jules.md')))
+        t.true(await fs.pathExists(path.join(day001Dir, '003.phase-one.ag-test.md')))
+        t.true(await fs.pathExists(path.join(day001Dir, '004.phase-two.jules.md')))
+        t.true(await fs.pathExists(path.join(day001Dir, '005.phase-two.ag-test.md')))
+    },
+)

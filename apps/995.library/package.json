@@ -4,6 +4,7 @@
     "private": true,
     "scripts": {
         "dev": "npx tsx run.ts -t pivot",
+        "dev:cauldron": "npx tsx run.ts -t cauldron",
         "test": "ava",
         "check:gauntlet": "ava test/gauntlet.verification.test.ts"
     },
