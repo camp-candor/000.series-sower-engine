@@ -1,102 +1,47 @@
-import { Hono } from 'hono'
-import { createAgentWorker } from '@funtuantw/pi-agent-cf'
-import { coreTools, type Env } from './tools.core.js'
-// import { customTools } from './tools.custom.js'
+import { Hono } from 'hono';
+import { SowerSessionDO } from './objects/SowerSessionDO.js';
+import { coreTools } from './tools.core.js';
 
-// ----------------------------------------------------------------------------
-// :: DETERMINISTIC LLM & DEVOPS SYSTEM PROMPT
-// ----------------------------------------------------------------------------
+export { SowerSessionDO };
 
-const cfModel: any = {
-    id: '@cf/meta/llama-3.2-3b-instruct',
-    api: 'openai-completions',
-    provider: 'openai',
-    baseUrl: '',
-    reasoning: false,
-    input: ['text'],
-    temperature: 0.1,
-    compat: {
-        supportsStore: false,
-        supportsDeveloperRole: false,
-        supportsStrictMode: false,
-    },
+export interface Env {
+  CANON_DB: D1Database;
+  SOWER_SESSION: DurableObjectNamespace;
 }
 
-const dynamicWorker = createAgentWorker<Env>({
-    systemPrompt: (env) => {
-        cfModel.baseUrl = `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/ai/v1`
+const app = new Hono<{ Bindings: Env }>();
 
-        return `
-You are repo-bot, the deterministic DevOps Control Plane and Git Mechanic.
-You possess a suite of deterministic Git and CI surveillance instruments:
-1. 'get_commit_sha': Captures the immutable base rollback anchor (S_clean) before modifying branches.
-2. 'create_ephemeral_branch': Creates an isolated work branch (spec/TASK-XX-<short-sha>). Direct commits to main are forbidden.
-3. 'write_repo_file': Writes bounded UTF-8 content to an ephemeral branch.
-4. 'create_pull_request': Opens a Pull Request from an ephemeral branch to trunk for validation.
-5. 'inspect_repo_checks': Queries repository commits and evaluates check-run CI outcomes.
+export const systemPrompt = (): string => {
+  return [
+    'You are Worker-Sower-Engine, the authoritative epistemological narrative state engine.',
+    'You have zero authority to perform Git commits, modify local file trees, or invoke cloud GPUs.',
+    'Your mandate is to evaluate narrative invariants, enforce somatic and epistemic constraints,',
+    'and emit validated dialogue ASTs and unsealed staging deltas for conductor compilation.',
+  ].join(' ');
+};
 
-OPERATIONAL INVARIANTS:
-- Always capture S_clean via get_commit_sha before creating branches.
-- Never modify files directly on main or production tracking branches.
-- Output deterministic, structured summaries following tool execution.
-        `.trim()
-    },
-    model: cfModel,
-    tools: (env) => [...coreTools(env)],
-    getApiKey: (provider, env) => {
-        if (provider === 'openai') return env.CLOUDFLARE_API_TOKEN
-        return undefined
-    },
-})
+app.get('/', (c) => {
+  return c.text('WORKER-SOWER-ENGINE EDGE CONTROL PLANE IS LIVE');
+});
 
-// ----------------------------------------------------------------------------
-// :: HONO ROUTER
-// ----------------------------------------------------------------------------
+app.get('/health', (c) => {
+  return c.json({
+    status: 'healthy',
+    service: 'worker-sower-engine',
+    engine: 'Worker-Sower-Engine',
+    toolsCount: coreTools.length,
+    timestamp: Date.now(),
+  });
+});
 
-const app = new Hono<{ Bindings: Env }>()
+app.get('/api/session/:id/status', async (c) => {
+  const sessionId = c.req.param('id');
+  const doId = c.env.SOWER_SESSION.idFromName(sessionId);
+  const stub = c.env.SOWER_SESSION.get(doId);
+  const status = await (stub as any).getStatus();
+  return c.json({ sessionId, ...status });
+});
 
-// Root Health & Verification Endpoint
-app.get('/', (c) => c.text('REPO-BOT EDGE CONTROL PLANE IS LIVE'))
-
-// Structured Diagnostics Endpoint (Satisfies packages/100.agent switchboard probe)
-app.get('/health', (c) =>
-    c.json(
-        {
-            status: 'healthy',
-            service: 'series-sower-engine-worker',
-            timestamp: new Date().toISOString(),
-            hasGithubToken: Boolean(c.env.GITHUB_TOKEN),
-            aiGateway: c.env.CLOUDFLARE_AI_GATEWAY || 'default',
-        },
-        200,
-    ),
-)
-
-// Fast-Path Oracle Endpoint
-app.get('/oracle', async (c) => {
-    try {
-        const prompt = c.req.query('prompt') || 'Inspect system status'
-        const response = await c.env.AI.run('@cf/meta/llama-3.2-3b-instruct', {
-            messages: [
-                { role: 'user', content: `${prompt}. Output ONLY raw JSON.` },
-            ],
-        })
-        return c.text(response.response || JSON.stringify(response))
-    } catch (error: any) {
-        console.error('Oracle Error:', error)
-        return c.text(`Error: ${error.message}`, 500)
-    }
-})
-
-// Durable Object Session Ingress
-app.all('/*', async (c) => {
-    if (!dynamicWorker.handler.fetch) return c.text('Handler missing', 500)
-    return await dynamicWorker.handler.fetch(
-        c.req.raw as any,
-        c.env,
-        c.executionCtx,
-    )
-})
-
-export const AgentSessionDO = dynamicWorker.AgentSessionDO
-export default app
+export default {
+  fetch: app.fetch,
+};

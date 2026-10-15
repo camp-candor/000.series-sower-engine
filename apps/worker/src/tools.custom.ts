@@ -1,6 +1,6 @@
 import type { AgentTool } from '@funtuantw/pi-agent-cf'
 // import { Type, type Static } from '@sinclair/typebox'
-import type { Env } from './tools.core.js'
+import type { Env } from './index.js'
 
 // ============================================================================
 // :: SOVEREIGN CUSTOM TOOLS REGISTRY (DOWNSTREAM EXTENSION HOOK)
