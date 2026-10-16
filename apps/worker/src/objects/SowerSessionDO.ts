@@ -1,4 +1,12 @@
 import { DurableObject } from 'cloudflare:workers'
+import type { EventEnvelope } from '../core/ledger/events.js'
+import {
+    createInitialLedgerState,
+    type LedgerState,
+} from '../core/ledger/reducer.js'
+import { StagingAccumulator } from '../core/ledger/stagingAccumulator.js'
+
+export const HOT_BUFFER_FLUSH_THRESHOLD = 1000
 
 export interface SowerSessionEnv {
     CANON_DB: D1Database
@@ -16,9 +24,64 @@ export class SowerSessionDO extends DurableObject {
     private stateMutexLocked: boolean = false
     private volatileStagingBuffer: StagedSimulationDelta[] = []
     private currentEpoch: number = 0
+    private readonly sowerEnv: SowerSessionEnv
+    private ledgerAccumulator: StagingAccumulator | null = null
 
     constructor(ctx: DurableObjectState, env: SowerSessionEnv) {
         super(ctx, env)
+        this.sowerEnv = env
+    }
+
+    private ensureAccumulator(): StagingAccumulator {
+        if (!this.ledgerAccumulator) {
+            this.ledgerAccumulator = new StagingAccumulator(
+                createInitialLedgerState(),
+            )
+        }
+        return this.ledgerAccumulator
+    }
+
+    async stageLedgerEvent(
+        envelope: EventEnvelope,
+    ): Promise<{ staged: boolean; hotBufferCount: number; flushed: number }> {
+        const accumulator = this.ensureAccumulator()
+        accumulator.stageEvent(envelope)
+        let flushed = 0
+        if (accumulator.getStagedCount() >= HOT_BUFFER_FLUSH_THRESHOLD) {
+            flushed = (await this.flushHotBufferToD1()).flushed
+        }
+        return {
+            staged: true,
+            hotBufferCount: accumulator.getStagedCount(),
+            flushed,
+        }
+    }
+
+    async flushHotBufferToD1(): Promise<{ flushed: number }> {
+        const accumulator = this.ensureAccumulator()
+        const count = accumulator.getStagedCount()
+        if (count === 0) {
+            return { flushed: 0 }
+        }
+        const statements = accumulator.compileD1BatchStatements(
+            this.sowerEnv.CANON_DB,
+        )
+        if (statements.length > 0) {
+            await this.sowerEnv.CANON_DB.batch(statements)
+        }
+        accumulator.commit()
+        return { flushed: count }
+    }
+
+    async rollbackHotBuffer(): Promise<{ discarded: number }> {
+        const accumulator = this.ensureAccumulator()
+        const discarded = accumulator.getStagedCount()
+        accumulator.rollback()
+        return { discarded }
+    }
+
+    async getLedgerState(): Promise<LedgerState> {
+        return this.ensureAccumulator().getWorkingState()
     }
 
     async acquireMutex(
@@ -68,11 +131,15 @@ export class SowerSessionDO extends DurableObject {
         locked: boolean
         epoch: number
         bufferCount: number
+        hotBufferCount: number
     }> {
         return {
             locked: this.stateMutexLocked,
             epoch: this.currentEpoch,
             bufferCount: this.volatileStagingBuffer.length,
+            hotBufferCount: this.ledgerAccumulator
+                ? this.ledgerAccumulator.getStagedCount()
+                : 0,
         }
     }
 }
