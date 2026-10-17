@@ -267,8 +267,17 @@ const init = async () => {
             }
         }
 
-        // Direct target dispatch if specified via -t / --separator
-        if (idx) {
+        await LIBRARY.hunt(CONSOLE_ACTION_LIBRARY.UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: '>> [READY] Terminal Cockpit active',
+        })
+        await LIBRARY.hunt(CONSOLE_ACTION_LIBRARY.UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: ':: [KEYS] UP/DOWN or J/K: Navigate | ENTER: Select',
+        })
+
+        // Direct target dispatch if specified via -t / --separator (excluding default 'library')
+        if (idx && idx.toLowerCase() !== 'library') {
             const target = existingPackages.find(
                 (p) =>
                     p.name.toLowerCase() === idx.toLowerCase() ||
@@ -329,16 +338,28 @@ const init = async () => {
 // 4. Main Build & Startup Pipeline
 const main = async () => {
     try {
-        console.log('>> [BUILD] Compiling Monorepo TypeScript References...')
         const existingPackages = getExistingPackages()
+        console.log(
+            `>> [BUILD] Compiling ${existingPackages.length + 1} TypeScript References (tsc -b)...`,
+        )
         const buildTargets = [
             '995.library',
             ...existingPackages.map((p) => `../../packages/${p.name}`),
         ].join(' ')
 
+        const startTime = Date.now()
+        const heartbeat = setInterval(() => {
+            const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
+            console.log(`>> [BUILD] Compiling references... (${elapsed}s elapsed)`)
+        }, 3000)
+
         var { stdout, stderr } = await exec(`tsc -b ${buildTargets}`, {
             cwd: import.meta.dirname,
         })
+        clearInterval(heartbeat)
+
+        const totalElapsed = ((Date.now() - startTime) / 1000).toFixed(1)
+        console.log(`>> [BUILD:OK] All references compiled in ${totalElapsed}s`)
 
         if (stdout) console.log(stdout)
         if (stderr) console.error(stderr)
