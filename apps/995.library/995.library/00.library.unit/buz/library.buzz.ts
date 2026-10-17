@@ -1518,6 +1518,10 @@ export interface SagaJournal {
 
 export const getJournalPath = (): string => {
     const path = require('path');
+    const override = process.env.SAGA_JOURNAL_PATH;
+    if (override && override.trim().length > 0) {
+        return path.resolve(override);
+    }
     return path.resolve(process.cwd(), 'data', 'saga', 'active.json');
 };
 

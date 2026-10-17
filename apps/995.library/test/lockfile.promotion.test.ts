@@ -184,14 +184,24 @@ test.serial('promoteLockfileScratchpad [NEG_CONTROL] -- restores backup if promo
     t.is(canonicalOnDisk.library_version, '1.0.12')
 })
 
-test('Reducer routing -- wraps model in clone(model, true) for promotion and ledger actions', (t) => {
+test('Reducer routing -- wraps model in clone(model, true) for promotion and ledger actions', async (t) => {
+    const sandboxDir = path.resolve(process.cwd(), 'scratch_test_mint_routing')
+    const ledgerFile = path.join(sandboxDir, 'routing.ledger.ndjson')
+    await fs.ensureDir(sandboxDir)
+
+    t.teardown(async () => {
+        await fs.remove(sandboxDir).catch(() => {})
+    })
+
     const model = new LibraryModel()
     const actPromote = new ActLib.PromoteLockfileScratchpad({ src: 'test.json' })
-    const actMint = new ActLib.MintLockfileLedger({ src: 'ledger.ndjson' })
+    const actMint = new ActLib.MintLockfileLedger({ src: ledgerFile })
 
-    const reducedPromote = reducer(model, actPromote)
+    const reducedPromote = await reducer(model, actPromote)
     t.truthy(reducedPromote)
 
-    const reducedMint = reducer(model, actMint)
+    const reducedMint = await reducer(model, actMint)
     t.truthy(reducedMint)
+
+    t.true(await fs.pathExists(ledgerFile), 'Mint buzzer must execute into the sandbox ledger, never the real tree')
 })
