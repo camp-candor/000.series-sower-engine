@@ -25,3 +25,6 @@ export { default as hunt } from '../hunt.js'
 export { default as UnitData, list, reducer } from '../BEE.js'
 export * as ActEng from '../00.engine.unit/engine.action.js'
 export * as ActMnu from '../98.menu.unit/menu.action.js'
+
+export * from './canon/types.js';
+export * from './canon/bibleLoader.js';
