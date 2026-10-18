@@ -1,145 +1,86 @@
 import { DurableObject } from 'cloudflare:workers'
-import type { EventEnvelope } from '../core/ledger/events.js'
-import {
-    createInitialLedgerState,
-    type LedgerState,
-} from '../core/ledger/reducer.js'
-import { StagingAccumulator } from '../core/ledger/stagingAccumulator.js'
-
-export const HOT_BUFFER_FLUSH_THRESHOLD = 1000
 
 export interface SowerSessionEnv {
-    CANON_DB: D1Database
-    SOWER_SESSION: DurableObjectNamespace
+  CANON_DB: D1Database
+  SOWER_SESSION: DurableObjectNamespace
 }
 
 export interface StagedSimulationDelta {
-    cycleId: string
-    timestamp: number
-    deltaPayload: Record<string, unknown>
-    verified: boolean
+  cycleId: string
+  timestamp_ms: number
+  deltaPayload: Record<string, unknown>
+  verified: boolean
 }
 
 export class SowerSessionDO extends DurableObject {
-    private stateMutexLocked: boolean = false
-    private volatileStagingBuffer: StagedSimulationDelta[] = []
-    private currentEpoch: number = 0
-    private readonly sowerEnv: SowerSessionEnv
-    private ledgerAccumulator: StagingAccumulator | null = null
+  private stateMutexLocked: boolean = false
+  private volatileStagingBuffer: StagedSimulationDelta[] = []
+  private currentEpoch: number = 0
+  private activeHolderId: string | null = null
 
-    constructor(ctx: DurableObjectState, env: SowerSessionEnv) {
-        super(ctx, env)
-        this.sowerEnv = env
-    }
+  constructor(ctx: DurableObjectState, env: SowerSessionEnv) {
+    super(ctx, env)
+  }
 
-    private ensureAccumulator(): StagingAccumulator {
-        if (!this.ledgerAccumulator) {
-            this.ledgerAccumulator = new StagingAccumulator(
-                createInitialLedgerState(),
-            )
-        }
-        return this.ledgerAccumulator
+  async acquireMutex(callerId: string): Promise<{ acquired: boolean; epoch: number }> {
+    if (this.stateMutexLocked) {
+      return { acquired: false, epoch: this.currentEpoch }
     }
+    this.stateMutexLocked = true
+    this.currentEpoch += 1
+    this.activeHolderId = callerId
+    return { acquired: true, epoch: this.currentEpoch }
+  }
 
-    async stageLedgerEvent(
-        envelope: EventEnvelope,
-    ): Promise<{ staged: boolean; hotBufferCount: number; flushed: number }> {
-        const accumulator = this.ensureAccumulator()
-        accumulator.stageEvent(envelope)
-        let flushed = 0
-        if (accumulator.getStagedCount() >= HOT_BUFFER_FLUSH_THRESHOLD) {
-            flushed = (await this.flushHotBufferToD1()).flushed
-        }
-        return {
-            staged: true,
-            hotBufferCount: accumulator.getStagedCount(),
-            flushed,
-        }
+  async releaseMutex(epoch: number): Promise<{ released: boolean; epoch: number }> {
+    if (this.stateMutexLocked && epoch === this.currentEpoch) {
+      this.stateMutexLocked = false
+      this.activeHolderId = null
+      return { released: true, epoch: this.currentEpoch }
     }
+    return { released: false, epoch: this.currentEpoch }
+  }
 
-    async flushHotBufferToD1(): Promise<{ flushed: number }> {
-        const accumulator = this.ensureAccumulator()
-        const count = accumulator.getStagedCount()
-        if (count === 0) {
-            return { flushed: 0 }
-        }
-        const statements = accumulator.compileD1BatchStatements(
-            this.sowerEnv.CANON_DB,
-        )
-        if (statements.length > 0) {
-            await this.sowerEnv.CANON_DB.batch(statements)
-        }
-        accumulator.commit()
-        return { flushed: count }
+  async stageDelta(
+    delta: StagedSimulationDelta,
+    epoch: number,
+  ): Promise<{ staged: boolean; bufferLength: number }> {
+    if (!this.stateMutexLocked) {
+      throw new Error('[ILLEGAL_MUTATION] Must hold state mutex to stage deltas')
     }
+    if (epoch !== this.currentEpoch) {
+      throw new Error(`[STALE_EPOCH_ZOMBIE] Presented ${epoch}, Active ${this.currentEpoch}`)
+    }
+    this.volatileStagingBuffer.push(delta)
+    return { staged: true, bufferLength: this.volatileStagingBuffer.length }
+  }
 
-    async rollbackHotBuffer(): Promise<{ discarded: number }> {
-        const accumulator = this.ensureAccumulator()
-        const discarded = accumulator.getStagedCount()
-        accumulator.rollback()
-        return { discarded }
+  async discardStaging(epoch: number): Promise<{ discarded: number }> {
+    if (epoch !== this.currentEpoch) {
+      throw new Error(`[STALE_EPOCH_ZOMBIE] Presented ${epoch}, Active ${this.currentEpoch}`)
     }
+    const count = this.volatileStagingBuffer.length
+    this.volatileStagingBuffer = []
+    return { discarded: count }
+  }
 
-    async getLedgerState(): Promise<LedgerState> {
-        return this.ensureAccumulator().getWorkingState()
-    }
+  async drainStaging(): Promise<StagedSimulationDelta[]> {
+    const drained = [...this.volatileStagingBuffer]
+    this.volatileStagingBuffer = []
+    return drained
+  }
 
-    async acquireMutex(
-        _callerId: string,
-    ): Promise<{ acquired: boolean; epoch: number }> {
-        if (this.stateMutexLocked) {
-            return { acquired: false, epoch: this.currentEpoch }
-        }
-        this.stateMutexLocked = true
-        this.currentEpoch += 1
-        return { acquired: true, epoch: this.currentEpoch }
+  async getStatus(): Promise<{
+    locked: boolean
+    epoch: number
+    bufferCount: number
+    holderId: string | null
+  }> {
+    return {
+      locked: this.stateMutexLocked,
+      epoch: this.currentEpoch,
+      bufferCount: this.volatileStagingBuffer.length,
+      holderId: this.activeHolderId,
     }
-
-    async releaseMutex(epoch: number): Promise<boolean> {
-        if (this.stateMutexLocked && epoch === this.currentEpoch) {
-            this.stateMutexLocked = false
-            return true
-        }
-        return false
-    }
-
-    async stageDelta(
-        delta: StagedSimulationDelta,
-    ): Promise<{ staged: boolean; bufferLength: number }> {
-        if (!this.stateMutexLocked) {
-            throw new Error(
-                'ILLEGAL_MUTATION: Cannot stage delta without holding session state mutex',
-            )
-        }
-        this.volatileStagingBuffer.push(delta)
-        return { staged: true, bufferLength: this.volatileStagingBuffer.length }
-    }
-
-    async discardStaging(): Promise<{ discarded: number }> {
-        const count = this.volatileStagingBuffer.length
-        this.volatileStagingBuffer = []
-        return { discarded: count }
-    }
-
-    async drainStaging(): Promise<StagedSimulationDelta[]> {
-        const drained = [...this.volatileStagingBuffer]
-        this.volatileStagingBuffer = []
-        return drained
-    }
-
-    async getStatus(): Promise<{
-        locked: boolean
-        epoch: number
-        bufferCount: number
-        hotBufferCount: number
-    }> {
-        return {
-            locked: this.stateMutexLocked,
-            epoch: this.currentEpoch,
-            bufferCount: this.volatileStagingBuffer.length,
-            hotBufferCount: this.ledgerAccumulator
-                ? this.ledgerAccumulator.getStagedCount()
-                : 0,
-        }
-    }
+  }
 }
