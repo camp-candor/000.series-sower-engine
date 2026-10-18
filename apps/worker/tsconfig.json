@@ -13,5 +13,5 @@
         "noEmit": true
     },
     "include": ["src", "test", "vitest.config.ts", "worker-configuration.d.ts"],
-    "references": []
+    "references": [{ "path": "../../packages/001.engine" }]
 }

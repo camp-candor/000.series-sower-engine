@@ -3,8 +3,6 @@
         "target": "ES2022",
         "module": "NodeNext",
         "moduleResolution": "NodeNext",
-
-        // STRICTNESS LEVEL 100
         "strict": true,
         "noImplicitAny": true,
         "strictNullChecks": true,
@@ -23,6 +21,6 @@
     "exclude": ["node_modules", "dist"],
     "references": [
         { "path": "./packages/100.agent" },
-        { "path": "./apps/worker" }
+        { "path": "./packages/001.engine" }
     ]
 }
