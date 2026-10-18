@@ -11,6 +11,6 @@
         "lib": ["ES2022"],
         "types": ["node", "vitest/globals"]
     },
-    "include": ["src/**/*", "test/**/*"],
+    "include": ["**/*.ts"],
     "exclude": ["node_modules", "dist"]
 }
