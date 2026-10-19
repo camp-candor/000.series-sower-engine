@@ -161,23 +161,30 @@ export interface CanonCheckpointVerificationResult {
     verifiedAtIso: string
 }
 
+/**
+ * Two-Tier Dependency Fingerprint Contracts
+ */
 export interface EntityDependencyNode {
     id: string
-    scope: 'CHARACTER' | 'LOCATION' | 'LOGISTIC' | 'LAW'
-    directFkIds: string[]
+    type: 'character' | 'location' | 'possession' | 'grievance'
+    contentHash: string
+    directFkIds: readonly string[]
 }
 
 export interface DependencyFingerprint {
     entityId: string
+    contentHash: string
     oneHopHash: string
     transitiveHash: string
-    directFkIds: string[]
-    transitiveFkIds: string[]
+    directFkIds: readonly string[]
+    transitiveFkIds: readonly string[]
 }
 
 export interface AdvisoryRebaseResult {
-    entityId: string
     requiresRebase: boolean
-    changedFkIds: string[]
+    entityId: string
+    previousOneHopHash: string
+    currentOneHopHash: string
+    changedFkIds: readonly string[]
     advisoryMessage: string
 }

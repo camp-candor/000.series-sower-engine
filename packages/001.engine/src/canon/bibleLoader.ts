@@ -14,6 +14,7 @@ import type {
 } from './types.js'
 
 export const LOADER_TAG = '[CANON::LOADER]' as const
+export const HDEP_TAG = '[CANON::HDEP]' as const
 
 export class CanonDriftError extends Error {
     constructor(message: string) {
@@ -110,141 +111,185 @@ export function deepFreeze<T>(obj: T): DeepReadonly<T> {
     return Object.freeze(obj) as DeepReadonly<T>
 }
 
+/**
+ * Tier 2: Multi-Hop Transitive Dependency Closure Precomputer (H_dep_transitive)
+ * Recursively walks the dependency DAG, prevents cyclical lockups,
+ * and hashes the canonical sorted set of all reachable upstream nodes.
+ */
 export function computeTransitiveDependencyClosure(
-    rootId: string,
-    graph: Record<string, EntityDependencyNode>,
-): { transitiveHash: string; transitiveFkIds: string[] } {
-    const visited = new Set<string>()
+    targetId: string,
+    dependencyGraph: Record<string, EntityDependencyNode>,
+): { transitiveHash: string; transitiveFkIds: readonly string[] } {
+    const targetNode = dependencyGraph[targetId]
+    if (!targetNode) {
+        throw new CanonValidationError(
+            `Entity [${targetId}] not found in dependency graph.`,
+        )
+    }
 
-    function traverse(nodeId: string) {
-        if (visited.has(nodeId)) return
-        visited.add(nodeId)
-        const node = graph[nodeId]
+    const visitedFkIds = new Set<string>()
+    const ancestorHashes: string[] = [targetNode.contentHash]
+
+    function walk(currentId: string) {
+        const node = dependencyGraph[currentId]
         if (!node) return
 
         for (const fkId of node.directFkIds) {
-            traverse(fkId)
+            // Root-excluded closure (ag-test 016 L3.2, authoritative over the
+            // original 015 reference walk): a node is not its own dependency,
+            // so a cycle back-edge to targetId contributes neither an fkId
+            // nor a duplicate copy of the target content hash.
+            if (fkId === targetId) continue
+            if (!visitedFkIds.has(fkId)) {
+                visitedFkIds.add(fkId)
+                const fkNode = dependencyGraph[fkId]
+                if (fkNode) {
+                    ancestorHashes.push(fkNode.contentHash)
+                    walk(fkId)
+                }
+            }
         }
     }
 
-    traverse(rootId)
-    visited.delete(rootId) // Exclude root from its own dependencies
+    walk(targetId)
 
-    const transitiveFkIds = Array.from(visited).sort()
+    // Deterministically sort hashes lexicographically by UTF-16 code units (RFC 8785)
+    const sortedHashes = [...ancestorHashes].sort((a, b) =>
+        a < b ? -1 : a > b ? 1 : 0,
+    )
+    const sortedFkIds = Array.from(visitedFkIds).sort((a, b) =>
+        a < b ? -1 : a > b ? 1 : 0,
+    )
 
-    // Create a dummy transitiveHash. `buildTwoTierDependencyFingerprints`
-    // computes the real transitiveHash but tests call this method directly
-    // expecting transitiveHash length 64.
-    // "closure.transitiveHash must not throw stack overflow"
-    const transitiveHash = computeSha256(transitiveFkIds.join(','))
-    return { transitiveHash, transitiveFkIds }
+    return {
+        transitiveHash: computeSha256(rfc8785Canonicalize(sortedHashes)),
+        transitiveFkIds: sortedFkIds,
+    }
 }
 
-export function extractDependencyGraph(state: BibleState): Record<string, EntityDependencyNode> {
+/**
+ * Extracts normalized dependency nodes across all entities in a BibleState
+ */
+export function extractDependencyGraph(
+    bibleState: BibleState | SealedBibleState,
+): Record<string, EntityDependencyNode> {
+    const raw = 'rawState' in bibleState ? bibleState.rawState : bibleState
     const graph: Record<string, EntityDependencyNode> = {}
 
-    for (const char of Object.values(state.characters)) {
-        const directFkIds: string[] = []
-        if (char.logistical.held) directFkIds.push(...char.logistical.held)
-        if (char.logistical.slung) directFkIds.push(...char.logistical.slung)
-        if (char.logistical.worn) directFkIds.push(...Object.values(char.logistical.worn))
-        // Is factionId a direct fk? The test says: "item_brass_nozzle" is in char_silas.directFkIds.
-        // Also: "char_silas" is in item_brass_nozzle.directFkIds.
-        // Also: "char_silas" is in grv_spurl_debt.directFkIds.
+    // Characters -> equip items, locations, faction
+    for (const [id, char] of Object.entries(raw.characters)) {
+        const fks = new Set<string>()
+        char.logistical.held.forEach((item) => fks.add(item))
+        Object.values(char.logistical.worn).forEach((item) => fks.add(item))
+        char.logistical.slung.forEach((item) => fks.add(item))
 
-        graph[char.id] = {
-            id: char.id,
-            scope: char.scope,
-            directFkIds,
+        graph[id] = {
+            id,
+            type: 'character',
+            contentHash: computeEntityContentHash(char),
+            directFkIds: Array.from(fks).sort((a, b) =>
+                a < b ? -1 : a > b ? 1 : 0,
+            ),
         }
     }
 
-    for (const loc of Object.values(state.locations)) {
-        const directFkIds: string[] = []
-        if (loc.portals) directFkIds.push(...loc.portals)
-        graph[loc.id] = {
-            id: loc.id,
-            scope: loc.scope,
-            directFkIds,
+    // Locations -> portals
+    for (const [id, loc] of Object.entries(raw.locations)) {
+        graph[id] = {
+            id,
+            type: 'location',
+            contentHash: computeEntityContentHash(loc),
+            directFkIds: [...loc.portals].sort((a, b) =>
+                a < b ? -1 : a > b ? 1 : 0,
+            ),
         }
     }
 
-    for (const item of Object.values(state.possessions)) {
-        const directFkIds: string[] = []
-        if (item.holderId) directFkIds.push(item.holderId)
-        graph[item.id] = {
-            id: item.id,
-            scope: item.scope,
-            directFkIds,
+    // Possessions -> holder character
+    for (const [id, item] of Object.entries(raw.possessions)) {
+        const fks: string[] = []
+        if (item.holderId) fks.push(item.holderId)
+
+        graph[id] = {
+            id,
+            type: 'possession',
+            contentHash: computeEntityContentHash(item),
+            directFkIds: fks,
         }
     }
 
-    for (const grv of Object.values(state.grievances)) {
-        const directFkIds: string[] = []
-        if (grv.sourceActorId) directFkIds.push(grv.sourceActorId)
-        if (grv.targetActorId) directFkIds.push(grv.targetActorId)
-        if (grv.escalatesToId) directFkIds.push(grv.escalatesToId)
-        graph[grv.id] = {
-            id: grv.id,
-            scope: grv.scope,
-            directFkIds: Array.from(new Set(directFkIds)),
+    // Grievances -> disputant characters, escalated grievance
+    for (const [id, grv] of Object.entries(raw.grievances)) {
+        const fks = new Set<string>([grv.sourceActorId, grv.targetActorId])
+        if (grv.escalatesToId) fks.add(grv.escalatesToId)
+
+        graph[id] = {
+            id,
+            type: 'grievance',
+            contentHash: computeEntityContentHash(grv),
+            directFkIds: Array.from(fks).sort((a, b) =>
+                a < b ? -1 : a > b ? 1 : 0,
+            ),
         }
     }
 
     return graph
 }
 
-export function buildTwoTierDependencyFingerprints(state: BibleState): Record<string, DependencyFingerprint> {
-    const graph = extractDependencyGraph(state)
-    const result: Record<string, DependencyFingerprint> = {}
-
-    // Create a flat map of entities for content hashing
-    const entities: Record<string, any> = {}
-    for (const char of Object.values(state.characters)) entities[char.id] = char
-    for (const loc of Object.values(state.locations)) entities[loc.id] = loc
-    for (const item of Object.values(state.possessions)) entities[item.id] = item
-    for (const grv of Object.values(state.grievances)) entities[grv.id] = grv
-
-    // Pre-compute content hashes
-    const contentHashes: Record<string, string> = {}
-    for (const [id, entity] of Object.entries(entities)) {
-        contentHashes[id] = computeEntityContentHash(entity)
-    }
+/**
+ * Computes full two-tier fingerprints (1-Hop + Transitive Closure) for every entity in a BibleState
+ */
+export function buildTwoTierDependencyFingerprints(
+    bibleState: BibleState | SealedBibleState,
+): Record<string, DependencyFingerprint> {
+    const graph = extractDependencyGraph(bibleState)
+    const fingerprints: Record<string, DependencyFingerprint> = {}
 
     for (const [id, node] of Object.entries(graph)) {
-        const fkHashes = node.directFkIds.map(fkId => contentHashes[fkId]).filter(Boolean)
-        const oneHopHash = compute1HopDependencyHash(contentHashes[id], fkHashes)
+        const fkHashes = node.directFkIds
+            .map((fkId) => graph[fkId]?.contentHash)
+            .filter((h): h is string => Boolean(h))
 
+        const oneHopHash = compute1HopDependencyHash(node.contentHash, fkHashes)
         const closure = computeTransitiveDependencyClosure(id, graph)
-        const transFkHashes = closure.transitiveFkIds.map(fkId => contentHashes[fkId]).filter(Boolean)
-        const transitiveHash = compute1HopDependencyHash(contentHashes[id], transFkHashes)
 
-        result[id] = {
+        fingerprints[id] = {
             entityId: id,
+            contentHash: node.contentHash,
             oneHopHash,
-            transitiveHash,
+            transitiveHash: closure.transitiveHash,
             directFkIds: node.directFkIds,
             transitiveFkIds: closure.transitiveFkIds,
         }
     }
 
-    return result
+    return fingerprints
 }
 
+/**
+ * Non-blocking 1-Hop Advisory Comparison Engine
+ * Compares cached 1-hop hash against active 1-hop hash to generate UI rebase guidance.
+ */
 export function compareOneHopAdvisory(
     entityId: string,
-    prevHash: string,
-    currHash: string,
-    changedFkIds: string[] = []
+    previousOneHopHash: string,
+    currentOneHopHash: string,
+    changedFkIds: readonly string[] = [],
 ): AdvisoryRebaseResult {
-    const requiresRebase = prevHash !== currHash
+    const requiresRebase =
+        previousOneHopHash.toLowerCase() !== currentOneHopHash.toLowerCase()
+
+    const advisoryMessage = requiresRebase
+        ? `${HDEP_TAG} [ADVISORY] Upstream canon modified for [${entityId}]. Direct foreign keys changed: [${changedFkIds.join(', ') || 'DIRECT_LINK'}]. Click Rebase to synchronize draft.`
+        : `${HDEP_TAG} [OK] 1-hop dependency hash aligned for [${entityId}]. No draft rebase required.`
+
     return {
-        entityId,
         requiresRebase,
+        entityId,
+        previousOneHopHash: previousOneHopHash.toLowerCase(),
+        currentOneHopHash: currentOneHopHash.toLowerCase(),
         changedFkIds,
-        advisoryMessage: requiresRebase
-            ? `[ADVISORY] Rebase required for entity ${entityId}. Hashes diverged.`
-            : `[OK] Entity ${entityId} is stable.`
+        advisoryMessage,
     }
 }
 
