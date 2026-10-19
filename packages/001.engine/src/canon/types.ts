@@ -160,3 +160,24 @@ export interface CanonCheckpointVerificationResult {
     isDirty: boolean
     verifiedAtIso: string
 }
+
+export interface EntityDependencyNode {
+    id: string
+    scope: 'CHARACTER' | 'LOCATION' | 'LOGISTIC' | 'LAW'
+    directFkIds: string[]
+}
+
+export interface DependencyFingerprint {
+    entityId: string
+    oneHopHash: string
+    transitiveHash: string
+    directFkIds: string[]
+    transitiveFkIds: string[]
+}
+
+export interface AdvisoryRebaseResult {
+    entityId: string
+    requiresRebase: boolean
+    changedFkIds: string[]
+    advisoryMessage: string
+}
