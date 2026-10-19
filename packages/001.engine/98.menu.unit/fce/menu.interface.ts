@@ -1,3 +1,3 @@
 export default interface Menu {
-  idx: string
+    idx: string
 }

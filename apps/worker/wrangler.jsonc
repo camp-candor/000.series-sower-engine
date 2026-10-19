@@ -1,31 +1,31 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "worker-sower-engine",
-  "main": "src/index.ts",
-  "compatibility_date": "2026-10-14",
-  "compatibility_flags": ["nodejs_compat"],
-  "durable_objects": {
-    "bindings": [
-      {
-        "name": "SOWER_SESSION",
-        "class_name": "SowerSessionDO"
-      }
-    ]
-  },
-  "migrations": [
-    {
-      "tag": "v1",
-      "new_sqlite_classes": ["SowerSessionDO"]
-    }
-  ],
-  "d1_databases": [
-    {
-      "binding": "CANON_DB",
-      "database_name": "series-canon-db",
-      "database_id": "00000000-0000-0000-0000-000000000000"
-    }
-  ],
-  "observability": {
-    "enabled": true
-  }
+    "$schema": "node_modules/wrangler/config-schema.json",
+    "name": "worker-sower-engine",
+    "main": "src/index.ts",
+    "compatibility_date": "2026-10-14",
+    "compatibility_flags": ["nodejs_compat"],
+    "durable_objects": {
+        "bindings": [
+            {
+                "name": "SOWER_SESSION",
+                "class_name": "SowerSessionDO",
+            },
+        ],
+    },
+    "migrations": [
+        {
+            "tag": "v1",
+            "new_sqlite_classes": ["SowerSessionDO"],
+        },
+    ],
+    "d1_databases": [
+        {
+            "binding": "CANON_DB",
+            "database_name": "series-canon-db",
+            "database_id": "00000000-0000-0000-0000-000000000000",
+        },
+    ],
+    "observability": {
+        "enabled": true,
+    },
 }

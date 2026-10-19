@@ -14,11 +14,11 @@ import * as reduceFromMenu from './98.menu.unit/menu.reduce.js'
 export const list: any[] = [EngineUnit, MenuUnit]
 
 export const reducer: any = {
-  engine: reduceFromEngine.reducer,
-  menu: reduceFromMenu.reducer,
+    engine: reduceFromEngine.reducer,
+    menu: reduceFromMenu.reducer,
 }
 
 export default class UnitData implements Model {
-  engine: Engine = new EngineModel()
-  menu: Menu = new MenuModel()
+    engine: Engine = new EngineModel()
+    menu: Menu = new MenuModel()
 }

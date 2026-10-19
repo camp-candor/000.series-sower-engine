@@ -1,5 +1,5 @@
 export default interface Engine {
-  idx: string
-  status: string
-  val: number
+    idx: string
+    status: string
+    val: number
 }
