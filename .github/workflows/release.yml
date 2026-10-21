@@ -50,8 +50,8 @@ jobs:
 
             - name: Mint and Publish GitHub Release
               env:
-                  GH_TOKEN: ${{ github.token }}
-                  GITHUB_TOKEN: ${{ github.token }}
+                  GH_TOKEN: ${{ secrets.GH_TOKEN || github.token }}
+                  GITHUB_TOKEN: ${{ secrets.GH_TOKEN || github.token }}
               run: |
                   TAG_NAME="${{ github.ref_name }}"
                   echo "Publishing automated GitHub Release for ${TAG_NAME}..."
