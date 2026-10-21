@@ -32,7 +32,7 @@ jobs:
               uses: actions/checkout@v4
               with:
                   fetch-depth: 0
-                  token: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
+                  token: ${{ github.token }}
 
             - name: Setup Node Runtime
               uses: actions/setup-node@v4
@@ -63,6 +63,7 @@ jobs:
                   # --no-workspaces guarantees child packages are NOT mutated
                   npm version ${{ inputs.bump_type }} --no-workspaces -m "chore(release): v%s"
                   NEW_TAG=$(node -e "console.log('v' + require('./package.json').version)")
+                  echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_ENV
                   echo ">> Successfully created version tag: ${NEW_TAG}"
 
             - name: Assert Boundary Integrity Post-Bump
@@ -77,8 +78,20 @@ jobs:
 
             - name: Push Commit and Tag to Remote Trunk
               env:
-                  GITHUB_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
+                  GITHUB_TOKEN: ${{ github.token }}
               run: |
                   echo ">> Pushing bump commit and tag to origin main..."
                   git push origin main --follow-tags
-                  echo ">> [OK] Tag pushed successfully. Companion release.yml workflow will handle publication."
+                  echo ">> [OK] Tag pushed successfully."
+
+            - name: Mint and Publish GitHub Release
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  GITHUB_TOKEN: ${{ github.token }}
+              run: |
+                  echo ">> Minting automated GitHub Release for ${NEW_TAG}..."
+                  gh release create "${NEW_TAG}" \
+                    --title "${NEW_TAG}: Edge DevOps Control Plane & Autonomous Agent Boilerplate" \
+                    --generate-notes \
+                    --latest
+                  echo ">> [OK] GitHub Release for ${NEW_TAG} published successfully."
