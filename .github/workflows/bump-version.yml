@@ -32,7 +32,7 @@ jobs:
               uses: actions/checkout@v4
               with:
                   fetch-depth: 0
-                  token: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
+                  token: ${{ github.token }}
 
             - name: Setup Node Runtime
               uses: actions/setup-node@v4
@@ -77,7 +77,7 @@ jobs:
 
             - name: Push Commit and Tag to Remote Trunk
               env:
-                  GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
+                  GITHUB_TOKEN: ${{ github.token }}
               run: |
                   echo ">> Pushing bump commit and tag to origin main..."
                   git push origin main --follow-tags
