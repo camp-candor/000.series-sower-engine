@@ -1,9 +1,11 @@
 {
     "name": "@camp_candor/995.library",
-    "version": "0.2.1",
+    "version": "0.4.2",
     "private": true,
     "scripts": {
-        "dev": "npx tsx run.ts -t pivot",
+        "dev": "npx tsx run.ts",
+        "dev:pivot": "npx tsx run.ts -t pivot",
+        "dev:cauldron": "npx tsx run.ts -t cauldron",
         "test": "ava",
         "check:gauntlet": "ava test/gauntlet.verification.test.ts"
     },

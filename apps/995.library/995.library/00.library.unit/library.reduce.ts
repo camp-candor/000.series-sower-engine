@@ -40,11 +40,44 @@ export function reducer(
         case Act.AUDIT_LIBRARY:
             return Buzz.auditLibrary(clone(model, true), act.bale, state)
 
+        case Act.BUMP_FLEET_VERSION:
+            return Buzz.bumpFleetVersion(clone(model, true), act.bale, state)
+
         case Act.CHECK_GIT_WORKING_TREE:
             return Buzz.checkGitWorkingTree(act.bale.src || process.cwd()).then(() => clone(model, true))
+
+        case Act.STAGE_LOCKFILE_CONFLICT:
+            return Buzz.stageLockfileConflict(clone(model, true), act.bale, state)
+
+        case Act.PURGE_LOCKFILE_SCRATCHPAD:
+            return Buzz.purgeLockfileScratchpad(clone(model, true), act.bale, state)
+
+
+        case Act.VALIDATE_LOCKFILE_SCRATCHPAD:
+            return Buzz.validateLockfileScratchpad(clone(model, true), act.bale, state)
+
+        case Act.RESOLVE_LOCKFILE_HUMAN_GATE:
+            return Buzz.resolveLockfileHumanGate(clone(model, true), act.bale, state)
+
+
+        case Act.PROMOTE_LOCKFILE_SCRATCHPAD:
+            return Buzz.promoteLockfileScratchpad(clone(model, true), act.bale, state)
+
+        case Act.MINT_LOCKFILE_LEDGER:
+            return Buzz.mintLockfileLedger(clone(model, true), act.bale, state)
+
+        case Act.OPEN_HUMAN_SAVE_GATE:
+            return Buzz.openHumanSaveGate(clone(model, true), act.bale as any, state)
+
+        case Act.CHECK_SOVEREIGNTY:
+            return Buzz.checkSovereigntyInterlock(act.bale.src).then(() => clone(model, true))
+
+        case Act.REWIRE_LIBRARY:
+            return Buzz.rewireLibrary(clone(model, true), act.bale, state)
 
         default:
             return model
     }
 }
+
 

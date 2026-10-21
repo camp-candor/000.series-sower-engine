@@ -120,6 +120,14 @@ export const openMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         idx: 'cns00',
         src: '-----------',
     })
+    bit = await ste.hunt(ActCns.UPDATE_CONSOLE, {
+        idx: 'cns00',
+        src: '>> [READY] Master Library Cockpit Active',
+    })
+    bit = await ste.hunt(ActCns.UPDATE_CONSOLE, {
+        idx: 'cns00',
+        src: ':: [KEYS] UP/DOWN or J/K: Navigate | ENTER: Select',
+    })
 
     updateMenu(cpy, bal, ste)
     return cpy

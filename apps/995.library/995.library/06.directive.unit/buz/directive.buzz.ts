@@ -143,7 +143,7 @@ export const createDirective = async (
             })
         }
 
-        // 1. Calculate the next monotonic sequential index prefix
+        // 1. Calculate the next monotonic sequential index prefix (< 800 boundary reserved)
         const existingEntries = await fs.readdir(targetDayDir)
         let maxPrefix = -1
 
@@ -151,7 +151,7 @@ export const createDirective = async (
             const match = entry.match(/^(\d{3})\./)
             if (match) {
                 const num = parseInt(match[1], 10)
-                if (num > maxPrefix) {
+                if (num < 800 && num > maxPrefix) {
                     maxPrefix = num
                 }
             }
@@ -191,27 +191,19 @@ export const createDirective = async (
             })
         }
 
-        // 3. Read base templates for Jules and Gravity/AG-Test pairs
+        // 3. Read base templates for Jules and AG-Test pairs
         const julesTemplateContent = await readTemplateContent([
             '000.xxxx.jules.md',
             '000.xxxx.jules',
             '000.jules.md',
         ])
 
-        const gravityTemplateContent = await readTemplateContent([
-            '000.xxxxx.gravity.md',
-            '000.xxxxx.gravity',
+        const agTestTemplateContent = await readTemplateContent([
             '000.xxxxx.ag-test.md',
             '000.xxxxx.ag-test',
+            '000.xxxxx.gravity.md',
+            '000.xxxxx.gravity',
         ])
-
-        let checkExt = 'gravity.md'
-        if (
-            (await fs.pathExists(path.join(templateDayDir, '000.xxxxx.ag-test.md'))) &&
-            !(await fs.pathExists(path.join(templateDayDir, '000.xxxxx.gravity.md')))
-        ) {
-            checkExt = 'ag-test.md'
-        }
 
         // 4. Provision sequential phase pairs
         for (let p = 1; p <= phaseCount; p++) {
@@ -231,15 +223,15 @@ export const createDirective = async (
             }
 
             currentSeq++
-            const gravityFileName = `${pad3(currentSeq)}.phase-${phaseWord}.${checkExt}`
-            const gravityFilePath = path.join(targetDayDir, gravityFileName)
-            await fs.writeFile(gravityFilePath, gravityTemplateContent, 'utf8')
-            createdFiles.push(gravityFileName)
+            const agTestFileName = `${pad3(currentSeq)}.phase-${phaseWord}.ag-test.md`
+            const agTestFilePath = path.join(targetDayDir, agTestFileName)
+            await fs.writeFile(agTestFilePath, agTestTemplateContent, 'utf8')
+            createdFiles.push(agTestFileName)
 
             if (ste) {
                 await ste.hunt(ActCns.UPDATE_CONSOLE, {
                     idx: 'cns00',
-                    src: `>> [OK] writing data/directive/${targetDay}/${gravityFileName}`,
+                    src: `>> [OK] writing data/directive/${targetDay}/${agTestFileName}`,
                 })
             }
         }
@@ -455,14 +447,14 @@ export const phaseDirective = async (
             const prefixMatch = filename.match(/^(\d{3})\./)
             if (prefixMatch) {
                 const prefixNum = parseInt(prefixMatch[1], 10)
-                if (prefixNum > maxPrefix) {
+                if (prefixNum < 800 && prefixNum > maxPrefix) {
                     maxPrefix = prefixNum
                 }
 
                 // Check if this file represents a phase directive
                 const phaseMatch = filename.match(/^(\d{3})\.phase-([a-zA-Z0-9]+)\./i)
                 if (phaseMatch) {
-                    if (prefixNum > highestPhaseFilePrefix) {
+                    if (prefixNum < 800 && prefixNum > highestPhaseFilePrefix) {
                         highestPhaseFilePrefix = prefixNum
                         lastPhaseWord = phaseMatch[2]
                     }

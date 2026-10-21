@@ -26,6 +26,7 @@ import {
 const cleanEnv = () => {
     delete process.env.FLEET_ROOT
     delete process.env.WORK_DIR
+    delete process.env.SAGA_JOURNAL_PATH
 }
 
 test.beforeEach(() => {
@@ -603,12 +604,16 @@ test.serial('progressLibrarySaga: aborts before staging when target tree is dirt
     const gitRoot = (await resolveGitRoot(process.cwd()))!
     const dirtyTarget = path.join(gitRoot, 'test_saga_dirty_target_real')
     const dirtyFile = path.join(dirtyTarget, 'agent.ts')
+    const journalSandbox = path.resolve(process.cwd(), 'scratch_saga_dirty_journal')
 
     await fs.ensureDir(dirtyTarget)
     await fs.writeFile(dirtyFile, '// Important unsaved work')
+    await fs.ensureDir(journalSandbox)
+    process.env.SAGA_JOURNAL_PATH = path.join(journalSandbox, 'active.json')
 
     t.teardown(async () => {
         await fs.remove(dirtyTarget).catch(() => {})
+        await fs.remove(journalSandbox).catch(() => {})
     })
 
     let resolvedResult: any = null
@@ -851,7 +856,21 @@ test.serial('retryAtomicRename: successfully renames and handles transient retri
     t.true(await fs.pathExists(destFile));
 });
 
-test.serial('Phase 3 Journal: writes and flushes active saga state to data/saga/active.json', async (t) => {
+test.serial('getJournalPath -- honors SAGA_JOURNAL_PATH override and defaults to cwd data/saga/active.json', (t) => {
+    delete process.env.SAGA_JOURNAL_PATH;
+    t.is(getJournalPath(), path.resolve(process.cwd(), 'data', 'saga', 'active.json'));
+
+    const sandboxOverride = path.join('scratch_journal_override', 'nested', 'active.json');
+    process.env.SAGA_JOURNAL_PATH = sandboxOverride;
+    t.is(getJournalPath(), path.resolve(sandboxOverride));
+
+    delete process.env.SAGA_JOURNAL_PATH;
+});
+
+test.serial('Phase 3 Journal: writes and flushes active saga state to the resolved journal path', async (t) => {
+    const sandboxDir = path.resolve(process.cwd(), 'scratch_journal_write_test');
+    await fs.ensureDir(sandboxDir);
+    process.env.SAGA_JOURNAL_PATH = path.join(sandboxDir, 'active.json');
     const journalFile = getJournalPath();
     const mockJournal: SagaJournal = {
         sagaId: 'test-saga-001',
@@ -868,7 +887,7 @@ test.serial('Phase 3 Journal: writes and flushes active saga state to data/saga/
     };
 
     t.teardown(async () => {
-        await fs.remove(path.dirname(journalFile)).catch(() => {});
+        await fs.remove(sandboxDir).catch(() => {});
     });
 
     await writeSagaJournal(mockJournal);
@@ -902,9 +921,11 @@ test.serial('Phase 3 Compensation: reverses multi-target fleet mutations in reve
     await fs.writeFile(path.join(backupB, 'version.txt'), 'ORIGINAL_B');
     await fs.writeFile(path.join(targetB, 'version.txt'), 'MUTATED_B');
 
+    const journalFile = path.join(sandboxDir, 'saga', 'active.json');
+    process.env.SAGA_JOURNAL_PATH = journalFile;
+
     t.teardown(async () => {
         await fs.remove(sandboxDir).catch(() => {});
-        await fs.remove(path.dirname(getJournalPath())).catch(() => {});
     });
 
     const mockJournal: SagaJournal = {
@@ -940,11 +961,16 @@ test.serial('Phase 3 Compensation: reverses multi-target fleet mutations in reve
 
     // Assert journal recorded COMPENSATED status
     t.is(mockJournal.status, 'COMPENSATED');
+
+    // Assert sandbox journal file persisted the COMPENSATED status
+    const persisted = await fs.readJson(journalFile);
+    t.is(persisted.status, 'COMPENSATED');
 });
 
 test.serial('Phase 3 Finalize: sweeps lingering backups and unlinks active journal file on success', async (t) => {
     const sandboxDir = path.resolve(process.cwd(), 'scratch_finalize_test');
     const backupDir = path.join(sandboxDir, '.tmp_backup_clean');
+    process.env.SAGA_JOURNAL_PATH = path.join(sandboxDir, 'saga', 'active.json');
     const journalFile = getJournalPath();
 
     await fs.ensureDir(backupDir);
@@ -952,7 +978,6 @@ test.serial('Phase 3 Finalize: sweeps lingering backups and unlinks active journ
 
     t.teardown(async () => {
         await fs.remove(sandboxDir).catch(() => {});
-        await fs.remove(path.dirname(journalFile)).catch(() => {});
     });
 
     const mockJournal: SagaJournal = {

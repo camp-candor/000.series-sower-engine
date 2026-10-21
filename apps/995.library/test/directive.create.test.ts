@@ -30,7 +30,7 @@ test.serial(
 
         await fs.writeFile(path.join(day000Dir, '000.focus.cpn'), '// Focus divider template')
         await fs.writeFile(path.join(day000Dir, '000.xxxx.jules.md'), '# Jules template')
-        await fs.writeFile(path.join(day000Dir, '000.xxxxx.gravity.md'), '# Gravity template')
+        await fs.writeFile(path.join(day000Dir, '000.xxxxx.ag-test.md'), '# AG-Test template')
 
         await fs.writeJson(path.join(scratchRoot, 'package.json'), {
             name: 'test-monorepo',
@@ -100,7 +100,7 @@ test.serial(
         // Seed day-000 templates
         await fs.writeFile(path.join(day000Dir, '000.focus.cpn'), '// Focus divider template')
         await fs.writeFile(path.join(day000Dir, '000.xxxx.jules.md'), '# Jules task template')
-        await fs.writeFile(path.join(day000Dir, '000.xxxxx.gravity.md'), '# Gravity verification template')
+        await fs.writeFile(path.join(day000Dir, '000.xxxxx.ag-test.md'), '# AG-Test verification template')
 
         // Seed existing files in day-003 up to 000
         await fs.writeFile(path.join(day003Dir, '000.focus.cpn'), '// Initial day-003 focus')
@@ -150,9 +150,9 @@ test.serial(
         // Assert exact sequential files exist in day-003
         t.true(await fs.pathExists(path.join(day003Dir, '001.modernize-media-pipeline.cpn')))
         t.true(await fs.pathExists(path.join(day003Dir, '002.phase-one.jules.md')))
-        t.true(await fs.pathExists(path.join(day003Dir, '003.phase-one.gravity.md')))
+        t.true(await fs.pathExists(path.join(day003Dir, '003.phase-one.ag-test.md')))
         t.true(await fs.pathExists(path.join(day003Dir, '004.phase-two.jules.md')))
-        t.true(await fs.pathExists(path.join(day003Dir, '005.phase-two.gravity.md')))
+        t.true(await fs.pathExists(path.join(day003Dir, '005.phase-two.ag-test.md')))
 
         // Verify content was transferred from templates
         const cpnContent = await fs.readFile(
@@ -173,7 +173,7 @@ test.serial(
         await fs.ensureDir(day003Dir)
 
         // Seed up to index 005
-        await fs.writeFile(path.join(day003Dir, '005.phase-two.gravity.md'), '')
+        await fs.writeFile(path.join(day003Dir, '005.phase-two.ag-test.md'), '')
 
         await fs.writeJson(path.join(scratchRoot, 'package.json'), {
             name: 'test-monorepo',
@@ -209,6 +209,60 @@ test.serial(
         // Expected sequence starts at 006
         t.true(await fs.pathExists(path.join(day003Dir, '006.enforce-type-contracts.cpn')))
         t.true(await fs.pathExists(path.join(day003Dir, '007.phase-one.jules.md')))
-        t.true(await fs.pathExists(path.join(day003Dir, '008.phase-one.gravity.md')))
+        t.true(await fs.pathExists(path.join(day003Dir, '008.phase-one.ag-test.md')))
+    },
+)
+
+test.serial(
+    'createDirective [BOUNDARY_RESERVATION] -- ignores boundary files >= 800 (refinement and checklist)',
+    async (t) => {
+        const scratchRoot = path.resolve(process.cwd(), 'scratch_test_boundary_reserve')
+        await fs.ensureDir(scratchRoot)
+
+        const day001Dir = path.join(scratchRoot, 'data', 'directive', 'day-001')
+        await fs.ensureDir(day001Dir)
+
+        // Seed 000 templates and 800/900 boundary files as provisioned by dayDirective
+        await fs.writeFile(path.join(day001Dir, '000.focus.cpn'), '// Focus template')
+        await fs.writeFile(path.join(day001Dir, '800.refinement.cpn'), '// Refinement')
+        await fs.writeFile(path.join(day001Dir, '900.check-list.cpn'), '// Checklist')
+
+        await fs.writeJson(path.join(scratchRoot, 'package.json'), {
+            name: 'test-monorepo',
+            workspaces: ['apps/*', 'packages/*'],
+        })
+        await fs.ensureDir(path.join(scratchRoot, 'apps'))
+        await fs.ensureDir(path.join(scratchRoot, 'packages'))
+
+        t.teardown(async () => {
+            await fs.remove(scratchRoot).catch(() => {})
+        })
+
+        let resolvedResult: any = null
+        const bal = {
+            src: 'day-001',
+            idx: 'facts-ledger',
+            val: 2,
+            slv: (res: any) => {
+                resolvedResult = res
+            },
+        }
+
+        const originalCwd = process.cwd
+        process.cwd = () => scratchRoot
+
+        try {
+            await createDirective(new DirectiveModel(), bal as any, null as any)
+        } finally {
+            process.cwd = originalCwd
+        }
+
+        t.truthy(resolvedResult)
+        // Must start at 001, not 901
+        t.true(await fs.pathExists(path.join(day001Dir, '001.facts-ledger.cpn')))
+        t.true(await fs.pathExists(path.join(day001Dir, '002.phase-one.jules.md')))
+        t.true(await fs.pathExists(path.join(day001Dir, '003.phase-one.ag-test.md')))
+        t.true(await fs.pathExists(path.join(day001Dir, '004.phase-two.jules.md')))
+        t.true(await fs.pathExists(path.join(day001Dir, '005.phase-two.ag-test.md')))
     },
 )
