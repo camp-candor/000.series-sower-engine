@@ -1,2 +1,10 @@
-export { initWounds  } from "./buz/wounds.buzz";
-export { updateWounds  } from "./buz/wounds.buzz";
+export {
+  initWounds,
+  updateWounds,
+  addWound,
+  computeSomaticMaskWounds,
+  assertKineticVerbsWounds,
+  compileSomaticMask,
+  VERB_FAMILIES,
+  CONDITION_VERB_ROLLUP,
+} from './buz/wounds.buzz';

@@ -1,8 +1,7 @@
-import Movement from "./fce/movement.interface";
-import MovementBit from "./fce/movement.interface";
+import type Movement from './fce/movement.interface';
+import type { ActorSpatialPosition } from './fce/movement.interface';
 
 export class MovementModel implements Movement {
- //idx:string;
- //movementBitList: MovementBit[] = [];
- //movementBits: any = {};
+  idx = '11.movement';
+  positions: Record<string, ActorSpatialPosition> = {};
 }

@@ -1,2 +1,10 @@
-export { initInventory  } from "./buz/inventory.buzz";
-export { updateInventory  } from "./buz/inventory.buzz";
+export {
+    initInventory,
+    updateInventory,
+    setArmsCapacity,
+    transferInventory,
+    dropExcessHeldInventory,
+    assertMassConservationInventory,
+    validateHandCapacity,
+    createDefaultInventoryState,
+} from './buz/inventory.buzz'

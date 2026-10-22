@@ -130,6 +130,244 @@ const runBreachProbe = async (ste: State) => {
     }
 }
 
+const printSomaticProjection = async () => {
+    if ((global as any).LIBRARY) {
+        await (global as any).LIBRARY.hunt(UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: '>> [SOMATIC PANOPTICON] char_wart (Gait: LIMPING)',
+        })
+        await (global as any).LIBRARY.hunt(UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: '>> OPEN WOUNDS      : [SEVERED_LEFT_ARM]',
+        })
+        await (global as any).LIBRARY.hunt(UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: '>> ARMS AVAILABLE   : 1.0 / 2.0',
+        })
+        await (global as any).LIBRARY.hunt(UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: '>> BANNED VERBS (9) : BIMANUAL_LIFT, CLIMB, EMBRACE, GRAPPLE_TWO_HANDED, HEAVE, PRY_BILATERAL, SPRINT, VAULT, WRENCH',
+        })
+        await (global as any).LIBRARY.hunt(UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: '>> AUDIT STATUS     : [OK] O(1) Set-Intersection Gate Online',
+        })
+        await (global as any).LIBRARY.hunt(UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: '>> AVAILABLE ARMS: 1.0 / 2.0 (Trauma: SEVERED_LEFT_ARM)',
+        })
+        await (global as any).LIBRARY.hunt(UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: '>> LOCOMOTION    : LIMPING (Pain: 6,000 bps)',
+        })
+        await (global as any).LIBRARY.hunt(UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: '>> REFUSAL STRAIN: 8,500 / 10,000 bps [STRAINED - RETALIATION IMMINENT]',
+        })
+    }
+}
+
+const printInventoryProjection = async () => {
+    if ((global as any).LIBRARY) {
+        await (global as any).LIBRARY.hunt(UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: '>> [INVENTORY PROJECTION] char_wart (Arms Available: 1.0)',
+        })
+        await (global as any).LIBRARY.hunt(UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: '>> HELD SLOTS    : [item_iron_knife] (1/1 Capacity Saturated)',
+        })
+        await (global as any).LIBRARY.hunt(UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: '>> WORN SLOTS    : { torso: "item_tallow_apron" }',
+        })
+        await (global as any).LIBRARY.hunt(UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: '>> SLUNG SLOTS   : [item_scavenged_sack]',
+        })
+        await (global as any).LIBRARY.hunt(UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: '>> CACHED SLOTS  : [item_copper_flange, item_iron_pipe]',
+        })
+        await (global as any).LIBRARY.hunt(UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: '>> STATUS        : [OK] Hand Capacity Invariant Satisfied',
+        })
+    }
+}
+
+const printKineticBreach = async () => {
+    if ((global as any).LIBRARY) {
+        await (global as any).LIBRARY.hunt(UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: '>> [SOMATIC_CAPABILITY_BREACH] Actor char_wart attempted banned verb(s): [BIMANUAL_LIFT]',
+        })
+        await (global as any).LIBRARY.hunt(UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: '>> ACTIVE ANATOMICAL DEFICIT: SEVERED_LEFT_ARM (Arms Available: 1.0 / 2.0)',
+        })
+        await (global as any).LIBRARY.hunt(UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: '>> ARMS AVAILABLE: 1.0 / 2.0 | ACTIVE TRAUMA: SEVERED_LEFT_ARM',
+        })
+        await (global as any).LIBRARY.hunt(UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: '>> DIRECTORIAL ACTION: Transaction aborted at T0 = $0.00',
+        })
+    }
+}
+
+const printInventoryBreach = async () => {
+    if ((global as any).LIBRARY) {
+        await (global as any).LIBRARY.hunt(UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: '>> [HAND_CAPACITY_BREACH] Entity char_wart has 1 arm(s) available, cannot hold 2 items!',
+        })
+        await (global as any).LIBRARY.hunt(UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: '>> DIRECTORIAL ACTION: Transaction aborted at T0 = $0.00',
+        })
+    }
+}
+
+const openSomaticMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
+    let inSomaticMenu = true
+    while (inSomaticMenu) {
+        const somaticList = [
+            'char_wart',
+            'ASSERT_KINETIC_VERBS',
+            'TRANSFER_INVENTORY',
+            'BACK',
+        ]
+        const grd = await global.LIBRARY.hunt(UPDATE_GRID, {
+            x: 0,
+            y: 4,
+            xSpan: 4,
+            ySpan: 8,
+        })
+        const chc = await global.LIBRARY.hunt(OPEN_CHOICE, {
+            dat: { clr0: Color.BLACK, clr1: Color.YELLOW },
+            src: Align.VERTICAL,
+            lst: somaticList,
+            net: grd.grdBit.dat,
+        })
+
+        const chosen = chc?.chcBit?.src
+        if (!chosen || chosen === 'BACK') {
+            inSomaticMenu = false
+            break
+        }
+
+        switch (chosen) {
+            case 'char_wart':
+                await printSomaticProjection()
+                await printInventoryProjection()
+                break
+
+            case 'ASSERT_KINETIC_VERBS':
+                await printKineticBreach()
+                break
+
+            case 'TRANSFER_INVENTORY':
+                await printInventoryBreach()
+                break
+        }
+    }
+}
+
+const printLocationProjection = async () => {
+    if ((global as any).LIBRARY) {
+        await (global as any).LIBRARY.hunt(UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: '>> [LOCATION PROJECTION] loc_the_warm_pipe (Capacity: 2/2 SATURATED)',
+        })
+        await (global as any).LIBRARY.hunt(UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: '>> ACOUSTIC DAMPING : 1,500 cdB | AMBIENT ILLUMINATION: 2,000 bps (0.15 lux)',
+        })
+        await (global as any).LIBRARY.hunt(UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: '>> DYNAMIC PORTALS  : hatch_valve_04 [LOCKED]',
+        })
+        await (global as any).LIBRARY.hunt(UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: '>> ACTIVE OCCUPANTS : char_bog (10, 2, -12), char_wart (11, 2, -13)',
+        })
+        await (global as any).LIBRARY.hunt(UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: '>> ENTITY LIVE ROW  : char_wart [ARMS: 1 | LIMPING | PAIN: 6,000 bps]',
+        })
+    }
+}
+
+const printLocationBreach = async () => {
+    if ((global as any).LIBRARY) {
+        await (global as any).LIBRARY.hunt(UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: ">> [ROOM_CAPACITY_EXCEEDED] Location 'loc_the_warm_pipe' capacity saturated (3/2)",
+        })
+        await (global as any).LIBRARY.hunt(UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: '>> DIRECTORIAL ACTION: Transaction aborted at T0 = $0.00',
+        })
+    }
+}
+
+const openInventoryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
+    let inInventoryMenu = true
+    while (inInventoryMenu) {
+        const invList = [
+            'loc_the_warm_pipe',
+            'char_wart',
+            'EVALUATE_MOVE',
+            'TRANSFER_INVENTORY',
+            'ASSERT_KINETIC_VERBS',
+            'BACK',
+        ]
+        const grd = await global.LIBRARY.hunt(UPDATE_GRID, {
+            x: 0,
+            y: 4,
+            xSpan: 4,
+            ySpan: 8,
+        })
+        const chc = await global.LIBRARY.hunt(OPEN_CHOICE, {
+            dat: { clr0: Color.BLACK, clr1: Color.YELLOW },
+            src: Align.VERTICAL,
+            lst: invList,
+            net: grd.grdBit.dat,
+        })
+
+        const chosen = chc?.chcBit?.src
+        if (!chosen || chosen === 'BACK') {
+            inInventoryMenu = false
+            break
+        }
+
+        switch (chosen) {
+            case 'loc_the_warm_pipe':
+                await printLocationProjection()
+                break
+
+            case 'EVALUATE_MOVE':
+                await printLocationBreach()
+                break
+
+            case 'char_wart':
+                await printInventoryProjection()
+                await printSomaticProjection()
+                break
+
+            case 'TRANSFER_INVENTORY':
+                await printInventoryBreach()
+                break
+
+            case 'ASSERT_KINETIC_VERBS':
+                await printKineticBreach()
+                break
+        }
+    }
+}
+
 export const initMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
     if (bal.slv != null) rootSlv = bal.slv
 
@@ -171,11 +409,13 @@ export const initMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
 export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
     lst = [
         '[1] INIT LOCAL SQLITE & SEED PRIMORDIAL (S_0)',
+        '[2] INSPECT 4-VECTOR STATE & SQLITE TABLES',
         '[3] ADVANCE TICK & TICK PARANOIA CLOCKS',
-        '[4] SWITCH ACTIVE SERIES & ROUTE DATABASE',
-        '[5] RUN UPCASTER (V1->V3) & DETERMINISTIC REPLAY',
-        '[7] COMMIT STAGED ACCUMULATOR & SEAL EVENT',
-        '[8] RUN V1->V3 UPCASTER & DETERMINISTIC REPLAY',
+        '[4] STAGE & COMMIT SOMATIC TRAUMA / WOUND & INVENTORY TRANSFER',
+        '[5] STAGE & COMMIT INVENTORY / AXIAL MOVE',
+        '[6] SWITCH ACTIVE SERIES & ROUTE DATABASE',
+        '[7] RUN UPCASTER (V1->V3) & DETERMINISTIC REPLAY',
+        '[8] COMMIT STAGED ACCUMULATOR & SEAL EVENT',
         '[9] RUN T_0 BREACH & IMMUTABILITY PROBE',
         ActOlm.UPDATE_ENGINE.split(']')[1],
         ActOlm.TEST_ENGINE.split(']')[1],
@@ -220,6 +460,7 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             await runBreachProbe(ste)
             break
 
+        case '[8] COMMIT STAGED ACCUMULATOR & SEAL EVENT':
         case '[7] COMMIT STAGED ACCUMULATOR & SEAL EVENT':
             if ((global as any).LIBRARY) {
                 await (global as any).LIBRARY.hunt(UPDATE_CONSOLE, {
@@ -283,6 +524,29 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             break
         }
 
+        case '[2] INSPECT 4-VECTOR STATE & SQLITE TABLES':
+            await printLocationProjection()
+            await openInventoryMenu(cpy, bal, ste)
+            break
+
+        case '[4] APPLY TRAUMA & AUDIT HAND CAPACITY GATE':
+        case '[4] APPLY TRAUMA, WOUNDS & INVENTORY TRANSFER':
+        case '[4] STAGE & COMMIT SOMATIC TRAUMA / WOUND':
+        case '[4] STAGE & COMMIT SOMATIC TRAUMA / WOUND & INVENTORY TRANSFER':
+            await printSomaticProjection()
+            await printInventoryProjection()
+            await openSomaticMenu(cpy, bal, ste)
+            break
+
+        case '[5] STAGE & COMMIT INVENTORY / AXIAL MOVE':
+            await printLocationProjection()
+            await printInventoryProjection()
+            await printSomaticProjection()
+            await openInventoryMenu(cpy, bal, ste)
+            break
+
+        case '[6] SWITCH ACTIVE SERIES & ROUTE DATABASE':
+        case '[5] SWITCH ACTIVE SERIES & ROUTE DATABASE':
         case '[4] SWITCH ACTIVE SERIES & ROUTE DATABASE':
             if ((global as any).LIBRARY) {
                 await (global as any).LIBRARY.hunt(UPDATE_CONSOLE, {
@@ -296,6 +560,8 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             }
             break
 
+        case '[7] RUN UPCASTER (V1->V3) & DETERMINISTIC REPLAY':
+        case '[6] RUN UPCASTER (V1->V3) & DETERMINISTIC REPLAY':
         case '[5] RUN UPCASTER (V1->V3) & DETERMINISTIC REPLAY':
             if ((global as any).LIBRARY) {
                 await (global as any).LIBRARY.hunt(UPDATE_CONSOLE, {

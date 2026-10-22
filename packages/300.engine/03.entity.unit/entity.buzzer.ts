@@ -1,2 +1,11 @@
-export { initEntity  } from "./buz/entity.buzz";
-export { updateEntity  } from "./buz/entity.buzz";
+export {
+  initEntity,
+  updateEntity,
+  upsertEntity,
+  getEntity,
+  listEntitiesByLocation,
+  assembleCompositeEntity,
+  serializeEntityToDbRow,
+  deserializeDbRowToEntity,
+  canonicalJson,
+} from './buz/entity.buzz';

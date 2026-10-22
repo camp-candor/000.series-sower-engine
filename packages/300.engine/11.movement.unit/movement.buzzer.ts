@@ -1,2 +1,8 @@
-export { initMovement  } from "./buz/movement.buzz";
-export { updateMovement  } from "./buz/movement.buzz";
+export {
+  initMovement,
+  updateMovement,
+  setActorPositionMovement,
+  evaluateMoveMovement,
+  computeAxialDistance,
+  assertAxialInvariant,
+} from './buz/movement.buzz';

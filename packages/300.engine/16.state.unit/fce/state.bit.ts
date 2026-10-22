@@ -1,10 +1,11 @@
+import type { LedgerWorkingState } from './state.interface';
 
-export default interface StateBit {
- idx: string;
- src?: string;
- val?: number;
- dat?: any;
- slv?: Function;
+export default interface StateBit<TDat = unknown, TLst = unknown> {
+  idx: string;
+  src?: string;
+  val?: number;
+  lst?: TLst[];
+  dat?: TDat;
+  slv?: (result: { steBit: Partial<StateBit<TDat, TLst>> }) => void;
 }
-
 

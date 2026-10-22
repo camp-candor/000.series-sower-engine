@@ -1,2 +1,8 @@
-export { initLocation  } from "./buz/location.buzz";
-export { updateLocation  } from "./buz/location.buzz";
+export {
+  initLocation,
+  updateLocation,
+  registerLocation,
+  setPortalStateLocation,
+  validateCapacityLocation,
+  createDefaultLocationRecord,
+} from './buz/location.buzz';

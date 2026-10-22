@@ -1,10 +1,8 @@
-
-export default interface InventoryBit {
- idx: string;
- src?: string;
- val?: number;
- dat?: any;
- slv?: Function;
+export default interface InventoryBit<TDat = unknown, TLst = unknown> {
+    idx: string
+    src?: string
+    lst?: TLst[]
+    val?: number
+    dat?: TDat
+    slv?: (result: { invBit: Partial<InventoryBit<TDat, TLst>> }) => void
 }
-
-

@@ -1,2 +1,9 @@
-export { initGrievance  } from "./buz/grievance.buzz";
-export { updateGrievance  } from "./buz/grievance.buzz";
+export {
+  initGrievance,
+  updateGrievance,
+  upsertGrievance,
+  escalateGrievance,
+  tickCooldownGrievance,
+  resolveGrievance,
+  queryEligibleGrievances,
+} from './buz/grievance.buzz';

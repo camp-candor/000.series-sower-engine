@@ -1,8 +1,7 @@
-import Entity from "./fce/entity.interface";
-import EntityBit from "./fce/entity.interface";
+import type Entity from './fce/entity.interface';
+import type { CompositeEntityState } from './fce/entity.interface';
 
 export class EntityModel implements Entity {
- //idx:string;
- //entityBitList: EntityBit[] = [];
- //entityBits: any = {};
+  idx = '03.entity';
+  entities: Record<string, CompositeEntityState> = {};
 }

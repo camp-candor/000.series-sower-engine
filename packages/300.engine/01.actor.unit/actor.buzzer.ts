@@ -1,2 +1,11 @@
-export { initActor  } from "./buz/actor.buzz";
-export { updateActor  } from "./buz/actor.buzz";
+export {
+  initActor,
+  updateActor,
+  recordBeliefActor,
+  queryHorizonActor,
+  scrubEpistemicContextActor,
+  stageDetailActor,
+  ratifyDetailActor,
+  discardDetailActor,
+  listUnratifiedDetailsActor,
+} from './buz/actor.buzz';

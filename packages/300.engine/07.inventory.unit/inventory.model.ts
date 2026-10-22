@@ -1,8 +1,7 @@
-import Inventory from "./fce/inventory.interface";
-import InventoryBit from "./fce/inventory.interface";
+import type Inventory from './fce/inventory.interface'
+import type { EntityInventoryState } from './fce/inventory.interface'
 
 export class InventoryModel implements Inventory {
- //idx:string;
- //inventoryBitList: InventoryBit[] = [];
- //inventoryBits: any = {};
+    idx = '07.inventory'
+    inventories: Record<string, EntityInventoryState> = {}
 }

@@ -1,8 +1,7 @@
-import Leverage from "./fce/leverage.interface";
-import LeverageBit from "./fce/leverage.interface";
+import type Leverage from './fce/leverage.interface';
+import type { StringsLedgerRecord } from './fce/leverage.interface';
 
 export class LeverageModel implements Leverage {
- //idx:string;
- //leverageBitList: LeverageBit[] = [];
- //leverageBits: any = {};
+  idx = '09.leverage';
+  records: Record<string, StringsLedgerRecord> = {};
 }

@@ -1,2 +1,11 @@
-export { initState  } from "./buz/state.buzz";
-export { updateState  } from "./buz/state.buzz";
+export {
+  initState,
+  updateState,
+  hydrateState,
+  computeHashState,
+  freezeState,
+  recursiveDeepFreeze,
+  canonicalizeStateJson,
+  computeWorkingStateHash,
+} from './buz/state.buzz';
+
