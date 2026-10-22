@@ -1,8 +1,12 @@
-import Tick from "./fce/tick.interface";
-import TickBit from "./fce/tick.interface";
+import type Tick from './fce/tick.interface'
 
 export class TickModel implements Tick {
- //idx:string;
- //tickBitList: TickBit[] = [];
- //tickBits: any = {};
+    idx = '17.tick'
+    currentTick = 0
+    worldSeed = 'series_world_seed_genesis_alpha'
+    lastDerivedSeed = '0'.repeat(64)
+    totalTicksAdvanced = 0
+    lastTickAtMs = 0
 }
+
+export default TickModel

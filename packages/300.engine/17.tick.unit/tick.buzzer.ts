@@ -1,2 +1,7 @@
-export { initTick  } from "./buz/tick.buzz";
-export { updateTick  } from "./buz/tick.buzz";
+export { initTick } from './buz/tick.buzz'
+export { updateTick } from './buz/tick.buzz'
+export { advanceTickAction } from './buz/tick.buzz'
+export { deriveSeedTickAction } from './buz/tick.buzz'
+export { executeDecaySweepTickAction } from './buz/tick.buzz'
+export { resetTick } from './buz/tick.buzz'
+export { deriveTickSeed, executeDecaySweep } from './buz/tick.buzz'

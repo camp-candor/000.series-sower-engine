@@ -1,9 +1,19 @@
+export interface SequenceValidationReport {
+  valid: boolean;
+  expectedSeq: number;
+  actualSeq: number;
+  error?: string;
+}
 
-import  SequenceBit  from "./sequence.bit";
+export interface StreamSequenceState {
+  streamId: string;
+  headSeq: number;
+  lastEventId: string;
+  updatedAtMs: number;
+}
 
 export default interface Sequence {
- // idx:string;
- // sequenceBitList: SequenceBit[];
- // sequenceBits:any;
-
+  idx: string;
+  streams: Record<string, StreamSequenceState>;
+  defaultStreamId: string;
 }

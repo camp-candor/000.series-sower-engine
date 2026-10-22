@@ -1,9 +1,13 @@
-
-import  SeriesBit  from "./series.bit";
+export interface SeriesRoutingResolution {
+  seriesSlug: string;
+  dbPath: string;
+  isMemory: boolean;
+  resolvedAt: string;
+}
 
 export default interface Series {
- // idx:string;
- // seriesBitList: SeriesBit[];
- // seriesBits:any;
-
+  idx: string;
+  activeSeriesSlug: string;
+  activeDbPath: string;
+  availableSeries: string[];
 }
