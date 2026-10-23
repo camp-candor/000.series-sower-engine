@@ -413,7 +413,7 @@ export const queryDatabase = (
     }
 
     const sql = bal?.src || bal?.dat?.sql
-    const params = bal?.dat?.params || []
+    const params = Array.isArray(bal?.dat) ? bal.dat : bal?.dat?.params || []
     const single = Boolean(bal?.dat?.single)
 
     if (!sql) {

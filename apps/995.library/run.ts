@@ -178,6 +178,18 @@ const init = async () => {
             src: '>> [OK] Master Bus Initialized',
         })
 
+        const screen = (LIBRARY as any).state?.value?.terminal?.screen
+        if (screen && typeof screen.key === 'function') {
+            screen.key(['C-c'], async () => {
+                const libTermAction = path.join(libPath, '80.terminal.unit/terminal.action')
+                try {
+                    const T_ACT = require(libTermAction)
+                    await LIBRARY.hunt(T_ACT.CLOSE_TERMINAL, {})
+                } catch {}
+                process.exit(0)
+            })
+        }
+
         // 3. Dynamic Package Injection & Bus Wiring
         const packagesDist = path.resolve(
             import.meta.dirname,

@@ -116,7 +116,8 @@ export const transferInventory = async (
 
         if (!validateHandCapacity(target.armsAvailable, projectedHeldCount)) {
             const errorMsg = `>> [HAND_CAPACITY_BREACH] Entity ${payload.targetEntityId} has ${target.armsAvailable} arm(s) available, cannot hold ${projectedHeldCount} items!`
-            const line2 = '>> DIRECTORIAL ACTION: Transaction aborted at T0 = $0.00'
+            const line2 =
+                '>> DIRECTORIAL ACTION: Transaction aborted at T0 = $0.00'
 
             const lib = (global as any).LIBRARY || (globalThis as any).LIBRARY
             if (lib && typeof lib.hunt === 'function' && lib !== ste) {

@@ -14,6 +14,7 @@ import {
     computeChainedEventHash,
     GENESIS_HASH_64,
 } from '../../04.envelope.unit/envelope.buzzer'
+export { EventUpcasterRegistry } from '../event.model'
 
 export const emitConsole = async (
     ste: State | undefined,

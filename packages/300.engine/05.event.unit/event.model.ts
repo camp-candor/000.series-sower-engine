@@ -45,6 +45,7 @@ export class EventUpcasterRegistry {
         return {
             ...envelope,
             schemaVersion: currentVersion,
+            version: currentVersion,
             payload: currentPayload as T,
         }
     }

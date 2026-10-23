@@ -1,6 +1,8 @@
-export default interface MenuBit {
+export default interface MenuBit<TDat = unknown, TLst = string> {
     idx: string
     src?: string
-    lst?: any
-    slv?: Function
+    lst?: TLst[]
+    val?: number
+    dat?: TDat
+    slv?: (result: { mnuBit: Partial<MenuBit<TDat, TLst>> }) => void
 }

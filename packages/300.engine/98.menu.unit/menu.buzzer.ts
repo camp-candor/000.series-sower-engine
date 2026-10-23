@@ -1,2 +1,6 @@
-export { initMenu } from './buz/00.menu.buzz.js'
-export { updateMenu } from './buz/00.menu.buzz.js'
+export {
+    initMenu,
+    updateMenu,
+    MENU_CHOICES,
+    MENU_DESCRIPTIONS,
+} from './buz/00.menu.buzz'
