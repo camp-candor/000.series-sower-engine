@@ -19,7 +19,7 @@
         "//__ BUILD & TYPES ________________________": "",
         "build": "npm run build --workspaces --if-present",
         "check": "npm run check:all",
-        "check:all": "npm run check:types && npm run prettier:check && npm run lint:check && npm run check:boundary",
+        "check:all": "npm run check:types && npm run prettier:check && npm run lint:check && npm run check:boundary && npm run check:boundary:ast",
         "check:types": "tsc -b",
         "check:boundary": "node -e \"const s = require('child_process').execSync('git status -s apps/995.library/995.library/').toString().trim(); if (s) { console.error('BOUNDARY BREACH:', s); process.exit(1); }\"",
         "check:boundary:ast": "npx depcruise --config .dependency-cruiser.cjs packages/",

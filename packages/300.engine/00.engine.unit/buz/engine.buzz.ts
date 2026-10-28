@@ -1,8 +1,10 @@
 import { EngineModel } from '../engine.model.js'
 import EngineBit from '../fce/engine.bit.js'
 import State from '../../99.core/state.js'
-import fs from 'fs'
-import path from 'path'
+import { createRequire } from 'module'
+const req = createRequire(import.meta.url)
+const fs = req('fs')
+const path = req('path')
 
 export const AUDIT_FENCE_OK = '>> [OK] Zero root runtime dependencies verified'
 export const AUDIT_FENCE_FAIL = ':: [FAIL] Root runtime dependencies detected'
@@ -10,6 +12,10 @@ export const CHECK_ARTIFACTS_OK =
     '>> [OK] Zero leaked compilation artifacts in packages/300.engine'
 export const CHECK_ARTIFACTS_FAIL =
     ':: [FAIL] Leaked compilation artifacts in packages/300.engine'
+export const AUDIT_BOUNDARY_OK =
+    '>> [OK] Zero AST boundary violations detected across simulation packages'
+export const AUDIT_BOUNDARY_FAIL =
+    ':: [FAIL] AST boundary violations detected across simulation packages'
 
 export const scanRootDependencies = (pkg: any): string[] => {
     if (pkg == null || typeof pkg !== 'object') return ['unreadable manifest']
@@ -163,6 +169,45 @@ export const checkArtifacts = (
                 src: ok
                     ? CHECK_ARTIFACTS_OK
                     : `${CHECK_ARTIFACTS_FAIL}: ${detail}`,
+                dat: { ok, detail },
+            },
+        })
+    }
+    return cpy
+}
+
+export const auditBoundary = (
+    cpy: EngineModel,
+    bal: EngineBit,
+    ste?: State,
+) => {
+    void ste
+    const root = findMonorepoRoot(process.cwd())
+    let ok = false
+    let detail = 'monorepo root not found'
+    if (root != null) {
+        try {
+            const cp = req('child_process')
+            cp.execSync(
+                'npx depcruise --config .dependency-cruiser.cjs packages/',
+                {
+                    cwd: root,
+                    stdio: 'pipe',
+                },
+            )
+            ok = true
+            detail = 'zero boundary violations'
+        } catch (err: unknown) {
+            detail = err instanceof Error ? err.message : String(err)
+        }
+    }
+    if (bal.slv != null) {
+        bal.slv({
+            fenBit: {
+                idx: ok ? 'audit-boundary-ok' : 'audit-boundary-fail',
+                src: ok
+                    ? AUDIT_BOUNDARY_OK
+                    : `${AUDIT_BOUNDARY_FAIL}: ${detail}`,
                 dat: { ok, detail },
             },
         })

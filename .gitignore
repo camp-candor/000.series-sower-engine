@@ -152,6 +152,7 @@ dist
 !*.config.mjs
 !*.config.js
 !.*.mjs
+!.dependency-cruiser.cjs
 
 # Docs
 docs

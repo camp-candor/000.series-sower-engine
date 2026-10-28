@@ -51,6 +51,12 @@ export class CheckArtifacts implements Action {
     constructor(public bale: EngineBit) {}
 }
 
+export const AUDIT_BOUNDARY = '[Boundary action] Audit Boundary'
+export class AuditBoundary implements Action {
+    readonly type = AUDIT_BOUNDARY
+    constructor(public bale: EngineBit) {}
+}
+
 export type Actions =
     | InitEngine
     | UpdateEngine
@@ -60,3 +66,4 @@ export type Actions =
     | ListEngine
     | AuditFence
     | CheckArtifacts
+    | AuditBoundary

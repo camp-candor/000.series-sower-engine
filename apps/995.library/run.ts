@@ -16,6 +16,7 @@ program
     .option('-t, --separator <char>')
     .option('--audit-fence')
     .option('--check-artifacts')
+    .option('--audit-boundary')
 program.parse(process.argv)
 const options = program.opts()
 
@@ -424,6 +425,42 @@ const checkArtifactsHeadless = () => {
     process.exit(0)
 }
 
+const auditBoundaryHeadless = async () => {
+    let curr = process.cwd()
+    let root: string | null = null
+    while (curr && curr !== path.dirname(curr)) {
+        const pkgPath = path.join(curr, 'package.json')
+        try {
+            if (fs.existsSync(pkgPath)) {
+                const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'))
+                if (Array.isArray(pkg.workspaces)) {
+                    root = curr
+                    break
+                }
+            }
+        } catch {}
+        curr = path.dirname(curr)
+    }
+    if (root == null) {
+        console.error(':: [FAIL] Monorepo root not found')
+        process.exit(1)
+    }
+    try {
+        await exec('npx depcruise --config .dependency-cruiser.cjs packages/', {
+            cwd: root,
+        })
+        console.log(
+            '>> [OK] Zero AST boundary violations detected across simulation packages',
+        )
+        process.exit(0)
+    } catch (err: any) {
+        console.error(
+            ':: [FAIL] AST boundary violations detected across simulation packages',
+        )
+        process.exit(1)
+    }
+}
+
 const main = async () => {
     if (options.auditFence) {
         auditFenceHeadless()
@@ -431,6 +468,10 @@ const main = async () => {
     }
     if (options.checkArtifacts) {
         checkArtifactsHeadless()
+        return
+    }
+    if (options.auditBoundary) {
+        await auditBoundaryHeadless()
         return
     }
     try {
