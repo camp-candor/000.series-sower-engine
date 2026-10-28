@@ -1,16 +1,15 @@
 {
-    "extends": "../../apps/995.library/tsconfig-base.json",
+    "extends": "../../tsconfig.base.json",
     "compilerOptions": {
-        "outDir": "../dist/300.engine",
         "composite": true,
-        "skipLibCheck": true,
-        "noImplicitAny": false,
-        "strictNullChecks": false,
-        "noUnusedLocals": false,
-        "noUnusedParameters": false,
-        "esModuleInterop": true,
-        "allowSyntheticDefaultImports": true
+        "outDir": "../dist/300.engine",
+        "rootDir": ".",
+        "tsBuildInfoFile": "../dist/300.engine/.tsbuildinfo",
+        "noImplicitAny": true,
+        "strictNullChecks": true,
+        "noUnusedLocals": true,
+        "noUnusedParameters": true
     },
     "include": ["**/*"],
-    "exclude": ["**/node_modules"]
+    "exclude": ["node_modules", "../dist", "**/*.spec.ts", "test/**/*"]
 }

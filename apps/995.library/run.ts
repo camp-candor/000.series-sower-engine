@@ -15,6 +15,7 @@ program
     .option('--first')
     .option('-t, --separator <char>')
     .option('--audit-fence')
+    .option('--check-artifacts')
 program.parse(process.argv)
 const options = program.opts()
 
@@ -373,9 +374,63 @@ const auditFenceHeadless = () => {
     process.exit(0)
 }
 
+const checkArtifactsHeadless = () => {
+    let curr = process.cwd()
+    let root: string | null = null
+    while (curr && curr !== path.dirname(curr)) {
+        const pkgPath = path.join(curr, 'package.json')
+        try {
+            if (fs.existsSync(pkgPath)) {
+                const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'))
+                if (Array.isArray(pkg.workspaces)) {
+                    root = curr
+                    break
+                }
+            }
+        } catch {}
+        curr = path.dirname(curr)
+    }
+    if (root == null) {
+        console.error(':: [FAIL] Monorepo root not found')
+        process.exit(1)
+    }
+    const leaked: string[] = []
+    const walk = (dir: string): void => {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            const full = path.join(dir, entry.name)
+            if (entry.isDirectory()) {
+                if (entry.name !== 'node_modules' && entry.name !== 'dist')
+                    walk(full)
+            } else if (
+                entry.isFile() &&
+                (entry.name.endsWith('.js') ||
+                    entry.name.endsWith('.d.ts')) &&
+                !entry.name.includes('.config.')
+            ) {
+                leaked.push(full)
+            }
+        }
+    }
+    walk(path.join(root, 'packages', '300.engine'))
+    if (leaked.length > 0) {
+        console.error(
+            `:: [FAIL] Leaked compilation artifacts in packages/300.engine: ${leaked.join(', ')}`,
+        )
+        process.exit(1)
+    }
+    console.log(
+        '>> [OK] Zero leaked compilation artifacts in packages/300.engine',
+    )
+    process.exit(0)
+}
+
 const main = async () => {
     if (options.auditFence) {
         auditFenceHeadless()
+        return
+    }
+    if (options.checkArtifacts) {
+        checkArtifactsHeadless()
         return
     }
     try {

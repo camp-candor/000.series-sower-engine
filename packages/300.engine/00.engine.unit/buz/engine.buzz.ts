@@ -6,6 +6,10 @@ import path from 'path'
 
 export const AUDIT_FENCE_OK = '>> [OK] Zero root runtime dependencies verified'
 export const AUDIT_FENCE_FAIL = ':: [FAIL] Root runtime dependencies detected'
+export const CHECK_ARTIFACTS_OK =
+    '>> [OK] Zero leaked compilation artifacts in packages/300.engine'
+export const CHECK_ARTIFACTS_FAIL =
+    ':: [FAIL] Leaked compilation artifacts in packages/300.engine'
 
 export const scanRootDependencies = (pkg: any): string[] => {
     if (pkg == null || typeof pkg !== 'object') return ['unreadable manifest']
@@ -104,6 +108,61 @@ export const auditFence = (cpy: EngineModel, bal: EngineBit, ste: State) => {
             fenBit: {
                 idx: ok ? 'audit-fence-ok' : 'audit-fence-fail',
                 src: ok ? AUDIT_FENCE_OK : `${AUDIT_FENCE_FAIL}: ${detail}`,
+                dat: { ok, detail },
+            },
+        })
+    }
+    return cpy
+}
+
+export const scanArtifactDir = (startDir: string): string[] => {
+    const leaked: string[] = []
+    const walk = (dir: string): void => {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            const full = path.join(dir, entry.name)
+            if (entry.isDirectory()) {
+                if (entry.name !== 'node_modules' && entry.name !== 'dist')
+                    walk(full)
+            } else if (
+                entry.isFile() &&
+                (entry.name.endsWith('.js') || entry.name.endsWith('.d.ts')) &&
+                !entry.name.includes('.config.')
+            ) {
+                leaked.push(full)
+            }
+        }
+    }
+    walk(startDir)
+    return leaked
+}
+
+export const checkArtifacts = (
+    cpy: EngineModel,
+    bal: EngineBit,
+    ste?: State,
+) => {
+    void ste
+    const root = findMonorepoRoot(process.cwd())
+    let ok = false
+    let detail = 'monorepo root not found'
+    if (root != null) {
+        try {
+            const leaked = scanArtifactDir(
+                path.join(root, 'packages', '300.engine'),
+            )
+            ok = leaked.length === 0
+            detail = ok ? 'zero leaked artifacts' : leaked.join(', ')
+        } catch (err: unknown) {
+            detail = err instanceof Error ? err.message : String(err)
+        }
+    }
+    if (bal.slv != null) {
+        bal.slv({
+            fenBit: {
+                idx: ok ? 'check-artifacts-ok' : 'check-artifacts-fail',
+                src: ok
+                    ? CHECK_ARTIFACTS_OK
+                    : `${CHECK_ARTIFACTS_FAIL}: ${detail}`,
                 dat: { ok, detail },
             },
         })

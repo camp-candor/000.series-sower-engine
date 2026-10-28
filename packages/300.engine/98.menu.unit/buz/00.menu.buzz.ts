@@ -66,6 +66,7 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         ActOlm.TEST_ENGINE.split(']')[1],
         ActOlm.LIST_ENGINE.split(']')[1],
         ActOlm.AUDIT_FENCE.split(']')[1],
+        ActOlm.CHECK_ARTIFACTS.split(']')[1],
         'ROOT MENU',
     ]
 
@@ -127,6 +128,15 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         case ActOlm.AUDIT_FENCE.split(']')[1]:
             bit = await ste.hunt(ActOlm.AUDIT_FENCE, {})
             bit = await global.LIBRARY.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: bit.fenBit.src,
+            })
+            await new Promise((resolve) => setTimeout(resolve, 1500))
+            break
+
+        case ActOlm.CHECK_ARTIFACTS.split(']')[1]:
+            bit = await ste.hunt(ActOlm.CHECK_ARTIFACTS, {})
+            bit = await (global as any).LIBRARY.hunt(UPDATE_CONSOLE, {
                 idx: 'cns00',
                 src: bit.fenBit.src,
             })

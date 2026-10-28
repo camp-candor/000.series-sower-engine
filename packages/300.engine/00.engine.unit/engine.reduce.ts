@@ -25,6 +25,9 @@ export function reducer(
         case Act.AUDIT_FENCE:
             return Buzz.auditFence(clone(model), act.bale, state)
 
+        case Act.CHECK_ARTIFACTS:
+            return Buzz.checkArtifacts(clone(model), act.bale, state)
+
         default:
             return model
     }

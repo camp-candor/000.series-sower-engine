@@ -45,6 +45,12 @@ export class AuditFence implements Action {
     constructor(public bale: EngineBit) {}
 }
 
+export const CHECK_ARTIFACTS = '[Fence action] Check Artifacts'
+export class CheckArtifacts implements Action {
+    readonly type = CHECK_ARTIFACTS
+    constructor(public bale: EngineBit) {}
+}
+
 export type Actions =
     | InitEngine
     | UpdateEngine
@@ -53,3 +59,4 @@ export type Actions =
     | VisionEngine
     | ListEngine
     | AuditFence
+    | CheckArtifacts

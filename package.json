@@ -23,6 +23,7 @@
         "check:types": "tsc -b",
         "check:boundary": "node -e \"const s = require('child_process').execSync('git status -s apps/995.library/995.library/').toString().trim(); if (s) { console.error('BOUNDARY BREACH:', s); process.exit(1); }\"",
         "check:boundary:ast": "npx depcruise --config .dependency-cruiser.cjs packages/",
+        "check:artifacts": "node -e \"const fs = require('fs'), path = require('path'); function scan(d) { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory() && e.name !== 'node_modules' && e.name !== 'dist') scan(p); else if (e.isFile() && (e.name.endsWith('.js') || e.name.endsWith('.d.ts')) && !e.name.includes('.config.')) { console.error(':: [FAIL] Leaked artifact in source:', p); process.exit(1); } } } scan('packages/300.engine'); console.log('PASS: Zero leaked compilation artifacts in packages/300.engine');\"",
         "check:zero-runtime": "node -e \"const pkg = JSON.parse(require('fs').readFileSync('package.json', 'utf8')); if (pkg.dependencies && Object.keys(pkg.dependencies).length > 0) { console.error('FAIL: Root dependencies must be empty'); process.exit(1); } console.log('PASS: Zero root runtime dependencies verified');\"",
         "//__ TESTING ______________________________": "",
         "test": "vitest run",
