@@ -39,6 +39,12 @@ export class ListEngine implements Action {
     constructor(public bale: EngineBit) {}
 }
 
+export const AUDIT_FENCE = '[Fence action] Audit Fence'
+export class AuditFence implements Action {
+    readonly type = AUDIT_FENCE
+    constructor(public bale: EngineBit) {}
+}
+
 export type Actions =
     | InitEngine
     | UpdateEngine
@@ -46,3 +52,4 @@ export type Actions =
     | IntellectEngine
     | VisionEngine
     | ListEngine
+    | AuditFence

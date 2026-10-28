@@ -11,7 +11,10 @@ const require = createRequire(import.meta.url)
 const exec = promisify(execCb)
 
 // 1. Setup CLI
-program.option('--first').option('-t, --separator <char>')
+program
+    .option('--first')
+    .option('-t, --separator <char>')
+    .option('--audit-fence')
 program.parse(process.argv)
 const options = program.opts()
 
@@ -336,7 +339,45 @@ const init = async () => {
 }
 
 // 4. Main Build & Startup Pipeline
+const auditFenceHeadless = () => {
+    let curr = process.cwd()
+    let root: string | null = null
+    while (curr && curr !== path.dirname(curr)) {
+        const pkgPath = path.join(curr, 'package.json')
+        try {
+            if (fs.existsSync(pkgPath)) {
+                const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'))
+                if (Array.isArray(pkg.workspaces)) {
+                    root = curr
+                    break
+                }
+            }
+        } catch {}
+        curr = path.dirname(curr)
+    }
+    if (root == null) {
+        console.error(':: [FAIL] Monorepo root not found')
+        process.exit(1)
+    }
+    const pkg = JSON.parse(
+        fs.readFileSync(path.join(root, 'package.json'), 'utf8'),
+    )
+    const deps = pkg.dependencies ? Object.keys(pkg.dependencies) : []
+    if (deps.length > 0) {
+        console.error(
+            `:: [FAIL] Root runtime dependencies detected: ${deps.join(', ')}`,
+        )
+        process.exit(1)
+    }
+    console.log('>> [OK] Zero root runtime dependencies verified')
+    process.exit(0)
+}
+
 const main = async () => {
+    if (options.auditFence) {
+        auditFenceHeadless()
+        return
+    }
     try {
         const existingPackages = getExistingPackages()
         console.log(

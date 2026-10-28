@@ -22,6 +22,9 @@ export function reducer(
         case Act.LIST_ENGINE:
             return Buzz.listEngine(clone(model), act.bale, state)
 
+        case Act.AUDIT_FENCE:
+            return Buzz.auditFence(clone(model), act.bale, state)
+
         default:
             return model
     }

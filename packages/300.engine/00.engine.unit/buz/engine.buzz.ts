@@ -1,6 +1,36 @@
 import { EngineModel } from '../engine.model.js'
 import EngineBit from '../fce/engine.bit.js'
 import State from '../../99.core/state.js'
+import fs from 'fs'
+import path from 'path'
+
+export const AUDIT_FENCE_OK = '>> [OK] Zero root runtime dependencies verified'
+export const AUDIT_FENCE_FAIL = ':: [FAIL] Root runtime dependencies detected'
+
+export const scanRootDependencies = (pkg: any): string[] => {
+    if (pkg == null || typeof pkg !== 'object') return ['unreadable manifest']
+    const deps = (pkg as any).dependencies
+    if (deps == null) return []
+    if (typeof deps !== 'object') return ['malformed dependencies block']
+    return Object.keys(deps)
+}
+
+export const findMonorepoRoot = (start: string): string | null => {
+    let curr = start
+    while (curr && curr !== path.dirname(curr)) {
+        const pkgPath = path.join(curr, 'package.json')
+        try {
+            if (fs.existsSync(pkgPath)) {
+                const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'))
+                if (Array.isArray(pkg.workspaces)) return curr
+            }
+        } catch {
+            // Keep walking toward filesystem root
+        }
+        curr = path.dirname(curr)
+    }
+    return null
+}
 
 const engine = {
     list: async () => {
@@ -42,11 +72,7 @@ export const initEngine = (cpy: EngineModel, bal: EngineBit, ste: State) => {
     return cpy
 }
 
-export const updateEngine = (
-    cpy: EngineModel,
-    bal: EngineBit,
-    ste: State,
-) => {
+export const updateEngine = (cpy: EngineModel, bal: EngineBit, ste: State) => {
     bal.slv({ intBit: { idx: 'update-engine' } })
 
     return cpy
@@ -54,6 +80,34 @@ export const updateEngine = (
 
 export const testEngine = (cpy: EngineModel, bal: EngineBit, ste: State) => {
     bal.slv({ mytBit: { idx: 'test-engine', val: 1 } })
+    return cpy
+}
+
+export const auditFence = (cpy: EngineModel, bal: EngineBit, ste: State) => {
+    const root = findMonorepoRoot(process.cwd())
+    let ok = false
+    let detail = 'monorepo root not found'
+    if (root != null) {
+        try {
+            const pkg = JSON.parse(
+                fs.readFileSync(path.join(root, 'package.json'), 'utf8'),
+            )
+            const deps = scanRootDependencies(pkg)
+            ok = deps.length === 0
+            detail = ok ? 'zero runtime dependencies' : deps.join(', ')
+        } catch (err: any) {
+            detail = err.message
+        }
+    }
+    if (bal.slv != null) {
+        bal.slv({
+            fenBit: {
+                idx: ok ? 'audit-fence-ok' : 'audit-fence-fail',
+                src: ok ? AUDIT_FENCE_OK : `${AUDIT_FENCE_FAIL}: ${detail}`,
+                dat: { ok, detail },
+            },
+        })
+    }
     return cpy
 }
 
