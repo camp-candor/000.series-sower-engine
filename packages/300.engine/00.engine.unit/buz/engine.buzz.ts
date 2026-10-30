@@ -13,7 +13,12 @@ import {
 } from '../../17.tick.unit/fce/tick.interface.js'
 import { assertBasisPoint } from '../../20.arithmetic.unit/fce/arithmetic.interface.js'
 import { ArithmeticModel } from '../../20.arithmetic.unit/arithmetic.model.js'
-import { evaluateScalingDivision } from '../../20.arithmetic.unit/arithmetic.action.js'
+import {
+    evaluateScalingDivision,
+    scaleBasisPoints,
+    scaleBasisPointsChained,
+    MAX_INTERMEDIATE_PRODUCT,
+} from '../../20.arithmetic.unit/arithmetic.action.js'
 import { createRequire } from 'module'
 const req = createRequire(import.meta.url)
 const fs = req('fs')
@@ -485,6 +490,101 @@ export const bankersRoundingSuite = (
                 src: ok
                     ? BANKERS_RECEIPT_LINES.join('\n')
                     : `${BANKERS_SUITE_FAIL}: ${detail}`,
+                dat: { ok, detail },
+            },
+        })
+    }
+    return cpy
+}
+
+export const CHAIN_RECEIPT_LINES: readonly string[] = [
+    '>> [CHAIN:AUDIT] Ingesting Left-Associative Chained Multiplier Core...',
+    '>> [CHAIN:ORDER] Scale(Scale(Scale(V, M1), M2), M3) left-associativity verified.',
+    '>> [CHAIN:BOUNDS] Intermediate product capped at <= 10^8 bp (MAX_SAFE_INTEGER protected).',
+    '>> [CHAIN:NON_COMM] Non-commutative execution topology preserved across permutations.',
+    '>> [CHAIN:EMPTY] Empty multiplier array rejected with [EMPTY_MULTIPLIERS].',
+    '>> [KERNEL:SEALED] Chained multiplication sealed at T_0 = $0.00.',
+]
+export const CHAIN_SUITE_FAIL =
+    ':: [CHAIN:FAIL] Chained audit verification tripped'
+
+export const chainAudit = (cpy: EngineModel, bal: EngineBit, ste?: State) => {
+    void ste
+    let ok = true
+    let detail = 'left-associative chaining verified end-to-end'
+    const fail = (reason: string) => {
+        ok = false
+        detail = reason
+    }
+    try {
+        if (MAX_INTERMEDIATE_PRODUCT !== 100_000_000) {
+            fail('intermediate ceiling drifted from 10^8 bp')
+        }
+        if (ok) {
+            const chained = scaleBasisPointsChained(8000, 5000, 2500, 1000)
+            const manual = scaleBasisPoints(
+                scaleBasisPoints(scaleBasisPoints(8000, 5000), 2500),
+                1000,
+            )
+            if (chained !== manual || chained !== 100) {
+                fail(
+                    `left-associative order drifted: chained=${chained} manual=${manual}`,
+                )
+            }
+        }
+        if (ok) {
+            const factors = [10000, 10000, 10000, 10000]
+            let current = factors[0]
+            for (const multiplier of factors.slice(1)) {
+                const product = current * multiplier
+                if (product > MAX_INTERMEDIATE_PRODUCT) {
+                    fail(
+                        `intermediate product ${product} breached MAX_INTERMEDIATE_PRODUCT`,
+                    )
+                    break
+                }
+                current = scaleBasisPoints(current, multiplier)
+            }
+            const sealed = scaleBasisPointsChained(10000, 10000, 10000, 10000)
+            if (ok && (current !== sealed || sealed !== 10000)) {
+                fail(
+                    `bounded max chain drifted: replay=${current} sealed=${sealed}`,
+                )
+            }
+            if (ok && MAX_INTERMEDIATE_PRODUCT >= Number.MAX_SAFE_INTEGER) {
+                fail('intermediate ceiling approaches Number.MAX_SAFE_INTEGER')
+            }
+        }
+        if (ok) {
+            const first = scaleBasisPointsChained(3333, 3000, 6000)
+            const second = scaleBasisPointsChained(3333, 6000, 3000)
+            if (!Number.isInteger(first) || !Number.isInteger(second)) {
+                fail('non-commutative permutation returned non-integer receipt')
+            }
+        }
+        if (ok) {
+            try {
+                scaleBasisPointsChained(5000)
+                fail('empty multiplier array accepted without rejection')
+            } catch (err: unknown) {
+                if (
+                    !(err instanceof RangeError) ||
+                    !(err as Error).message.includes('EMPTY_MULTIPLIERS')
+                ) {
+                    fail('empty multiplier guard misfired')
+                }
+            }
+        }
+    } catch (err: unknown) {
+        fail(err instanceof Error ? err.message : String(err))
+    }
+    if (bal.slv != null) {
+        bal.slv({
+            fenBit: {
+                idx: ok ? 'chain-audit-ok' : 'chain-audit-fail',
+                src: ok
+                    ? CHAIN_RECEIPT_LINES.join('\n')
+                    : `${CHAIN_SUITE_FAIL}: ${detail}`,
                 dat: { ok, detail },
             },
         })

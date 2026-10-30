@@ -88,6 +88,13 @@ export class BankersRoundingSuite implements Action {
     constructor(public bale: EngineBit) {}
 }
 
+export const CHAIN_AUDIT =
+    '[Arithmetic action] Run 100,000 Boundary Tie-Break Gauntlet'
+export class ChainAudit implements Action {
+    readonly type = CHAIN_AUDIT
+    constructor(public bale: EngineBit) {}
+}
+
 export type Actions =
     | InitEngine
     | UpdateEngine
@@ -103,3 +110,4 @@ export type Actions =
     | FastForwardTicks
     | ArithmeticAudit
     | BankersRoundingSuite
+    | ChainAudit

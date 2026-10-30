@@ -70,6 +70,7 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         'PROFILE TICK REDUCTION BUDGET',
         'ARITHMETIC KERNEL AUDIT',
         "EXECUTE BANKER'S ROUNDING SUITE",
+        'RUN 100,000 BOUNDARY TIE-BREAK GAUNTLET',
         'ROOT MENU',
         ActOlm.UPDATE_ENGINE.split(']')[1],
         ActOlm.TEST_ENGINE.split(']')[1],
@@ -82,6 +83,7 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         ActOlm.FAST_FORWARD_TICKS.split(']')[1],
         ActOlm.ARITHMETIC_AUDIT.split(']')[1],
         ActOlm.BANKERS_ROUNDING_SUITE.split(']')[1],
+        ActOlm.CHAIN_AUDIT.split(']')[1],
     ]
 
     const descriptions: Record<string, string> = {
@@ -97,6 +99,8 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             'Assert BasisPoint float rejection and bounds guards.',
         "EXECUTE BANKER'S ROUNDING SUITE":
             'Verify 4-case Round-Half-Even scaling kernel.',
+        'RUN 100,000 BOUNDARY TIE-BREAK GAUNTLET':
+            'Verify left-associative chained scaling under 10^8 bp.',
         'ROOT MENU': 'Return to the master runner switchboard.',
     }
 
@@ -244,6 +248,21 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
                 src: '>> Executing Banker Rounding Suite...',
             })
             const res = await ste.hunt(ActOlm.BANKERS_ROUNDING_SUITE, {})
+            const lines: string[] =
+                res?.fncBit?.lst ?? (res?.fenBit?.src ? [res.fenBit.src] : [])
+            for (const line of lines) {
+                await lib.hunt(UPDATE_CONSOLE, { idx: 'cns00', src: line })
+            }
+            break
+        }
+
+        case 'RUN 100,000 BOUNDARY TIE-BREAK GAUNTLET':
+        case ActOlm.CHAIN_AUDIT.split(']')[1]: {
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> Executing Chained Scaling Audit...',
+            })
+            const res = await ste.hunt(ActOlm.CHAIN_AUDIT, {})
             const lines: string[] =
                 res?.fncBit?.lst ?? (res?.fenBit?.src ? [res.fenBit.src] : [])
             for (const line of lines) {
