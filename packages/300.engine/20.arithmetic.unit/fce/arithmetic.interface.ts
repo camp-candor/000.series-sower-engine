@@ -82,9 +82,9 @@ export function assertBigIntBasisPoint(
     n: bigint,
     label = 'BigIntBasisPoint',
 ): asserts n is BigIntBasisPoint {
-    if (n < 0n || n > BigInt(BASIS_POINT_DENOMINATOR)) {
+    if (n < 0n) {
         throw new RangeError(
-            `[OUT_OF_BOUNDS] ${label} must be within [0n, ${BASIS_POINT_DENOMINATOR}n] bp. Received: ${n}n`,
+            `[OUT_OF_BOUNDS] ${label} must be non-negative. Received: ${n}n`,
         )
     }
 }
