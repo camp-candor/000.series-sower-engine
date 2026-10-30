@@ -5,6 +5,6 @@
 
 Day 001
 
-[Build.Sower-Engine.Day-001]( ./docs/010.Build.Sower-Engine.Day-001.md)
+[Build.Sower-Engine.Day-001]( ./doc/010.Build.Sower-Engine.Day-001.md)
 
 

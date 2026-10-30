@@ -11,52 +11,52 @@ export function reducer(
 ) {
     switch (act.type) {
         case Act.UPDATE_COLLECT:
-            return Buzz.updateCollect(clone(model), act.bale, state)
+            return Buzz.updateCollect(clone(model), act.bale, state as State)
 
         case Act.INIT_COLLECT:
-            return Buzz.initCollect(clone(model), act.bale, state)
+            return Buzz.initCollect(clone(model), act.bale, state as State)
 
         case Act.READ_COLLECT:
-            return Buzz.readCollect(clone(model), act.bale, state)
+            return Buzz.readCollect(clone(model), act.bale, state as State)
 
         case Act.WRITE_COLLECT:
-            return Buzz.writeCollect(clone(model), act.bale, state)
+            return Buzz.writeCollect(clone(model), act.bale, state as State)
 
         case Act.CREATE_COLLECT:
-            return Buzz.createCollect(clone(model), act.bale, state)
+            return Buzz.createCollect(clone(model), act.bale, state as State)
 
         case Act.DELETE_COLLECT:
-            return Buzz.deleteCollect(clone(model), act.bale, state)
+            return Buzz.deleteCollect(clone(model), act.bale, state as State)
 
         case Act.REMOVE_COLLECT:
-            return Buzz.removeCollect(clone(model), act.bale, state)
+            return Buzz.removeCollect(clone(model), act.bale, state as State)
 
         case Act.EMPTY_COLLECT:
-            return Buzz.emptyCollect(clone(model), act.bale, state)
+            return Buzz.emptyCollect(clone(model), act.bale, state as State)
 
         case Act.FETCH_COLLECT:
-            return Buzz.fetchCollect(clone(model), act.bale, state)
+            return Buzz.fetchCollect(clone(model), act.bale, state as State)
 
         case Act.MODEL_COLLECT:
-            return Buzz.modelCollect(clone(model), act.bale, state)
+            return Buzz.modelCollect(clone(model), act.bale, state as State)
 
         case Act.GET_COLLECT:
-            return Buzz.getCollect(clone(model), act.bale, state)
+            return Buzz.getCollect(clone(model), act.bale, state as State)
 
         case Act.PUT_COLLECT:
-            return Buzz.putCollect(clone(model), act.bale, state)
+            return Buzz.putCollect(clone(model), act.bale, state as State)
 
         case Act.FORMAT_COLLECT:
-            return Buzz.formatCollect(clone(model), act.bale, state)
+            return Buzz.formatCollect(clone(model), act.bale, state as State)
 
         case Act.DOT_COLLECT:
-            return Buzz.dotCollect(clone(model), act.bale, state)
+            return Buzz.dotCollect(clone(model), act.bale, state as State)
 
         case Act.LIST_COLLECT:
-            return Buzz.listCollect(clone(model), act.bale, state)
+            return Buzz.listCollect(clone(model), act.bale, state as State)
 
         case Act.HASH_COLLECT:
-            return Buzz.hashCollect(clone(model), act.bale, state)
+            return Buzz.hashCollect(clone(model), act.bale, state as State)
 
         default:
             return model

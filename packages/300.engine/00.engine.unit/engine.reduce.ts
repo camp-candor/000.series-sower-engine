@@ -11,25 +11,25 @@ export function reducer(
 ) {
     switch (act.type) {
         case Act.UPDATE_ENGINE:
-            return Buzz.updateEngine(clone(model), act.bale, state)
+            return Buzz.updateEngine(clone(model), act.bale, state as State)
 
         case Act.INIT_ENGINE:
-            return Buzz.initEngine(clone(model), act.bale, state)
+            return Buzz.initEngine(clone(model), act.bale, state as State)
 
         case Act.TEST_ENGINE:
-            return Buzz.testEngine(clone(model), act.bale, state)
+            return Buzz.testEngine(clone(model), act.bale, state as State)
 
         case Act.LIST_ENGINE:
-            return Buzz.listEngine(clone(model), act.bale, state)
+            return Buzz.listEngine(clone(model), act.bale, state as State)
 
         case Act.AUDIT_FENCE:
-            return Buzz.auditFence(clone(model), act.bale, state)
+            return Buzz.auditFence(clone(model), act.bale, state as State)
 
         case Act.CHECK_ARTIFACTS:
-            return Buzz.checkArtifacts(clone(model), act.bale, state)
+            return Buzz.checkArtifacts(clone(model), act.bale, state as State)
 
         case Act.AUDIT_BOUNDARY:
-            return Buzz.auditBoundary(clone(model), act.bale, state)
+            return Buzz.auditBoundary(clone(model), act.bale, state as State)
 
         default:
             return model

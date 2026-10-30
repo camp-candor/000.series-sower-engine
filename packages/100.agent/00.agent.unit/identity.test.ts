@@ -9,13 +9,12 @@ describe('Dynamic Repository Identity Resolver (100.agent)', () => {
     })
 
     it('formats title banner using repo name followed by version number', () => {
+        const { pkg } = resolveRootPackageJson()
         const identity = getRepoIdentity()
         const legacyToken = ['repo', 'bot'].join('-')
         expect(identity.name.toLowerCase()).not.toContain(legacyToken)
-        expect(identity.name).toBe('series-sower-engine')
-        expect(identity.titleBanner).toMatch(
-            /^series-sower-engine v\d+\.\d+\.\d+$/,
-        )
+        expect(identity.name).toBe(pkg.name)
+        expect(identity.titleBanner).toBe(`${pkg.name} v${pkg.version}`)
     })
 
     it('dynamically adapts when run against a downstream repo manifest', () => {

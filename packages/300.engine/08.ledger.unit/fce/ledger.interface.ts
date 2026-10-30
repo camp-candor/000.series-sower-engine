@@ -1,9 +1,7 @@
-
-import  LedgerBit  from "./ledger.bit";
+// import  LedgerBit  from "./ledger.bit.js";
 
 export default interface Ledger {
- // idx:string;
- // ledgerBitList: LedgerBit[];
- // ledgerBits:any;
-
+    // idx:string;
+    // ledgerBitList: LedgerBit[];
+    // ledgerBits:any;
 }

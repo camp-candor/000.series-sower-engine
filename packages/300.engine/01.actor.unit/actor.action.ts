@@ -1,18 +1,18 @@
-import { Action } from "../99.core/interface/action.interface";
-import  ActorBit  from "./fce/actor.bit";
+import { Action } from '../99.core/interface/action.interface.js'
+import ActorBit from './fce/actor.bit.js'
 
 // Actor actions
 
-export const INIT_ACTOR = "[Actor action] Init Actor";
+export const INIT_ACTOR = '[Actor action] Init Actor'
 export class InitActor implements Action {
- readonly type = INIT_ACTOR;
- constructor(public bale: ActorBit) {}
+    readonly type = INIT_ACTOR
+    constructor(public bale: ActorBit) {}
 }
 
-export const UPDATE_ACTOR = "[Actor action] Update Actor";
+export const UPDATE_ACTOR = '[Actor action] Update Actor'
 export class UpdateActor implements Action {
- readonly type = UPDATE_ACTOR;
- constructor(public bale: ActorBit) {}
+    readonly type = UPDATE_ACTOR
+    constructor(public bale: ActorBit) {}
 }
 
-export type Actions = | InitActor | UpdateActor ;
+export type Actions = InitActor | UpdateActor

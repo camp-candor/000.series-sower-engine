@@ -1,13 +1,20 @@
-export const initPrimordial = (cpy: PrimordialModel, bal:PrimordialBit, ste: State) => {
- debugger
- return cpy;
-};
+export const initPrimordial = (
+    cpy: PrimordialModel,
+    _bal: PrimordialBit,
+    _ste: State,
+) => {
+    debugger
+    return cpy
+}
 
-export const updatePrimordial = (cpy: PrimordialModel, bal:PrimordialBit, ste: State) => {
- return cpy;
-};
+export const updatePrimordial = (
+    cpy: PrimordialModel,
+    _bal: PrimordialBit,
+    _ste: State,
+) => {
+    return cpy
+}
 
-
-import { PrimordialModel } from "../primordial.model";
-import PrimordialBit from "../fce/primordial.bit";
-import State from "../../99.core/state";
+import { PrimordialModel } from '../primordial.model.js'
+import PrimordialBit from '../fce/primordial.bit.js'
+import State from '../../99.core/state.js'

@@ -6,9 +6,18 @@ import { promisify } from 'util'
 import path from 'path'
 import fs from 'fs'
 import { createRequire } from 'module'
+import { fileURLToPath } from 'url'
 
 const require = createRequire(import.meta.url)
 const exec = promisify(execCb)
+const __filename =
+    typeof import.meta.url === 'string' ? fileURLToPath(import.meta.url) : ''
+const __dirname =
+    typeof (import.meta as any).dirname === 'string'
+        ? (import.meta as any).dirname
+        : __filename
+          ? path.dirname(__filename)
+          : process.cwd()
 
 // 1. Setup CLI
 program
@@ -32,7 +41,7 @@ export interface PackageTerminalMetadata {
  * Sweeps packages/ for valid TypeScript packages and extracts Schema-Driven metadata.
  */
 export const getExistingPackages = (): PackageTerminalMetadata[] => {
-    const packagesDir = path.resolve(import.meta.dirname, '../../packages')
+    const packagesDir = path.resolve(__dirname, '../../packages')
     if (!fs.existsSync(packagesDir)) return []
 
     const entries = fs.readdirSync(packagesDir, { withFileTypes: true })
@@ -125,7 +134,7 @@ const init = async () => {
     const idx = options.separator
     if (idx) console.log(`   Targeting: ${idx}`)
 
-    const libPath = path.resolve(import.meta.dirname, './dist/995.library')
+    const libPath = path.resolve(__dirname, './dist/995.library')
     const existingPackages = getExistingPackages()
 
     try {
@@ -153,7 +162,7 @@ const init = async () => {
         const logWidget = cnsBit?.cnsBit?.dat?.bit
         if (logWidget && Array.isArray(logWidget.logLines)) {
             const libPkgPath = path.resolve(
-                import.meta.dirname,
+                __dirname,
                 './package.json',
             )
             const libPkg = fs.existsSync(libPkgPath)
@@ -182,7 +191,7 @@ const init = async () => {
 
         // 3. Dynamic Package Injection & Bus Wiring
         const packagesDist = path.resolve(
-            import.meta.dirname,
+            __dirname,
             '../../packages/dist',
         )
         if (fs.existsSync(packagesDist)) {
@@ -198,12 +207,12 @@ const init = async () => {
         for (const pkg of existingPackages) {
             try {
                 let pkgDistPath = path.resolve(
-                    import.meta.dirname,
+                    __dirname,
                     `../../packages/dist/${pkg.name}`,
                 )
                 if (!fs.existsSync(pkgDistPath)) {
                     const localDist = path.resolve(
-                        import.meta.dirname,
+                        __dirname,
                         `../../packages/${pkg.name}/dist`,
                     )
                     if (fs.existsSync(localDist)) {
@@ -293,12 +302,12 @@ const init = async () => {
             )
             if (target) {
                 let pkgDistPath = path.resolve(
-                    import.meta.dirname,
+                    __dirname,
                     `../../packages/dist/${target.name}`,
                 )
                 if (!fs.existsSync(pkgDistPath)) {
                     const localDist = path.resolve(
-                        import.meta.dirname,
+                        __dirname,
                         `../../packages/${target.name}/dist`,
                     )
                     if (fs.existsSync(localDist)) {
@@ -461,6 +470,94 @@ const auditBoundaryHeadless = async () => {
     }
 }
 
+const formatCompilationFeedback = (rawOutput: string): void => {
+    const lines = rawOutput.split(/\r?\n/).filter((l) => l.trim().length > 0)
+    const errorPattern = /^(.+?)\((\d+),(\d+)\):\s*error\s*(TS\d+):\s*(.+)$/
+    const errors: Array<{
+        file: string
+        line: string
+        col: string
+        code: string
+        msg: string
+        raw: string
+    }> = []
+
+    for (const line of lines) {
+        const match = line.match(errorPattern)
+        if (match) {
+            errors.push({
+                file: match[1].trim(),
+                line: match[2],
+                col: match[3],
+                code: match[4],
+                msg: match[5].trim(),
+                raw: line,
+            })
+        }
+    }
+
+    console.error('')
+    console.error(
+        '================================================================================',
+    )
+    console.error(':: [FAIL] TypeScript Compilation Failed (tsc -b)')
+    console.error(
+        '================================================================================',
+    )
+
+    if (errors.length === 0) {
+        console.error(rawOutput.trim())
+    } else {
+        const fileSet = new Set(errors.map((e) => e.file))
+        const codeCounts: Record<string, number> = {}
+        const packageCounts: Record<string, number> = {}
+
+        for (const e of errors) {
+            codeCounts[e.code] = (codeCounts[e.code] || 0) + 1
+            const pkgMatch = e.file.match(/(?:packages|apps)[\\/]([^\\/]+)/)
+            const pkgName = pkgMatch ? pkgMatch[1] : 'root'
+            packageCounts[pkgName] = (packageCounts[pkgName] || 0) + 1
+        }
+
+        console.error(
+            `Total Errors : ${errors.length} error(s) detected across ${fileSet.size} file(s)`,
+        )
+        console.error('')
+        console.error('Breakdown by Workspace / Package:')
+        for (const [pkg, count] of Object.entries(packageCounts)) {
+            console.error(`  - [${pkg}]: ${count} error(s)`)
+        }
+        console.error('')
+        console.error('Error Code Distribution:')
+        for (const [code, count] of Object.entries(codeCounts)) {
+            console.error(`  - ${code}: ${count} occurrence(s)`)
+        }
+        console.error('')
+        console.error('Diagnostic Sample (first 15 errors):')
+        const sample = errors.slice(0, 15)
+        for (const s of sample) {
+            console.error(`  >> ${s.file}:${s.line}:${s.col}`)
+            console.error(`     [${s.code}] ${s.msg}`)
+        }
+        if (errors.length > 15) {
+            console.error(`  ... and ${errors.length - 15} additional error(s).`)
+        }
+    }
+
+    console.error(
+        '================================================================================',
+    )
+    console.error(
+        ':: [ABORT] Terminal Orchestrator startup halted due to compilation errors.',
+    )
+    console.error(
+        ':: All TypeScript project references must compile cleanly (exit code 0) before launch.',
+    )
+    console.error(
+        '================================================================================',
+    )
+}
+
 const main = async () => {
     if (options.auditFence) {
         auditFenceHeadless()
@@ -474,6 +571,7 @@ const main = async () => {
         await auditBoundaryHeadless()
         return
     }
+    let heartbeat: NodeJS.Timeout | null = null
     try {
         const existingPackages = getExistingPackages()
         console.log(
@@ -485,15 +583,15 @@ const main = async () => {
         ].join(' ')
 
         const startTime = Date.now()
-        const heartbeat = setInterval(() => {
+        heartbeat = setInterval(() => {
             const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
             console.log(`>> [BUILD] Compiling references... (${elapsed}s elapsed)`)
         }, 3000)
 
-        var { stdout, stderr } = await exec(`tsc -b ${buildTargets}`, {
-            cwd: import.meta.dirname,
+        const { stdout, stderr } = await exec(`tsc -b ${buildTargets}`, {
+            cwd: __dirname,
         })
-        clearInterval(heartbeat)
+        if (heartbeat) clearInterval(heartbeat)
 
         const totalElapsed = ((Date.now() - startTime) / 1000).toFixed(1)
         console.log(`>> [BUILD:OK] All references compiled in ${totalElapsed}s`)
@@ -503,8 +601,12 @@ const main = async () => {
 
         await init()
     } catch (err: any) {
-        console.error(':: [FAIL] Build Failed:')
-        console.error(err.stdout || err.message)
+        if (heartbeat) clearInterval(heartbeat)
+        const rawOutput =
+            (err.stdout || '') +
+            (err.stderr ? '\n' + err.stderr : '') +
+            (!err.stdout && !err.stderr ? '\n' + (err.message || '') : '')
+        formatCompilationFeedback(rawOutput)
         process.exit(1)
     }
 }

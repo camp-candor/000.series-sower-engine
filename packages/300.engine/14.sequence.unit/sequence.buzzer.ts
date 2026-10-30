@@ -1,2 +1,2 @@
-export { initSequence  } from "./buz/sequence.buzz";
-export { updateSequence  } from "./buz/sequence.buzz";
+export { initSequence } from './buz/sequence.buzz.js'
+export { updateSequence } from './buz/sequence.buzz.js'

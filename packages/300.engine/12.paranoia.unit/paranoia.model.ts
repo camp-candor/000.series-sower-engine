@@ -1,8 +1,8 @@
-import Paranoia from "./fce/paranoia.interface";
-import ParanoiaBit from "./fce/paranoia.interface";
+import Paranoia from './fce/paranoia.interface.js'
+// import ParanoiaBit from "./fce/paranoia.interface.js";
 
 export class ParanoiaModel implements Paranoia {
- //idx:string;
- //paranoiaBitList: ParanoiaBit[] = [];
- //paranoiaBits: any = {};
+    //idx:string;
+    //paranoiaBitList: ParanoiaBit[] = [];
+    //paranoiaBits: any = {};
 }

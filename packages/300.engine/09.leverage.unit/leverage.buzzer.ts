@@ -1,2 +1,2 @@
-export { initLeverage  } from "./buz/leverage.buzz";
-export { updateLeverage  } from "./buz/leverage.buzz";
+export { initLeverage } from './buz/leverage.buzz.js'
+export { updateLeverage } from './buz/leverage.buzz.js'

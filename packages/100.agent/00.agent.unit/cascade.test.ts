@@ -49,7 +49,6 @@ describe('4-Tier Resolution Cascade & Protocol Derivation (100.agent)', () => {
 
     it('The Never-Cache Invariant: resolves dynamically across successive dispatches', () => {
         expect(getBaseUrl()).toBe('http://127.0.0.1:8787')
-
         ;(global as any).agentBaseUrl = 'http://127.0.0.1:9999'
         expect(getBaseUrl()).toBe('http://127.0.0.1:9999')
 

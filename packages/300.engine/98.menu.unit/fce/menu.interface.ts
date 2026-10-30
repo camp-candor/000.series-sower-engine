@@ -1,4 +1,4 @@
-import MenuBit from './menu.bit'
+// import MenuBit from './menu.bit.js'
 
 export default interface Menu {
     // idx:string;

@@ -27,8 +27,7 @@ describe('engine', () => {
         const slv = vi.fn()
         const bal = { idx: 'test', slv } as any
 
-        const urlengine =
-            'https://zero00-engine.onrender.com/api/engine/test'
+        const urlengine = 'https://zero00-engine.onrender.com/api/engine/test'
 
         const mockResponseengine = { status: 'engine-awake' }
 
@@ -68,8 +67,7 @@ describe('engine', () => {
         const slv = vi.fn()
         const bal = { idx: 'test', slv } as any
 
-        const urlengine =
-            'https://zero00-engine.onrender.com/api/engine/test'
+        const urlengine = 'https://zero00-engine.onrender.com/api/engine/test'
 
         const errorMessage = 'Network error'
         const globalFetch = vi

@@ -1,13 +1,20 @@
-export const initEnvelope = (cpy: EnvelopeModel, bal:EnvelopeBit, ste: State) => {
- debugger
- return cpy;
-};
+export const initEnvelope = (
+    cpy: EnvelopeModel,
+    _bal: EnvelopeBit,
+    _ste: State,
+) => {
+    debugger
+    return cpy
+}
 
-export const updateEnvelope = (cpy: EnvelopeModel, bal:EnvelopeBit, ste: State) => {
- return cpy;
-};
+export const updateEnvelope = (
+    cpy: EnvelopeModel,
+    _bal: EnvelopeBit,
+    _ste: State,
+) => {
+    return cpy
+}
 
-
-import { EnvelopeModel } from "../envelope.model";
-import EnvelopeBit from "../fce/envelope.bit";
-import State from "../../99.core/state";
+import { EnvelopeModel } from '../envelope.model.js'
+import EnvelopeBit from '../fce/envelope.bit.js'
+import State from '../../99.core/state.js'

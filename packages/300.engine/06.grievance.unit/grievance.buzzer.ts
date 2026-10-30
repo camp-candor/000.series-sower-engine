@@ -1,2 +1,2 @@
-export { initGrievance  } from "./buz/grievance.buzz";
-export { updateGrievance  } from "./buz/grievance.buzz";
+export { initGrievance } from './buz/grievance.buzz.js'
+export { updateGrievance } from './buz/grievance.buzz.js'

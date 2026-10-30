@@ -1,9 +1,7 @@
-
-import  GrievanceBit  from "./grievance.bit";
+// import  GrievanceBit  from "./grievance.bit.js";
 
 export default interface Grievance {
- // idx:string;
- // grievanceBitList: GrievanceBit[];
- // grievanceBits:any;
-
+    // idx:string;
+    // grievanceBitList: GrievanceBit[];
+    // grievanceBits:any;
 }

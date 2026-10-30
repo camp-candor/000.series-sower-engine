@@ -1,7 +1,5 @@
-import State from "../99.core/state";
+import State from '../99.core/state.js'
 
 export default class TraumaUnit {
-
- constructor(state: State) {
- }
+    constructor(_state: State) {}
 }

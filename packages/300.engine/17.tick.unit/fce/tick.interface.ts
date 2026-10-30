@@ -1,9 +1,7 @@
-
-import  TickBit  from "./tick.bit";
+// import  TickBit  from "./tick.bit.js";
 
 export default interface Tick {
- // idx:string;
- // tickBitList: TickBit[];
- // tickBits:any;
-
+    // idx:string;
+    // tickBitList: TickBit[];
+    // tickBits:any;
 }

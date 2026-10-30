@@ -1,2 +1,2 @@
-export { initDatabase  } from "./buz/database.buzz";
-export { updateDatabase  } from "./buz/database.buzz";
+export { initDatabase } from './buz/database.buzz.js'
+export { updateDatabase } from './buz/database.buzz.js'

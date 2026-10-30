@@ -1,9 +1,7 @@
-
-import  ParanoiaBit  from "./paranoia.bit";
+// import  ParanoiaBit  from "./paranoia.bit.js";
 
 export default interface Paranoia {
- // idx:string;
- // paranoiaBitList: ParanoiaBit[];
- // paranoiaBits:any;
-
+    // idx:string;
+    // paranoiaBitList: ParanoiaBit[];
+    // paranoiaBits:any;
 }

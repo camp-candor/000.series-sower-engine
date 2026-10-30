@@ -1,2 +1,2 @@
-export { initActor  } from "./buz/actor.buzz";
-export { updateActor  } from "./buz/actor.buzz";
+export { initActor } from './buz/actor.buzz.js'
+export { updateActor } from './buz/actor.buzz.js'

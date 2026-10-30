@@ -48,7 +48,7 @@ const engine = {
     },
 }
 
-export const initEngine = (cpy: EngineModel, bal: EngineBit, ste: State) => {
+export const initEngine = (cpy: EngineModel, bal: EngineBit, _ste: State) => {
     const url =
         process.env.ENGINE_URL ||
         'https://zero00-engine.onrender.com/api/engine/test'
@@ -82,18 +82,18 @@ export const initEngine = (cpy: EngineModel, bal: EngineBit, ste: State) => {
     return cpy
 }
 
-export const updateEngine = (cpy: EngineModel, bal: EngineBit, ste: State) => {
-    bal.slv({ intBit: { idx: 'update-engine' } })
+export const updateEngine = (cpy: EngineModel, bal: EngineBit, _ste: State) => {
+    if (bal.slv) bal.slv({ intBit: { idx: 'update-engine' } })
 
     return cpy
 }
 
-export const testEngine = (cpy: EngineModel, bal: EngineBit, ste: State) => {
-    bal.slv({ mytBit: { idx: 'test-engine', val: 1 } })
+export const testEngine = (cpy: EngineModel, bal: EngineBit, _ste: State) => {
+    if (bal.slv) bal.slv({ mytBit: { idx: 'test-engine', val: 1 } })
     return cpy
 }
 
-export const auditFence = (cpy: EngineModel, bal: EngineBit, ste: State) => {
+export const auditFence = (cpy: EngineModel, bal: EngineBit, _ste: State) => {
     const root = findMonorepoRoot(process.cwd())
     let ok = false
     let detail = 'monorepo root not found'
@@ -218,7 +218,7 @@ export const auditBoundary = (
 export const listEngine = async (
     cpy: EngineModel,
     bal: EngineBit,
-    ste: State,
+    _ste: State,
 ) => {
     const response = await engine.list()
     if (bal.slv != null)

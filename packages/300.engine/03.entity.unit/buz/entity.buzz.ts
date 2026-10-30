@@ -1,13 +1,16 @@
-export const initEntity = (cpy: EntityModel, bal:EntityBit, ste: State) => {
- debugger
- return cpy;
-};
+export const initEntity = (cpy: EntityModel, _bal: EntityBit, _ste: State) => {
+    debugger
+    return cpy
+}
 
-export const updateEntity = (cpy: EntityModel, bal:EntityBit, ste: State) => {
- return cpy;
-};
+export const updateEntity = (
+    cpy: EntityModel,
+    _bal: EntityBit,
+    _ste: State,
+) => {
+    return cpy
+}
 
-
-import { EntityModel } from "../entity.model";
-import EntityBit from "../fce/entity.bit";
-import State from "../../99.core/state";
+import { EntityModel } from '../entity.model.js'
+import EntityBit from '../fce/entity.bit.js'
+import State from '../../99.core/state.js'

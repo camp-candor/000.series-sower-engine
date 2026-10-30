@@ -1,9 +1,7 @@
-
-import  EventBit  from "./event.bit";
+// import  EventBit  from "./event.bit.js";
 
 export default interface Event {
- // idx:string;
- // eventBitList: EventBit[];
- // eventBits:any;
-
+    // idx:string;
+    // eventBitList: EventBit[];
+    // eventBits:any;
 }

@@ -1,9 +1,7 @@
-
-import  WoundsBit  from "./wounds.bit";
+// import  WoundsBit  from "./wounds.bit.js";
 
 export default interface Wounds {
- // idx:string;
- // woundsBitList: WoundsBit[];
- // woundsBits:any;
-
+    // idx:string;
+    // woundsBitList: WoundsBit[];
+    // woundsBits:any;
 }

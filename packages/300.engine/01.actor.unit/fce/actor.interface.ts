@@ -1,9 +1,7 @@
-
-import  ActorBit  from "./actor.bit";
+// import  ActorBit  from "./actor.bit.js";
 
 export default interface Actor {
- // idx:string;
- // actorBitList: ActorBit[];
- // actorBits:any;
-
+    // idx:string;
+    // actorBitList: ActorBit[];
+    // actorBits:any;
 }
