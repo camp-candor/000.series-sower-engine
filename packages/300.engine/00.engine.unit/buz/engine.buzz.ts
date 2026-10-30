@@ -1,6 +1,16 @@
 import { EngineModel } from '../engine.model.js'
 import EngineBit from '../fce/engine.bit.js'
 import State from '../../99.core/state.js'
+import {
+    reducer as tickReducer,
+    reduceTickStep,
+} from '../../17.tick.unit/tick.reduce.js'
+import { TickModel } from '../../17.tick.unit/tick.model.js'
+import { UPDATE_TICK } from '../../17.tick.unit/tick.action.js'
+import {
+    toSimTime,
+    type TickStatePayload,
+} from '../../17.tick.unit/fce/tick.interface.js'
 import { createRequire } from 'module'
 const req = createRequire(import.meta.url)
 const fs = req('fs')
@@ -209,6 +219,129 @@ export const auditBoundary = (
                     ? AUDIT_BOUNDARY_OK
                     : `${AUDIT_BOUNDARY_FAIL}: ${detail}`,
                 dat: { ok, detail },
+            },
+        })
+    }
+    return cpy
+}
+
+export const PROFILE_BUDGET_MS = 2.0
+const PROFILE_BUDGET_NS = BigInt(2000000)
+
+export const formatBudgetPass = (elapsedMs: number): string =>
+    `>> [BUDGET_PASS] Execution took ${elapsedMs.toFixed(4)}ms (Budget: <= ${PROFILE_BUDGET_MS.toFixed(4)}ms)`
+
+export const formatBudgetBreach = (elapsedMs: number): string =>
+    `:: [BUDGET_BREACH] Execution took ${elapsedMs.toFixed(4)}ms, strictly capped at ${PROFILE_BUDGET_MS.toFixed(4)}ms`
+
+export const profileBudget = (
+    cpy: EngineModel,
+    bal: EngineBit,
+    ste?: State,
+) => {
+    void ste
+    const step = () => {
+        tickReducer(
+            new TickModel(),
+            { type: UPDATE_TICK, bale: { idx: 'profile-budget' } } as any,
+            {} as any,
+        )
+    }
+    // Warm-up pass to prime the V8 JIT before measurement
+    step()
+    const start = process.hrtime.bigint()
+    step()
+    const end = process.hrtime.bigint()
+    const elapsedNs = end - start
+    const elapsedMs = Number(elapsedNs) / 1_000_000
+    const ok = elapsedNs <= PROFILE_BUDGET_NS
+    if (bal.slv != null) {
+        bal.slv({
+            fenBit: {
+                idx: ok ? 'profile-budget-ok' : 'profile-budget-fail',
+                src: ok
+                    ? formatBudgetPass(elapsedMs)
+                    : formatBudgetBreach(elapsedMs),
+                dat: { ok, elapsedMs, budgetMs: PROFILE_BUDGET_MS },
+            },
+        })
+    }
+    return cpy
+}
+
+let demoTickState: TickStatePayload = {
+    tick: toSimTime(0),
+    actors: [
+        {
+            id: 'char_elias',
+            somatic_strain_bp: 4500,
+            paranoia_bp: 1200,
+            current_loc: 'loc_culvert',
+            busyUntil: toSimTime(0),
+        },
+        {
+            id: 'char_vance',
+            somatic_strain_bp: 1200,
+            paranoia_bp: 3400,
+            current_loc: 'loc_warm_pipe',
+            busyUntil: toSimTime(0),
+        },
+    ],
+    pending_actions: [],
+}
+
+export const formatTickReceipt = (
+    advanced: number,
+    fromTick: number,
+    toTick: number,
+    elapsedMs: number,
+): string => {
+    const safeMs = elapsedMs > 0 ? elapsedMs : 0.0001
+    const ticksPerSec = Math.round(advanced / (safeMs / 1000))
+    const unit = advanced === 1 ? 'tick' : 'ticks'
+    return `>> [TICK_OK] Advanced ${advanced} ${unit} in ${elapsedMs.toFixed(4)}ms (~${ticksPerSec} ticks/sec, tick ${fromTick} -> ${toTick})`
+}
+
+export const stepTick = (cpy: EngineModel, bal: EngineBit, ste?: State) => {
+    void ste
+    const fromTick: number = demoTickState.tick
+    const start = process.hrtime.bigint()
+    demoTickState = reduceTickStep(demoTickState)
+    const end = process.hrtime.bigint()
+    const elapsedMs = Number(end - start) / 1_000_000
+    const toTick: number = demoTickState.tick
+    if (bal.slv != null) {
+        bal.slv({
+            fenBit: {
+                idx: 'step-tick-ok',
+                src: formatTickReceipt(1, fromTick, toTick, elapsedMs),
+                dat: { ok: true, advanced: 1, fromTick, toTick, elapsedMs },
+            },
+        })
+    }
+    return cpy
+}
+
+export const fastForwardTicks = (
+    cpy: EngineModel,
+    bal: EngineBit,
+    ste?: State,
+) => {
+    void ste
+    const fromTick: number = demoTickState.tick
+    const start = process.hrtime.bigint()
+    for (let i = 0; i < 100; i++) {
+        demoTickState = reduceTickStep(demoTickState)
+    }
+    const end = process.hrtime.bigint()
+    const elapsedMs = Number(end - start) / 1_000_000
+    const toTick: number = demoTickState.tick
+    if (bal.slv != null) {
+        bal.slv({
+            fenBit: {
+                idx: 'fast-forward-ticks-ok',
+                src: formatTickReceipt(100, fromTick, toTick, elapsedMs),
+                dat: { ok: true, advanced: 100, fromTick, toTick, elapsedMs },
             },
         })
     }

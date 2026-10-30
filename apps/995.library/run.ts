@@ -26,6 +26,9 @@ program
     .option('--audit-fence')
     .option('--check-artifacts')
     .option('--audit-boundary')
+    .option('--profile-budget')
+    .option('--tick-step')
+    .option('--tick-fast-forward')
 program.parse(process.argv)
 const options = program.opts()
 
@@ -75,6 +78,15 @@ export const getExistingPackages = (): PackageTerminalMetadata[] => {
                 menuDesc:
                     terminalMeta.menuDesc ||
                     `Open ${entry.name} management console.`,
+                targetDir,
+            })
+        } else if (entry.name === '300.engine') {
+            results.push({
+                name: entry.name,
+                globalKey: 'ENGINE',
+                menuTitle: 'SIMULATION ENGINE',
+                menuDesc:
+                    'Inspect simulation fences, boundary gates, and budget profilers.',
                 targetDir,
             })
         } else {
@@ -470,6 +482,101 @@ const auditBoundaryHeadless = async () => {
     }
 }
 
+const profileBudgetHeadless = async () => {
+    try {
+        const mod = await import(
+            '../../packages/300.engine/00.engine.unit/buz/engine.buzz.js'
+        )
+        let receipt = ''
+        let ok = false
+        mod.profileBudget(
+            {} as any,
+            {
+                idx: 'profile',
+                slv: (bit: any) => {
+                    receipt = bit.fenBit.src
+                    ok = bit.fenBit.idx === 'profile-budget-ok'
+                },
+            } as any,
+        )
+        if (ok) {
+            console.log(receipt)
+            process.exit(0)
+        }
+        console.error(receipt)
+        process.exit(1)
+    } catch (err: any) {
+        console.error(
+            `:: [BUDGET_BREACH] Profile Budget headless execution failed: ${err?.message ?? err}`,
+        )
+        process.exit(1)
+    }
+}
+
+const tickStepHeadless = async () => {
+    try {
+        const mod = await import(
+            '../../packages/300.engine/00.engine.unit/buz/engine.buzz.js'
+        )
+        let receipt = ''
+        let ok = false
+        mod.stepTick(
+            {} as any,
+            {
+                idx: 'step',
+                slv: (bit: any) => {
+                    receipt = bit.fenBit.src
+                    ok = bit.fenBit.idx === 'step-tick-ok'
+                },
+            } as any,
+        )
+        if (ok) {
+            console.log(receipt)
+            process.exit(0)
+        }
+        console.error(receipt || ':: [TICK_FAIL] Step 1 tick produced no receipt')
+        process.exit(1)
+    } catch (err: any) {
+        console.error(
+            `:: [TICK_FAIL] Tick step headless execution failed: ${err?.message ?? err}`,
+        )
+        process.exit(1)
+    }
+}
+
+const tickFastForwardHeadless = async () => {
+    try {
+        const mod = await import(
+            '../../packages/300.engine/00.engine.unit/buz/engine.buzz.js'
+        )
+        let receipt = ''
+        let ok = false
+        mod.fastForwardTicks(
+            {} as any,
+            {
+                idx: 'fast-forward',
+                slv: (bit: any) => {
+                    receipt = bit.fenBit.src
+                    ok = bit.fenBit.idx === 'fast-forward-ticks-ok'
+                },
+            } as any,
+        )
+        if (ok) {
+            console.log(receipt)
+            process.exit(0)
+        }
+        console.error(
+            receipt || ':: [TICK_FAIL] Fast forward produced no receipt',
+        )
+        process.exit(1)
+    } catch (err: any) {
+        console.error(
+            `:: [TICK_FAIL] Tick fast-forward headless execution failed: ${err?.message ?? err}`,
+        )
+        process.exit(1)
+    }
+}
+
 const formatCompilationFeedback = (rawOutput: string): void => {
     const lines = rawOutput.split(/\r?\n/).filter((l) => l.trim().length > 0)
     const errorPattern = /^(.+?)\((\d+),(\d+)\):\s*error\s*(TS\d+):\s*(.+)$/
@@ -569,6 +676,18 @@ const main = async () => {
     }
     if (options.auditBoundary) {
         await auditBoundaryHeadless()
+        return
+    }
+    if (options.profileBudget) {
+        await profileBudgetHeadless()
+        return
+    }
+    if (options.tickStep) {
+        await tickStepHeadless()
+        return
+    }
+    if (options.tickFastForward) {
+        await tickFastForwardHeadless()
         return
     }
     let heartbeat: NodeJS.Timeout | null = null

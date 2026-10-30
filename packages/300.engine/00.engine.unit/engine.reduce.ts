@@ -31,6 +31,15 @@ export function reducer(
         case Act.AUDIT_BOUNDARY:
             return Buzz.auditBoundary(clone(model), act.bale, state as State)
 
+        case Act.PROFILE_BUDGET:
+            return Buzz.profileBudget(clone(model), act.bale, state as State)
+
+        case Act.STEP_TICK:
+            return Buzz.stepTick(clone(model), act.bale, state as State)
+
+        case Act.FAST_FORWARD_TICKS:
+            return Buzz.fastForwardTicks(clone(model), act.bale, state as State)
+
         default:
             return model
     }

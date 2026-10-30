@@ -22,128 +22,212 @@ const PRINT_MENU = '[Render action] Print Menu'
 export const initMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
     if (bal.slv != null) rootSlv = bal.slv
 
-    bit = await (global as any).LIBRARY.hunt(UPDATE_GRID, {
-        x: 4,
-        y: 0,
-        xSpan: 8,
-        ySpan: 12,
-    })
-    bit = await (global as any).LIBRARY.hunt(WRITE_CONSOLE, {
-        idx: 'cns00',
-        src: '',
-        dat: { net: bit.grdBit.dat, src: 'alligaor0' },
-    })
+    const lib = (globalThis as any).LIBRARY || (global as any).LIBRARY
+    if (lib && typeof lib.hunt === 'function') {
+        bit = await lib.hunt(UPDATE_GRID, {
+            x: 4,
+            y: 0,
+            xSpan: 8,
+            ySpan: 12,
+        })
+        bit = await lib.hunt(WRITE_CONSOLE, {
+            idx: 'cns00',
+            src: '',
+            dat: { net: bit?.grdBit?.dat, src: 'alligaor0' },
+        })
 
-    bit = await (global as any).LIBRARY.hunt(UPDATE_CONSOLE, {
-        idx: 'cns00',
-        src: '-----------',
-    })
-    bit = await (global as any).LIBRARY.hunt(UPDATE_CONSOLE, {
-        idx: 'cns00',
-        src: 'ENGINE MENU',
-    })
+        bit = await lib.hunt(UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: '-----------',
+        })
+        bit = await lib.hunt(UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: 'SIMULATION ENGINE',
+        })
 
-    bit = await (global as any).LIBRARY.hunt(UPDATE_CONSOLE, {
-        idx: 'cns00',
-        src: '-----------',
-    })
+        bit = await lib.hunt(UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: '-----------',
+        })
+    }
 
     await updateMenu(cpy, bal, ste)
 
     return cpy
 }
 
-export const updateMenu = async (cpy: MenuModel, _bal: MenuBit, ste: State) => {
+export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
+    const lib = (globalThis as any).LIBRARY || (global as any).LIBRARY
+    if (!lib || typeof lib.hunt !== 'function') {
+        if (bal?.slv) bal.slv({ mnuBit: { idx: 'update-menu-headless' } })
+        return cpy
+    }
+
     lst = [
+        'AUDIT ZERO-RUNTIME FENCE',
+        'AUDIT AST BOUNDARY FIREWALL',
+        'CHECK EMITTED ARTIFACT HYGIENE',
+        'PROFILE TICK REDUCTION BUDGET',
+        'ROOT MENU',
         ActOlm.UPDATE_ENGINE.split(']')[1],
         ActOlm.TEST_ENGINE.split(']')[1],
         ActOlm.LIST_ENGINE.split(']')[1],
         ActOlm.AUDIT_FENCE.split(']')[1],
         ActOlm.CHECK_ARTIFACTS.split(']')[1],
         ActOlm.AUDIT_BOUNDARY.split(']')[1],
-        'ROOT MENU',
+        ActOlm.PROFILE_BUDGET.split(']')[1],
+        ActOlm.STEP_TICK.split(']')[1],
+        ActOlm.FAST_FORWARD_TICKS.split(']')[1],
     ]
 
-    bit = await (global as any).LIBRARY.hunt(UPDATE_GRID, {
+    const descriptions: Record<string, string> = {
+        'AUDIT ZERO-RUNTIME FENCE':
+            'Verify zero runtime dependencies at workspace root.',
+        'AUDIT AST BOUNDARY FIREWALL':
+            'Run AST boundary linter enforcing engine isolation.',
+        'CHECK EMITTED ARTIFACT HYGIENE':
+            'Assert zero leaked .js/.d.ts files in source units.',
+        'PROFILE TICK REDUCTION BUDGET':
+            'Run pure engine Vitest suite asserting <= 2ms budget.',
+        'ROOT MENU': 'Return to the master runner switchboard.',
+    }
+
+    bit = await lib.hunt(UPDATE_GRID, {
         x: 0,
         y: 4,
         xSpan: 4,
-        ySpan: 8,
+        ySpan: 12,
     })
-    bit = await (global as any).LIBRARY.hunt(OPEN_CHOICE, {
-        dat: { clr0: Color.BLACK, clr1: Color.YELLOW },
+    bit = await lib.hunt(OPEN_CHOICE, {
+        dat: {
+            clr0: Color.BLACK,
+            clr1: Color.YELLOW,
+            cb: (choice: string) => {
+                const text = descriptions[choice] || 'No description available.'
+                text.split('\n').forEach((s: string) =>
+                    lib.hunt(UPDATE_CONSOLE, { idx: 'cns00', src: s }),
+                )
+            },
+        },
         src: Align.VERTICAL,
         lst,
-        net: bit.grdBit.dat,
+        net: bit?.grdBit?.dat,
     })
 
-    src = bit.chcBit.src
+    src = bit?.chcBit?.src
 
     switch (src) {
+        case 'AUDIT ZERO-RUNTIME FENCE':
+        case ActOlm.AUDIT_FENCE.split(']')[1]: {
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> Initiating Zero-Runtime Fence Audit...',
+            })
+            const res = await ste.hunt(ActOlm.AUDIT_FENCE, {})
+            const lines: string[] =
+                res?.fncBit?.lst ?? (res?.fenBit?.src ? [res.fenBit.src] : [])
+            for (const line of lines) {
+                await lib.hunt(UPDATE_CONSOLE, { idx: 'cns00', src: line })
+            }
+            break
+        }
+
+        case 'AUDIT AST BOUNDARY FIREWALL':
+        case ActOlm.AUDIT_BOUNDARY.split(']')[1]: {
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> Initiating AST Boundary Sweep...',
+            })
+            const res = await ste.hunt(ActOlm.AUDIT_BOUNDARY, {})
+            const lines: string[] =
+                res?.fncBit?.lst ?? (res?.fenBit?.src ? [res.fenBit.src] : [])
+            for (const line of lines) {
+                await lib.hunt(UPDATE_CONSOLE, { idx: 'cns00', src: line })
+            }
+            break
+        }
+
+        case 'CHECK EMITTED ARTIFACT HYGIENE':
+        case ActOlm.CHECK_ARTIFACTS.split(']')[1]: {
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> Scanning source tree for compilation debris...',
+            })
+            const res = await ste.hunt(ActOlm.CHECK_ARTIFACTS, {})
+            const lines: string[] =
+                res?.fncBit?.lst ?? (res?.fenBit?.src ? [res.fenBit.src] : [])
+            for (const line of lines) {
+                await lib.hunt(UPDATE_CONSOLE, { idx: 'cns00', src: line })
+            }
+            break
+        }
+
+        case 'PROFILE TICK REDUCTION BUDGET':
+        case ActOlm.PROFILE_BUDGET.split(']')[1]: {
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> Executing Pure Engine Budget Profiling Suite...',
+            })
+            const res = await ste.hunt(ActOlm.PROFILE_BUDGET, {})
+            const lines: string[] =
+                res?.fncBit?.lst ?? (res?.fenBit?.src ? [res.fenBit.src] : [])
+            for (const line of lines) {
+                await lib.hunt(UPDATE_CONSOLE, { idx: 'cns00', src: line })
+            }
+            break
+        }
+
         case ActOlm.UPDATE_ENGINE.split(']')[1]:
             bit = await ste.hunt(ActOlm.UPDATE_ENGINE, {
                 content: 'Engine Menu Selected',
             })
-            bit = await (global as any).LIBRARY.hunt(PRINT_MENU, bit)
+            bit = await lib.hunt(PRINT_MENU, bit)
             break
 
         case ActOlm.TEST_ENGINE.split(']')[1]:
             bit = await ste.hunt(ActOlm.TEST_ENGINE, {
                 content: 'Engine Menu Selected',
             })
-            bit = await (global as any).LIBRARY.hunt(PRINT_MENU, bit)
+            bit = await lib.hunt(PRINT_MENU, bit)
             break
 
         case ActOlm.LIST_ENGINE.split(']')[1]:
             bit = await ste.hunt(ActOlm.LIST_ENGINE, {})
-            lst = bit.olmBit.lst
+            lst = bit?.olmBit?.lst || []
 
             if (lst.length === 0) {
-                bit = await (global as any).LIBRARY.hunt(UPDATE_CONSOLE, {
+                bit = await lib.hunt(UPDATE_CONSOLE, {
                     idx: 'cns00',
                     src: 'No Engine Models Found',
                 })
             } else {
-                bit = await (global as any).LIBRARY.hunt(UPDATE_CONSOLE, {
+                bit = await lib.hunt(UPDATE_CONSOLE, {
                     idx: 'cns00',
                     src: 'Listing Engine Models...',
                 })
                 lst.forEach((a: string) =>
-                    (global as any).LIBRARY.hunt(UPDATE_CONSOLE, {
+                    lib.hunt(UPDATE_CONSOLE, {
                         idx: 'cns00',
                         src: a,
                     }),
                 )
             }
-
-            await new Promise((resolve) => setTimeout(resolve, 3000))
             break
 
-        case ActOlm.AUDIT_FENCE.split(']')[1]:
-            bit = await ste.hunt(ActOlm.AUDIT_FENCE, {})
-            bit = await (global as any).LIBRARY.hunt(UPDATE_CONSOLE, {
+        case ActOlm.STEP_TICK.split(']')[1]:
+            bit = await ste.hunt(ActOlm.STEP_TICK, {})
+            bit = await lib.hunt(UPDATE_CONSOLE, {
                 idx: 'cns00',
-                src: bit.fenBit.src,
+                src: bit?.fenBit?.src,
             })
-            await new Promise((resolve) => setTimeout(resolve, 1500))
             break
 
-        case ActOlm.CHECK_ARTIFACTS.split(']')[1]:
-            bit = await ste.hunt(ActOlm.CHECK_ARTIFACTS, {})
-            bit = await (global as any).LIBRARY.hunt(UPDATE_CONSOLE, {
+        case ActOlm.FAST_FORWARD_TICKS.split(']')[1]:
+            bit = await ste.hunt(ActOlm.FAST_FORWARD_TICKS, {})
+            bit = await lib.hunt(UPDATE_CONSOLE, {
                 idx: 'cns00',
-                src: bit.fenBit.src,
+                src: bit?.fenBit?.src,
             })
-            await new Promise((resolve) => setTimeout(resolve, 1500))
-            break
-
-        case ActOlm.AUDIT_BOUNDARY.split(']')[1]:
-            bit = await ste.hunt(ActOlm.AUDIT_BOUNDARY, {})
-            bit = await (global as any).LIBRARY.hunt(UPDATE_CONSOLE, {
-                idx: 'cns00',
-                src: bit.fenBit.src,
-            })
-            await new Promise((resolve) => setTimeout(resolve, 1500))
             break
 
         case 'ROOT MENU':

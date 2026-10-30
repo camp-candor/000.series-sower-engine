@@ -57,6 +57,24 @@ export class AuditBoundary implements Action {
     constructor(public bale: EngineBit) {}
 }
 
+export const PROFILE_BUDGET = '[Budget action] Profile Budget'
+export class ProfileBudget implements Action {
+    readonly type = PROFILE_BUDGET
+    constructor(public bale: EngineBit) {}
+}
+
+export const STEP_TICK = '[Tick action] Step 1 Tick'
+export class StepTick implements Action {
+    readonly type = STEP_TICK
+    constructor(public bale: EngineBit) {}
+}
+
+export const FAST_FORWARD_TICKS = '[Tick action] Fast Forward 100 Ticks'
+export class FastForwardTicks implements Action {
+    readonly type = FAST_FORWARD_TICKS
+    constructor(public bale: EngineBit) {}
+}
+
 export type Actions =
     | InitEngine
     | UpdateEngine
@@ -67,3 +85,6 @@ export type Actions =
     | AuditFence
     | CheckArtifacts
     | AuditBoundary
+    | ProfileBudget
+    | StepTick
+    | FastForwardTicks
