@@ -102,6 +102,12 @@ export class DivisionAudit implements Action {
     constructor(public bale: EngineBit) {}
 }
 
+export const BIGINT_AUDIT = '[Arithmetic action] Execute BigInt Precision Suite'
+export class BigIntAudit implements Action {
+    readonly type = BIGINT_AUDIT
+    constructor(public bale: EngineBit) {}
+}
+
 export type Actions =
     | InitEngine
     | UpdateEngine
@@ -119,3 +125,4 @@ export type Actions =
     | BankersRoundingSuite
     | ChainAudit
     | DivisionAudit
+    | BigIntAudit

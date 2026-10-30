@@ -56,6 +56,9 @@ export function reducer(
         case Act.DIVISION_AUDIT:
             return Buzz.divisionAudit(clone(model), act.bale, state as State)
 
+        case Act.BIGINT_AUDIT:
+            return Buzz.bigintAudit(clone(model), act.bale, state as State)
+
         default:
             return model
     }

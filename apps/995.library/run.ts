@@ -33,6 +33,8 @@ program
     .option('--bankers-rounding')
     .option('--chain-audit')
     .option('--division-audit')
+    .option('--bigint-audit')
+    .option('--bigint-precision')
 program.parse(process.argv)
 const options = program.opts()
 
@@ -714,6 +716,39 @@ const divisionAuditHeadless = async () => {
     }
 }
 
+const bigintAuditHeadless = async () => {
+    try {
+        const mod = await import(
+            '../../packages/300.engine/00.engine.unit/buz/engine.buzz.js'
+        )
+        let receipt = ''
+        let ok = false
+        mod.bigintAudit(
+            {} as any,
+            {
+                idx: 'bigint',
+                slv: (bit: any) => {
+                    receipt = bit.fenBit.src
+                    ok = bit.fenBit.idx === 'bigint-audit-ok'
+                },
+            } as any,
+        )
+        if (ok) {
+            console.log(receipt)
+            process.exit(0)
+        }
+        console.error(
+            receipt || ':: [BIGINT:FAIL] BigInt precision produced no receipt',
+        )
+        process.exit(1)
+    } catch (err: any) {
+        console.error(
+            `:: [BIGINT:FAIL] BigInt precision headless execution failed: ${err?.message ?? err}`,
+        )
+        process.exit(1)
+    }
+}
+
 const formatCompilationFeedback = (rawOutput: string): void => {
     const lines = rawOutput.split(/\r?\n/).filter((l) => l.trim().length > 0)
     const errorPattern = /^(.+?)\((\d+),(\d+)\):\s*error\s*(TS\d+):\s*(.+)$/
@@ -841,6 +876,10 @@ const main = async () => {
     }
     if (options.divisionAudit) {
         await divisionAuditHeadless()
+        return
+    }
+    if (options.bigintAudit || options.bigintPrecision) {
+        await bigintAuditHeadless()
         return
     }
     let heartbeat: NodeJS.Timeout | null = null
