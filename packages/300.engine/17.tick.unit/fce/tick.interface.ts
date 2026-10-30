@@ -3,7 +3,7 @@ export type SimTime = number & { readonly __brand: unique symbol }
 export function toSimTime(value: number): SimTime {
     if (!Number.isInteger(value) || value < 0) {
         throw new RangeError(
-            `SimTime must be a non-negative integer. Received: ${value}`,
+            `[INVALID_TICK] SimTime must be a non-negative integer. Received: ${value}`,
         )
     }
     return value as SimTime

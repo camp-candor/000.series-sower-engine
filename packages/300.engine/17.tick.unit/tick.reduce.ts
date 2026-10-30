@@ -34,6 +34,9 @@ export function reduceTickStep(state: TickStatePayload): TickStatePayload {
             if (nextStrain > 0) nextStrain = Math.max(0, nextStrain - 1)
         }
 
+        nextStrain = Math.max(0, Math.min(10000, nextStrain))
+        nextParanoia = Math.max(0, Math.min(10000, nextParanoia))
+
         return {
             id: actor.id,
             somatic_strain_bp: nextStrain,
