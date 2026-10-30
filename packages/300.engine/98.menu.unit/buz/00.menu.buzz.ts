@@ -68,6 +68,7 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         'AUDIT AST BOUNDARY FIREWALL',
         'CHECK EMITTED ARTIFACT HYGIENE',
         'PROFILE TICK REDUCTION BUDGET',
+        'ARITHMETIC KERNEL AUDIT',
         'ROOT MENU',
         ActOlm.UPDATE_ENGINE.split(']')[1],
         ActOlm.TEST_ENGINE.split(']')[1],
@@ -78,6 +79,7 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         ActOlm.PROFILE_BUDGET.split(']')[1],
         ActOlm.STEP_TICK.split(']')[1],
         ActOlm.FAST_FORWARD_TICKS.split(']')[1],
+        ActOlm.ARITHMETIC_AUDIT.split(']')[1],
     ]
 
     const descriptions: Record<string, string> = {
@@ -89,6 +91,8 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             'Assert zero leaked .js/.d.ts files in source units.',
         'PROFILE TICK REDUCTION BUDGET':
             'Run pure engine Vitest suite asserting <= 2ms budget.',
+        'ARITHMETIC KERNEL AUDIT':
+            'Assert BasisPoint float rejection and bounds guards.',
         'ROOT MENU': 'Return to the master runner switchboard.',
     }
 
@@ -213,6 +217,21 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
                 )
             }
             break
+
+        case 'ARITHMETIC KERNEL AUDIT':
+        case ActOlm.ARITHMETIC_AUDIT.split(']')[1]: {
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> Initiating Arithmetic Kernel Audit...',
+            })
+            const res = await ste.hunt(ActOlm.ARITHMETIC_AUDIT, {})
+            const lines: string[] =
+                res?.fncBit?.lst ?? (res?.fenBit?.src ? [res.fenBit.src] : [])
+            for (const line of lines) {
+                await lib.hunt(UPDATE_CONSOLE, { idx: 'cns00', src: line })
+            }
+            break
+        }
 
         case ActOlm.STEP_TICK.split(']')[1]:
             bit = await ste.hunt(ActOlm.STEP_TICK, {})

@@ -29,6 +29,7 @@ program
     .option('--profile-budget')
     .option('--tick-step')
     .option('--tick-fast-forward')
+    .option('--arithmetic-audit')
 program.parse(process.argv)
 const options = program.opts()
 
@@ -577,6 +578,39 @@ const tickFastForwardHeadless = async () => {
     }
 }
 
+const arithmeticAuditHeadless = async () => {
+    try {
+        const mod = await import(
+            '../../packages/300.engine/00.engine.unit/buz/engine.buzz.js'
+        )
+        let receipt = ''
+        let ok = false
+        mod.arithmeticAudit(
+            {} as any,
+            {
+                idx: 'arithmetic',
+                slv: (bit: any) => {
+                    receipt = bit.fenBit.src
+                    ok = bit.fenBit.idx === 'arithmetic-audit-ok'
+                },
+            } as any,
+        )
+        if (ok) {
+            console.log(receipt)
+            process.exit(0)
+        }
+        console.error(
+            receipt || ':: [ARITHMETIC:FAIL] Arithmetic audit produced no receipt',
+        )
+        process.exit(1)
+    } catch (err: any) {
+        console.error(
+            `:: [ARITHMETIC:FAIL] Arithmetic audit headless execution failed: ${err?.message ?? err}`,
+        )
+        process.exit(1)
+    }
+}
+
 const formatCompilationFeedback = (rawOutput: string): void => {
     const lines = rawOutput.split(/\r?\n/).filter((l) => l.trim().length > 0)
     const errorPattern = /^(.+?)\((\d+),(\d+)\):\s*error\s*(TS\d+):\s*(.+)$/
@@ -688,6 +722,10 @@ const main = async () => {
     }
     if (options.tickFastForward) {
         await tickFastForwardHeadless()
+        return
+    }
+    if (options.arithmeticAudit) {
+        await arithmeticAuditHeadless()
         return
     }
     let heartbeat: NodeJS.Timeout | null = null

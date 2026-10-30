@@ -40,6 +40,9 @@ export function reducer(
         case Act.FAST_FORWARD_TICKS:
             return Buzz.fastForwardTicks(clone(model), act.bale, state as State)
 
+        case Act.ARITHMETIC_AUDIT:
+            return Buzz.arithmeticAudit(clone(model), act.bale, state as State)
+
         default:
             return model
     }

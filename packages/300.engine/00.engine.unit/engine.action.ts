@@ -75,6 +75,12 @@ export class FastForwardTicks implements Action {
     constructor(public bale: EngineBit) {}
 }
 
+export const ARITHMETIC_AUDIT = '[Arithmetic action] Arithmetic Kernel Audit'
+export class ArithmeticAudit implements Action {
+    readonly type = ARITHMETIC_AUDIT
+    constructor(public bale: EngineBit) {}
+}
+
 export type Actions =
     | InitEngine
     | UpdateEngine
@@ -88,3 +94,4 @@ export type Actions =
     | ProfileBudget
     | StepTick
     | FastForwardTicks
+    | ArithmeticAudit

@@ -11,6 +11,7 @@ import {
     toSimTime,
     type TickStatePayload,
 } from '../../17.tick.unit/fce/tick.interface.js'
+import { assertBasisPoint } from '../../20.arithmetic.unit/fce/arithmetic.interface.js'
 import { createRequire } from 'module'
 const req = createRequire(import.meta.url)
 const fs = req('fs')
@@ -342,6 +343,61 @@ export const fastForwardTicks = (
                 idx: 'fast-forward-ticks-ok',
                 src: formatTickReceipt(100, fromTick, toTick, elapsedMs),
                 dat: { ok: true, advanced: 100, fromTick, toTick, elapsedMs },
+            },
+        })
+    }
+    return cpy
+}
+
+export const ARITHMETIC_AUDIT_INGEST =
+    '>> [ARITHMETIC:AUDIT] Ingesting Basis Point Rounding Contracts...'
+export const ARITHMETIC_AUDIT_OK =
+    '>> [ARITHMETIC:OK] Float rejection asserted on all BasisPoint types.'
+export const ARITHMETIC_AUDIT_FAIL =
+    ':: [ARITHMETIC:FAIL] Basis point guard contract violated'
+
+export const arithmeticAudit = (
+    cpy: EngineModel,
+    bal: EngineBit,
+    ste?: State,
+) => {
+    void ste
+    const probes: Array<{
+        input: number
+        error: new (...args: never[]) => Error
+        tag: string
+    }> = [
+        { input: 10.5, error: TypeError, tag: 'FLOAT_PROHIBITED' },
+        { input: -1, error: RangeError, tag: 'OUT_OF_BOUNDS' },
+        { input: 10001, error: RangeError, tag: 'OUT_OF_BOUNDS' },
+    ]
+    let ok = true
+    let detail = 'all guards rejected adversarial inputs'
+    for (const probe of probes) {
+        try {
+            assertBasisPoint(probe.input)
+            ok = false
+            detail = `guard accepted forbidden input ${probe.input}`
+            break
+        } catch (err: unknown) {
+            if (
+                !(err instanceof probe.error) ||
+                !(err as Error).message.includes(probe.tag)
+            ) {
+                ok = false
+                detail = `guard misfired on ${probe.input}`
+                break
+            }
+        }
+    }
+    if (bal.slv != null) {
+        bal.slv({
+            fenBit: {
+                idx: ok ? 'arithmetic-audit-ok' : 'arithmetic-audit-fail',
+                src: ok
+                    ? `${ARITHMETIC_AUDIT_INGEST}\n${ARITHMETIC_AUDIT_OK}`
+                    : `${ARITHMETIC_AUDIT_FAIL}: ${detail}`,
+                dat: { ok, detail },
             },
         })
     }
