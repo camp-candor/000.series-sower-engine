@@ -9,7 +9,8 @@ import {
   type ArithmeticActionBit,
   type ScaleScalarPayload
 } from './fce/arithmetic.bit.js';
-import { evaluateScalingDivision } from './arithmetic.action.js';
+import { evaluateScalingDivision, scaleBasisPointsChained } from './arithmetic.action.js';
+import type { ScaleChainedPayload } from './fce/arithmetic.bit.js';
 
 export function reduceArithmetic(
   state: ArithmeticModel,
@@ -27,6 +28,20 @@ export function reduceArithmetic(
       return state.copyWith({
         lastScaledValue: receipt.roundedOutput,
         lastReceipt: receipt,
+        totalCalculations: state.totalCalculations + 1
+      });
+    }
+
+    case ArithmeticCommand.SCALE_CHAINED: {
+      const payload = bit.dat as ScaleChainedPayload;
+      const result = scaleBasisPointsChained(payload.baseValue, ...payload.multipliers);
+
+      if (bit.slv) {
+        bit.slv(result);
+      }
+
+      return state.copyWith({
+        lastChainedValue: result,
         totalCalculations: state.totalCalculations + 1
       });
     }

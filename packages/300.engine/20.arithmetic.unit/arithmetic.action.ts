@@ -71,3 +71,41 @@ export function scaleBasisPoints(a: number, b: number): BasisPoint {
   const receipt = evaluateScalingDivision(a, b);
   return receipt.roundedOutput;
 }
+
+export const MAX_INTERMEDIATE_PRODUCT = 100_000_000;
+
+export function scaleBasisPointsChained(baseValue: number, ...multipliers: readonly number[]): BasisPoint {
+  if (multipliers.length === 0) {
+    throw new RangeError('[EMPTY_MULTIPLIERS] At least one multiplier must be provided for chaining.');
+  }
+
+  if (!Number.isInteger(baseValue)) {
+    throw new TypeError(`[FLOAT_PROHIBITED] Operands must be integers. Received: baseValue=${baseValue}`);
+  }
+  if (baseValue < 0) {
+    throw new RangeError(`[NEGATIVE_PROHIBITED] Basis points cannot be negative. Received: baseValue=${baseValue}`);
+  }
+
+  let currentValue = baseValue;
+
+  for (const multiplier of multipliers) {
+    if (!Number.isInteger(multiplier)) {
+      throw new TypeError(`[FLOAT_PROHIBITED] Operands must be integers. Received: multiplier=${multiplier}`);
+    }
+    if (multiplier < 0) {
+      throw new RangeError(`[NEGATIVE_PROHIBITED] Basis points cannot be negative. Received: multiplier=${multiplier}`);
+    }
+    if (multiplier > BASIS_POINT_DENOMINATOR) {
+      throw new RangeError(`[OUT_OF_BOUNDS] Basis points must be within [0, ${BASIS_POINT_DENOMINATOR}] bp. Received: multiplier=${multiplier}`);
+    }
+
+    const product = currentValue * multiplier;
+    if (product > MAX_INTERMEDIATE_PRODUCT) {
+      throw new RangeError(`[INTERMEDIATE_OVERFLOW] Intermediate product ${product} exceeds MAX_INTERMEDIATE_PRODUCT ${MAX_INTERMEDIATE_PRODUCT}`);
+    }
+
+    currentValue = scaleBasisPoints(currentValue, multiplier);
+  }
+
+  return toBasisPoint(currentValue);
+}
