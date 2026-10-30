@@ -16,6 +16,13 @@ export function reducer(
         case Act.INIT_MENU:
             return Buzz.initMenu(clone(model), act.bale, state as State)
 
+        case Act.OPEN_ARITHMETIC_MENU:
+            return Buzz.updateArithmeticMenu(
+                clone(model),
+                act.bale,
+                state as State,
+            )
+
         default:
             return model
     }

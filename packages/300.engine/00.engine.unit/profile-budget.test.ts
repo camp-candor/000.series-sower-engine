@@ -94,7 +94,10 @@ describe('profile budget', () => {
         })
         ;(global as any).LIBRARY = { hunt: libraryHunt }
         const engineHunt = vi.fn(async () => ({
-            fenBit: { src: formatBudgetPass(0.412) },
+            fenBit: {
+                idx: 'profile-budget-ok',
+                src: formatBudgetPass(0.412),
+            },
         }))
 
         await updateMenu(
@@ -104,10 +107,21 @@ describe('profile budget', () => {
         )
 
         expect(choiceList).toContain(' Profile Budget')
+        expect(choiceList).toContain('PROFILE TICK REDUCTION BUDGET')
         expect(engineHunt).toHaveBeenCalledWith(PROFILE_BUDGET, {})
-        const budgetLine = consoles.find(
-            (c) => c.idx === 'cns00' && RECEIPT_PATTERN.test(c.src),
+        const cnsLines = consoles
+            .filter((c) => c.idx === 'cns00')
+            .map((c) => c.src as string)
+        expect(cnsLines).toHaveLength(4)
+        expect(cnsLines[0]).toBe(
+            '>> [BUDGET:INIT] Priming V8 isolate and mounting nanosecond BigInt timer...',
         )
-        expect(budgetLine).toBeTruthy()
+        expect(cnsLines[1]).toBe(
+            '>> [BUDGET:STEP] Executing 17.tick.unit state reduction under 2ms ceiling...',
+        )
+        expect(cnsLines[2]).toMatch(RECEIPT_PATTERN)
+        expect(cnsLines[3]).toBe(
+            '>> [SUCCESS] Pure engine reduction budget verified at T_0 = $0.00',
+        )
     }, 10000)
 })

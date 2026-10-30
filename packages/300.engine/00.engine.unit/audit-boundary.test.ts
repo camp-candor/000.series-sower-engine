@@ -90,10 +90,14 @@ describe('audit boundary', { timeout: 15000 }, () => {
         )
 
         expect(choiceList).toContain(' Audit Boundary')
+        expect(choiceList).toContain('AUDIT AST BOUNDARY FIREWALL')
         expect(engineHunt).toHaveBeenCalledWith(AUDIT_BOUNDARY, {})
-        const boundaryLine = consoles.find(
-            (c) => c.idx === 'cns00' && c.src === AUDIT_BOUNDARY_OK,
-        )
-        expect(boundaryLine).toBeTruthy()
+        const cnsLines = consoles
+            .filter((c) => c.idx === 'cns00')
+            .map((c) => c.src as string)
+        expect(cnsLines).toEqual([
+            '>> [BOUNDARY] Running AST dependency firewall sweep...',
+            AUDIT_BOUNDARY_OK,
+        ])
     }, 10000)
 })

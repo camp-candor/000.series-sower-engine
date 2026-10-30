@@ -13,6 +13,13 @@ const EXPECTED_LINES = [
     '>> [CHAIN:NON_COMM] Non-commutative execution topology preserved across permutations.',
     '>> [CHAIN:EMPTY] Empty multiplier array rejected with [EMPTY_MULTIPLIERS].',
     '>> [KERNEL:SEALED] Chained multiplication sealed at T_0 = $0.00.',
+    '>> [BOUNDARY:INIT] Mounting Synthetic Remainder Matrix Generator...',
+    '>> [BOUNDARY:TIES] Executing 100,000 synthetic half-tie iterations (R = 5,000)...',
+    '>> [PARITY:VERIFIED] Even quotients remained even; odd quotients rounded up (0 drift).',
+    '>> [BOUNDARY:EDGES] Remainder matrices R=4,999 and R=5,001 certified across 2,000 cases.',
+    '>> [CHAIN:BOUNDS] 5-factor chained scaling verified <= 10^8 intermediate ceiling.',
+    '>> [ORACLE:MATCH] 100% bit parity verified against arbitrary-precision BigInt kernel.',
+    '>> [KERNEL:CERTIFIED] Exhaustive boundary verification sealed at T_0 = $0.00.',
 ]
 
 describe('chain audit suite', () => {
@@ -21,7 +28,7 @@ describe('chain audit suite', () => {
         delete (global as any).LIBRARY
     })
 
-    it('emits all six exact chaining telemetry lines', () => {
+    it('emits all thirteen exact chaining plus boundary telemetry lines', () => {
         const slv = vi.fn()
         const result = chainAudit(
             new EngineModel(),

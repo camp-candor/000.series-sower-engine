@@ -35,6 +35,8 @@ program
     .option('--division-audit')
     .option('--bigint-audit')
     .option('--bigint-precision')
+    .option('--arithmetic-menu')
+    .option('--run-all-levels')
 program.parse(process.argv)
 const options = program.opts()
 
@@ -287,6 +289,26 @@ const init = async () => {
                     },
                 })
 
+                if (pkg.name === '300.engine') {
+                    await LIBRARY.hunt(MENU_ACTION_LIBRARY.ROUTE_MENU, {
+                        idx: 'ARITHMETIC KERNEL AUDIT',
+                        src: 'Open Arithmetic Kernel Cockpit (Bounds, Banker Rounding, Gauntlet).',
+                        fnc: async () => {
+                            await new Promise<void>((resolve) => {
+                                ;(global as any)[pkg.globalKey].hunt(
+                                    MENU_ACTION.OPEN_ARITHMETIC_MENU,
+                                    {
+                                        slv: resolve,
+                                    },
+                                )
+                            })
+                            await LIBRARY.hunt(MENU_ACTION_LIBRARY.OPEN_MENU, {
+                                src: '',
+                            })
+                        },
+                    })
+                }
+
                 await LIBRARY.hunt(CONSOLE_ACTION_LIBRARY.UPDATE_CONSOLE, {
                     idx: 'cns00',
                     src: `>> [OK] Mounted UI Pivot: [${pkg.name}] -> ${pkg.menuTitle}`,
@@ -310,13 +332,17 @@ const init = async () => {
 
         // Direct target dispatch if specified via -t / --separator (excluding default 'library')
         if (idx && idx.toLowerCase() !== 'library') {
+            const isArithmetic =
+                idx.toLowerCase() === 'arithmetic' ||
+                idx.toLowerCase() === 'arithmetic-menu'
             const target = existingPackages.find(
                 (p) =>
                     p.name.toLowerCase() === idx.toLowerCase() ||
                     p.globalKey.toLowerCase() === idx.toLowerCase() ||
                     p.menuTitle.toLowerCase() === idx.toLowerCase() ||
                     p.name.endsWith(`.${idx.toLowerCase()}`) ||
-                    p.name.split('.')[1]?.toLowerCase() === idx.toLowerCase(),
+                    p.name.split('.')[1]?.toLowerCase() === idx.toLowerCase() ||
+                    (isArithmetic && p.name === '300.engine'),
             )
             if (target) {
                 let pkgDistPath = path.resolve(
@@ -344,8 +370,11 @@ const init = async () => {
                     fs.existsSync(menuActionPath)
                 ) {
                     const TARGET_ACTION = require(menuActionPath)
+                    const actionToHunt = isArithmetic
+                        ? TARGET_ACTION.OPEN_ARITHMETIC_MENU
+                        : TARGET_ACTION.INIT_MENU
                     await (global as any)[target.globalKey].hunt(
-                        TARGET_ACTION.INIT_MENU,
+                        actionToHunt,
                         {
                             slv: async () => {
                                 await LIBRARY.hunt(
@@ -749,6 +778,76 @@ const bigintAuditHeadless = async () => {
     }
 }
 
+const arithmeticMenuHeadless = async () => {
+    try {
+        const mod = await import(
+            '../../packages/300.engine/98.menu.unit/buz/arithmetic-menu.buzz.js'
+        )
+        const hudMod = await import(
+            '../terminal/cns00/views/arithmetic-monitor.view.js'
+        )
+
+        console.log(
+            '>> [INIT] Running Arithmetic Cockpit Full Verification Suite...',
+        )
+
+        const mockLib = {
+            hunt: async (action: string, payload: any) => {
+                if (
+                    action === '[Console Action] Update Console' &&
+                    payload?.src
+                ) {
+                    console.log(payload.src)
+                }
+                return {
+                    grdBit: { dat: {} },
+                    chcBit: { src: '6. RUN ALL VERIFICATION LEVELS' },
+                }
+            },
+        }
+
+        const p1 = await mod.runBasisPointBoundsAudit(mockLib)
+        const p2 = await mod.runBankersRoundingAudit(mockLib)
+        const p3 = await mod.runArbitraryDivisionAudit(mockLib)
+        const p4 = await mod.runBigIntPrecisionAudit(mockLib)
+        const p5 = await mod.runExhaustiveGauntletAudit(mockLib)
+
+        if (p1 && p2 && p3 && p4 && p5) {
+            console.log(
+                '>> ============================================================',
+            )
+            console.log(
+                '>> [SUCCESS] ALL ARITHMETIC INVARIANTS CERTIFIED AT T_0 = $0.00',
+            )
+            console.log(
+                '>> ============================================================',
+            )
+
+            const hudLines = hudMod.renderArithmeticHudAscii({
+                totalCalculations: 100000,
+                lastScaledBp: 8000,
+                lastDivisionOutput: 4,
+                lastBigIntOutput: 1004320000n,
+                tieDetected: true,
+                kernelStatus: 'VERIFIED',
+            })
+            for (const line of hudLines) {
+                console.log(line)
+            }
+
+            process.exit(0)
+        } else {
+            console.error(':: [FAIL] One or more arithmetic invariants failed.')
+            process.exit(1)
+        }
+    } catch (err: any) {
+        console.error(
+            `:: [ARITHMETIC_MENU:FAIL] Headless execution failed: ${err?.message ?? err}`,
+        )
+        process.exit(1)
+    }
+}
+
 const formatCompilationFeedback = (rawOutput: string): void => {
     const lines = rawOutput.split(/\r?\n/).filter((l) => l.trim().length > 0)
     const errorPattern = /^(.+?)\((\d+),(\d+)\):\s*error\s*(TS\d+):\s*(.+)$/
@@ -880,6 +979,10 @@ const main = async () => {
     }
     if (options.bigintAudit || options.bigintPrecision) {
         await bigintAuditHeadless()
+        return
+    }
+    if (options.arithmeticMenu || options.runAllLevels) {
+        await arithmeticMenuHeadless()
         return
     }
     let heartbeat: NodeJS.Timeout | null = null

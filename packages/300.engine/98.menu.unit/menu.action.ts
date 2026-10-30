@@ -13,6 +13,43 @@ export class UpdateMenu implements Action {
     constructor(public bale: MenuBit) {}
 }
 
+export const ROUTE_MENU = '[Menu action] Route Menu'
+export const OPEN_ARITHMETIC_MENU = '[Menu action] Open Arithmetic Menu'
+export const EXECUTE_ARITHMETIC_AUDIT = '[Menu action] Execute Arithmetic Audit'
+
+export interface MenuActionPayload {
+    readonly idx?: string
+    readonly val?: number
+    readonly dat?: any
+    readonly slv?: (res: any) => void
+}
+
+export class InitMenuAction implements Action {
+    readonly type = INIT_MENU
+    constructor(public readonly bale: MenuActionPayload = {}) {}
+}
+
+export class UpdateMenuAction implements Action {
+    readonly type = UPDATE_MENU
+    constructor(public readonly bale: MenuActionPayload = {}) {}
+}
+
+export class OpenArithmeticMenuAction implements Action {
+    readonly type = OPEN_ARITHMETIC_MENU
+    constructor(public readonly bale: MenuActionPayload = {}) {}
+}
+
+export class ExecuteArithmeticAuditAction implements Action {
+    readonly type = EXECUTE_ARITHMETIC_AUDIT
+    constructor(public readonly bale: MenuActionPayload = {}) {}
+}
+
+export type MenuActions =
+    | InitMenuAction
+    | UpdateMenuAction
+    | OpenArithmeticMenuAction
+    | ExecuteArithmeticAuditAction
+
 export const TEST_MENU = '[Menu action] Test Menu'
 export class TestMenu implements Action {
     readonly type = TEST_MENU
@@ -184,3 +221,4 @@ export type Actions =
     | DataMenu
     | AgentMenu
     | GraphicsmagicMenu
+    | OpenArithmeticMenuAction

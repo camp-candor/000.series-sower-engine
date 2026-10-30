@@ -22,7 +22,7 @@ describe('20.arithmetic.unit - BigInt High-Magnitude Precision', () => {
         // 100 yr * 365 d * 24 hr * 3600 s * 100 cs = 315,360,000,000 cs
         const tCentiseconds = 315_360_000_000n
         const edgeTraversalCost = 8_640_000n // 1 day in centiseconds
-        // Intermediate product: t * edgeCost ≈ 2.7247 * 10^18 (> 9.007 * 10^15 safe integer ceiling)
+        // Intermediate product: t * edgeCost ~ 2.7247 * 10^18 (> 9.007 * 10^15 safe integer ceiling)
         const intermediateProduct = tCentiseconds * edgeTraversalCost
         expect(intermediateProduct > BigInt(Number.MAX_SAFE_INTEGER)).toBe(true)
 
