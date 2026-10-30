@@ -12,6 +12,8 @@ import {
     type TickStatePayload,
 } from '../../17.tick.unit/fce/tick.interface.js'
 import { assertBasisPoint } from '../../20.arithmetic.unit/fce/arithmetic.interface.js'
+import { ArithmeticModel } from '../../20.arithmetic.unit/arithmetic.model.js'
+import { evaluateScalingDivision } from '../../20.arithmetic.unit/arithmetic.action.js'
 import { createRequire } from 'module'
 const req = createRequire(import.meta.url)
 const fs = req('fs')
@@ -397,6 +399,92 @@ export const arithmeticAudit = (
                 src: ok
                     ? `${ARITHMETIC_AUDIT_INGEST}\n${ARITHMETIC_AUDIT_OK}`
                     : `${ARITHMETIC_AUDIT_FAIL}: ${detail}`,
+                dat: { ok, detail },
+            },
+        })
+    }
+    return cpy
+}
+
+export const BANKERS_RECEIPT_LINES: readonly string[] = [
+    '>> [ARITHMETIC:STATE] Initializing ArithmeticModel scratchpad container...',
+    ">> [ROUNDING:AUDIT] Ingesting 4-case Banker's Rounding integer kernel...",
+    '>> [BRANCH:1] Remainder R < 5,000 truncation verified (Q = 2, R = 0 -> 2).',
+    '>> [BRANCH:2] Remainder R > 5,000 increment verified (Q = 2, R = 7,500 -> 3).',
+    '>> [BRANCH:3] Remainder R = 5,000 even tie verified (Q = 2, R = 5,000 -> 2).',
+    '>> [BRANCH:4] Remainder R = 5,000 odd tie verified (Q = 3, R = 5,000 -> 4).',
+    '>> [OVERFLOW:GUARD] MAX_SAFE_INTEGER bounds checking active.',
+    '>> [STATE:FREEZE] Arithmetic receipts sealed with Object.freeze(). Status: PASS.',
+]
+export const BANKERS_SUITE_FAIL =
+    ':: [BANKERS:FAIL] Rounding suite verification tripped'
+
+export const bankersRoundingSuite = (
+    cpy: EngineModel,
+    bal: EngineBit,
+    ste?: State,
+) => {
+    void ste
+    let ok = true
+    let detail = '4-case kernel verified end-to-end'
+    const fail = (reason: string) => {
+        ok = false
+        detail = reason
+    }
+    try {
+        const model = new ArithmeticModel()
+        if (model.totalCalculations !== 0 || !Object.isFrozen(model)) {
+            fail('scratchpad container failed frozen-zero invariant')
+        }
+        const cases: Array<{
+            a: number
+            b: number
+            q: number
+            r: number
+            out: number
+        }> = [
+            { a: 40, b: 500, q: 2, r: 0, out: 2 },
+            { a: 55, b: 500, q: 2, r: 7500, out: 3 },
+            { a: 50, b: 500, q: 2, r: 5000, out: 2 },
+            { a: 70, b: 500, q: 3, r: 5000, out: 4 },
+        ]
+        for (const c of cases) {
+            if (!ok) break
+            const receipt = evaluateScalingDivision(c.a, c.b)
+            if (
+                receipt.quotient !== c.q ||
+                receipt.remainder !== c.r ||
+                receipt.roundedOutput !== c.out ||
+                !Object.isFrozen(receipt)
+            ) {
+                fail(`branch tripped on operands a=${c.a}, b=${c.b}`)
+            }
+        }
+        if (ok) {
+            try {
+                evaluateScalingDivision(Number.MAX_SAFE_INTEGER + 1, 500)
+                fail('overflow guard accepted MAX_SAFE_INTEGER + 1')
+            } catch (err: unknown) {
+                if (
+                    !(err instanceof RangeError) ||
+                    !(err as Error).message.includes('OVERFLOW_HAZARD')
+                ) {
+                    fail('overflow guard misfired')
+                }
+            }
+        }
+    } catch (err: unknown) {
+        fail(err instanceof Error ? err.message : String(err))
+    }
+    if (bal.slv != null) {
+        bal.slv({
+            fenBit: {
+                idx: ok
+                    ? 'bankers-rounding-suite-ok'
+                    : 'bankers-rounding-suite-fail',
+                src: ok
+                    ? BANKERS_RECEIPT_LINES.join('\n')
+                    : `${BANKERS_SUITE_FAIL}: ${detail}`,
                 dat: { ok, detail },
             },
         })

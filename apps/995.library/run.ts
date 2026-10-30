@@ -30,6 +30,7 @@ program
     .option('--tick-step')
     .option('--tick-fast-forward')
     .option('--arithmetic-audit')
+    .option('--bankers-rounding')
 program.parse(process.argv)
 const options = program.opts()
 
@@ -611,6 +612,39 @@ const arithmeticAuditHeadless = async () => {
     }
 }
 
+const bankersRoundingHeadless = async () => {
+    try {
+        const mod = await import(
+            '../../packages/300.engine/00.engine.unit/buz/engine.buzz.js'
+        )
+        let receipt = ''
+        let ok = false
+        mod.bankersRoundingSuite(
+            {} as any,
+            {
+                idx: 'bankers',
+                slv: (bit: any) => {
+                    receipt = bit.fenBit.src
+                    ok = bit.fenBit.idx === 'bankers-rounding-suite-ok'
+                },
+            } as any,
+        )
+        if (ok) {
+            console.log(receipt)
+            process.exit(0)
+        }
+        console.error(
+            receipt || ':: [BANKERS:FAIL] Rounding suite produced no receipt',
+        )
+        process.exit(1)
+    } catch (err: any) {
+        console.error(
+            `:: [BANKERS:FAIL] Rounding suite headless execution failed: ${err?.message ?? err}`,
+        )
+        process.exit(1)
+    }
+}
+
 const formatCompilationFeedback = (rawOutput: string): void => {
     const lines = rawOutput.split(/\r?\n/).filter((l) => l.trim().length > 0)
     const errorPattern = /^(.+?)\((\d+),(\d+)\):\s*error\s*(TS\d+):\s*(.+)$/
@@ -726,6 +760,10 @@ const main = async () => {
     }
     if (options.arithmeticAudit) {
         await arithmeticAuditHeadless()
+        return
+    }
+    if (options.bankersRounding) {
+        await bankersRoundingHeadless()
         return
     }
     let heartbeat: NodeJS.Timeout | null = null

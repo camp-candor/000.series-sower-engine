@@ -81,6 +81,13 @@ export class ArithmeticAudit implements Action {
     constructor(public bale: EngineBit) {}
 }
 
+export const BANKERS_ROUNDING_SUITE =
+    '[Arithmetic action] Execute Banker Rounding Suite'
+export class BankersRoundingSuite implements Action {
+    readonly type = BANKERS_ROUNDING_SUITE
+    constructor(public bale: EngineBit) {}
+}
+
 export type Actions =
     | InitEngine
     | UpdateEngine
@@ -95,3 +102,4 @@ export type Actions =
     | StepTick
     | FastForwardTicks
     | ArithmeticAudit
+    | BankersRoundingSuite

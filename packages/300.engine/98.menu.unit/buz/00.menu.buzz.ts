@@ -69,6 +69,7 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         'CHECK EMITTED ARTIFACT HYGIENE',
         'PROFILE TICK REDUCTION BUDGET',
         'ARITHMETIC KERNEL AUDIT',
+        "EXECUTE BANKER'S ROUNDING SUITE",
         'ROOT MENU',
         ActOlm.UPDATE_ENGINE.split(']')[1],
         ActOlm.TEST_ENGINE.split(']')[1],
@@ -80,6 +81,7 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         ActOlm.STEP_TICK.split(']')[1],
         ActOlm.FAST_FORWARD_TICKS.split(']')[1],
         ActOlm.ARITHMETIC_AUDIT.split(']')[1],
+        ActOlm.BANKERS_ROUNDING_SUITE.split(']')[1],
     ]
 
     const descriptions: Record<string, string> = {
@@ -93,6 +95,8 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             'Run pure engine Vitest suite asserting <= 2ms budget.',
         'ARITHMETIC KERNEL AUDIT':
             'Assert BasisPoint float rejection and bounds guards.',
+        "EXECUTE BANKER'S ROUNDING SUITE":
+            'Verify 4-case Round-Half-Even scaling kernel.',
         'ROOT MENU': 'Return to the master runner switchboard.',
     }
 
@@ -225,6 +229,21 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
                 src: '>> Initiating Arithmetic Kernel Audit...',
             })
             const res = await ste.hunt(ActOlm.ARITHMETIC_AUDIT, {})
+            const lines: string[] =
+                res?.fncBit?.lst ?? (res?.fenBit?.src ? [res.fenBit.src] : [])
+            for (const line of lines) {
+                await lib.hunt(UPDATE_CONSOLE, { idx: 'cns00', src: line })
+            }
+            break
+        }
+
+        case "EXECUTE BANKER'S ROUNDING SUITE":
+        case ActOlm.BANKERS_ROUNDING_SUITE.split(']')[1]: {
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> Executing Banker Rounding Suite...',
+            })
+            const res = await ste.hunt(ActOlm.BANKERS_ROUNDING_SUITE, {})
             const lines: string[] =
                 res?.fncBit?.lst ?? (res?.fenBit?.src ? [res.fenBit.src] : [])
             for (const line of lines) {

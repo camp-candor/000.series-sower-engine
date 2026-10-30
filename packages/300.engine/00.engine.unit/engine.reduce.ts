@@ -43,6 +43,13 @@ export function reducer(
         case Act.ARITHMETIC_AUDIT:
             return Buzz.arithmeticAudit(clone(model), act.bale, state as State)
 
+        case Act.BANKERS_ROUNDING_SUITE:
+            return Buzz.bankersRoundingSuite(
+                clone(model),
+                act.bale,
+                state as State,
+            )
+
         default:
             return model
     }
