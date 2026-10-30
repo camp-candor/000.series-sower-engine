@@ -1,3 +1,7 @@
+/**
+ * 20.arithmetic.unit - Pure Banker's Rounding Scalar Actions
+ */
+
 import {
     BASIS_POINT_DENOMINATOR,
     TIE_BREAK_REMAINDER,
@@ -46,7 +50,6 @@ export function evaluateScalingDivision(
     const tieDetected = remainder === TIE_BREAK_REMAINDER
 
     const rounded = arbitrateRemainder(quotient, remainder, TIE_BREAK_REMAINDER)
-
     const roundedOutput = toBasisPoint(rounded)
 
     const receipt: ScalingDivisionResult = {
@@ -64,6 +67,11 @@ export function scaleBasisPoints(a: number, b: number): BasisPoint {
     return receipt.roundedOutput
 }
 
+/**
+ * Evaluates chained scalar multiplications enforcing strict left-associativity:
+ * Scale(Scale(Scale(val, m1), m2), m3)
+ * Rounds and clamps at each intermediate step to prevent integer overflow beyond 10^8.
+ */
 export const MAX_INTERMEDIATE_PRODUCT = 100_000_000
 
 export function scaleBasisPointsChained(
@@ -72,8 +80,12 @@ export function scaleBasisPointsChained(
 ): BasisPoint {
     if (multipliers.length === 0) {
         throw new RangeError(
-            '[EMPTY_MULTIPLIERS] Multipliers array cannot be empty',
+            '[EMPTY_MULTIPLIERS] Chained scaling requires at least one multiplier',
         )
+    }
+
+    if (baseValue > MAX_INTERMEDIATE_PRODUCT) {
+        throw new RangeError('[INTERMEDIATE_OVERFLOW]')
     }
 
     if (!Number.isInteger(baseValue)) {
@@ -86,6 +98,13 @@ export function scaleBasisPointsChained(
     let current = baseValue
 
     for (const multiplier of multipliers) {
+        const product = current * multiplier
+        if (product > MAX_INTERMEDIATE_PRODUCT) {
+            throw new RangeError(
+                `[INTERMEDIATE_OVERFLOW] Intermediate product ${product} exceeds MAX_INTERMEDIATE_PRODUCT ${MAX_INTERMEDIATE_PRODUCT}`,
+            )
+        }
+
         if (!Number.isInteger(multiplier) || !Number.isInteger(current)) {
             throw new TypeError('[FLOAT_PROHIBITED] Operands must be integers')
         }
@@ -95,68 +114,57 @@ export function scaleBasisPointsChained(
             )
         }
 
-        const product = current * multiplier
-        if (product > MAX_INTERMEDIATE_PRODUCT) {
-            throw new RangeError(
-                `[INTERMEDIATE_OVERFLOW] Intermediate product ${product} exceeds MAX_INTERMEDIATE_PRODUCT ${MAX_INTERMEDIATE_PRODUCT}`,
-            )
-        }
-
         current = scaleBasisPoints(current, multiplier)
     }
 
     return current as BasisPoint
 }
 
-/**
- * Exact integer division with Banker's Rounding (Round-Half-Even).
- * Divides numerator by denominator and rounds ties to the nearest even integer.
- */
 export function divRoundHalfEven(
     numerator: number,
     denominator: number,
 ): number {
     if (denominator === 0) {
-        throw new RangeError('[DIV_ZERO] Division by zero is prohibited')
+        throw new RangeError(
+            '[DIV_ZERO] Division by zero in integer arithmetic',
+        )
     }
     if (!Number.isInteger(numerator) || !Number.isInteger(denominator)) {
-        throw new TypeError('[FLOAT_PROHIBITED] Operands must be integers')
+        throw new TypeError(
+            `[FLOAT_PROHIBITED] Operands must be integers. Received: ${numerator} / ${denominator}`,
+        )
     }
     if (
         Math.abs(numerator) > Number.MAX_SAFE_INTEGER ||
         Math.abs(denominator) > Number.MAX_SAFE_INTEGER
     ) {
         throw new RangeError(
-            '[OVERFLOW_HAZARD] Operand exceeds Number.MAX_SAFE_INTEGER',
+            '[OVERFLOW_HAZARD] Operands exceed Number.MAX_SAFE_INTEGER',
         )
     }
 
-    if (numerator === 0) {
-        return 0
+    let n = numerator
+    let d = denominator
+
+    if (d < 0) {
+        n = -n
+        d = -d
     }
 
-    const isNegative = numerator < 0 !== denominator < 0
-    const n = Math.abs(numerator)
-    const d = Math.abs(denominator)
+    const quotient = Math.floor(n / d)
+    const remainder = ((n % d) + d) % d
 
-    const q = Math.floor(n / d)
-    const r = n % d
-
-    let roundedMagnitude: number
-    const twiceR = 2 * r
-
-    if (twiceR < d) {
-        roundedMagnitude = q
-    } else if (twiceR > d) {
-        roundedMagnitude = q + 1
-    } else {
-        // Exact half-tie: round toward even integer
-        roundedMagnitude = q % 2 === 0 ? q : q + 1
+    if (remainder === 0) {
+        return quotient
     }
 
-    if (roundedMagnitude === 0) {
-        return 0
+    const doubleR = remainder * 2
+    if (doubleR < d) {
+        return quotient
+    }
+    if (doubleR > d) {
+        return quotient + 1
     }
 
-    return isNegative ? -roundedMagnitude : roundedMagnitude
+    return quotient % 2 === 0 ? quotient : quotient + 1
 }
