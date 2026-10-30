@@ -66,6 +66,7 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
     lst = [
         'AUDIT ZERO-RUNTIME FENCE',
         'AUDIT AST BOUNDARY FIREWALL',
+        'AUDIT ANTI-GAMING OVERLAY',
         'CHECK EMITTED ARTIFACT HYGIENE',
         'PROFILE TICK REDUCTION BUDGET',
         'OPEN ARITHMETIC MENU',
@@ -81,6 +82,7 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         ActOlm.AUDIT_FENCE.split(']')[1],
         ActOlm.CHECK_ARTIFACTS.split(']')[1],
         ActOlm.AUDIT_BOUNDARY.split(']')[1],
+        ActOlm.ANTI_GAMING_AUDIT.split(']')[1],
         ActOlm.PROFILE_BUDGET.split(']')[1],
         ActOlm.STEP_TICK.split(']')[1],
         ActOlm.FAST_FORWARD_TICKS.split(']')[1],
@@ -97,6 +99,8 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             'Verify zero runtime dependencies at workspace root.',
         'AUDIT AST BOUNDARY FIREWALL':
             'Run AST boundary linter enforcing engine isolation.',
+        'AUDIT ANTI-GAMING OVERLAY':
+            'Restore held-out test overlay and verify anti-gaming baseline.',
         'CHECK EMITTED ARTIFACT HYGIENE':
             'Assert zero leaked .js/.d.ts files in source units.',
         'PROFILE TICK REDUCTION BUDGET':
@@ -163,6 +167,17 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
                 src: '>> [BOUNDARY] Running AST dependency firewall sweep...',
             })
             const res = await ste.hunt(ActOlm.AUDIT_BOUNDARY, {})
+            const lines: string[] =
+                res?.fncBit?.lst ?? (res?.fenBit?.src ? [res.fenBit.src] : [])
+            for (const line of lines) {
+                await lib.hunt(UPDATE_CONSOLE, { idx: 'cns00', src: line })
+            }
+            break
+        }
+
+        case 'AUDIT ANTI-GAMING OVERLAY':
+        case ActOlm.ANTI_GAMING_AUDIT.split(']')[1]: {
+            const res = await ste.hunt(ActOlm.ANTI_GAMING_AUDIT, {})
             const lines: string[] =
                 res?.fncBit?.lst ?? (res?.fenBit?.src ? [res.fenBit.src] : [])
             for (const line of lines) {

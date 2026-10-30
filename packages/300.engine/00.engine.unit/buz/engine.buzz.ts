@@ -239,6 +239,54 @@ export const auditBoundary = (
     return cpy
 }
 
+export const ANTI_GAMING_SUCCESS =
+    '>> [SUCCESS] Anti-gaming falsification protocol verified at T_0 = $0.00'
+export const ANTI_GAMING_FAIL =
+    ':: [ANTI-GAMING:FAIL] Anti-gaming overlay verification tripped'
+
+export const antiGamingAudit = (
+    cpy: EngineModel,
+    bal: EngineBit,
+    ste?: State,
+) => {
+    void ste
+    const root = findMonorepoRoot(process.cwd())
+    let ok = false
+    let detail = 'monorepo root not found'
+    let receipt = ''
+    if (root != null) {
+        try {
+            const cp = req('child_process')
+            const stdout: string = cp.execSync(
+                'npx tsx scripts/test-overlay.ts',
+                {
+                    cwd: root,
+                    encoding: 'utf8',
+                    stdio: 'pipe',
+                },
+            )
+            receipt = `${stdout.trim()}\n${ANTI_GAMING_SUCCESS}`
+            ok = true
+            detail = 'held-out overlay restored and locked'
+        } catch (err: unknown) {
+            detail = err instanceof Error ? err.message : String(err)
+        }
+    }
+    if (!ok && receipt === '') {
+        receipt = `${ANTI_GAMING_FAIL}: ${detail}`
+    }
+    if (bal.slv != null) {
+        bal.slv({
+            fenBit: {
+                idx: ok ? 'anti-gaming-ok' : 'anti-gaming-fail',
+                src: receipt,
+                dat: { ok, detail },
+            },
+        })
+    }
+    return cpy
+}
+
 export const PROFILE_BUDGET_MS = 2.0
 const PROFILE_BUDGET_NS = BigInt(2000000)
 

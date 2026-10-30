@@ -34,7 +34,9 @@ export default tseslint.config(
             ecmaVersion: 2020,
             globals: globals.node,
             parserOptions: {
-                projectService: true,
+                projectService: {
+                    allowDefaultProject: ['scripts/*.ts'],
+                },
                 tsconfigRootDir: import.meta.dirname,
             },
         },
@@ -56,6 +58,17 @@ export default tseslint.config(
             '**/*.cjs',
             'vitest.workspace.ts',
             'vitest.config.ts',
+            'scripts/**/*.ts',
         ],
+    },
+
+    // 4. Scripts overrides
+    {
+        files: ['scripts/**/*.{ts,cjs,js}'],
+        rules: {
+            'no-console': 'off',
+            '@typescript-eslint/no-unused-vars': 'off',
+            '@typescript-eslint/no-inferrable-types': 'off',
+        },
     },
 )

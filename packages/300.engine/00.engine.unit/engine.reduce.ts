@@ -59,6 +59,9 @@ export function reducer(
         case Act.BIGINT_AUDIT:
             return Buzz.bigintAudit(clone(model), act.bale, state as State)
 
+        case Act.ANTI_GAMING_AUDIT:
+            return Buzz.antiGamingAudit(clone(model), act.bale, state as State)
+
         default:
             return model
     }

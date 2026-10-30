@@ -108,6 +108,12 @@ export class BigIntAudit implements Action {
     constructor(public bale: EngineBit) {}
 }
 
+export const ANTI_GAMING_AUDIT = '[Overlay action] Audit Anti-Gaming Overlay'
+export class AntiGamingAudit implements Action {
+    readonly type = ANTI_GAMING_AUDIT
+    constructor(public bale: EngineBit) {}
+}
+
 export type Actions =
     | InitEngine
     | UpdateEngine
@@ -126,3 +132,4 @@ export type Actions =
     | ChainAudit
     | DivisionAudit
     | BigIntAudit
+    | AntiGamingAudit
