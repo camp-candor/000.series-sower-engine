@@ -71,6 +71,7 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         'ARITHMETIC KERNEL AUDIT',
         "EXECUTE BANKER'S ROUNDING SUITE",
         'RUN 100,000 BOUNDARY TIE-BREAK GAUNTLET',
+        'ARBITRARY INTEGER DIVISION SUITE',
         'ROOT MENU',
         ActOlm.UPDATE_ENGINE.split(']')[1],
         ActOlm.TEST_ENGINE.split(']')[1],
@@ -84,6 +85,7 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         ActOlm.ARITHMETIC_AUDIT.split(']')[1],
         ActOlm.BANKERS_ROUNDING_SUITE.split(']')[1],
         ActOlm.CHAIN_AUDIT.split(']')[1],
+        ActOlm.DIVISION_AUDIT.split(']')[1],
     ]
 
     const descriptions: Record<string, string> = {
@@ -101,6 +103,8 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             'Verify 4-case Round-Half-Even scaling kernel.',
         'RUN 100,000 BOUNDARY TIE-BREAK GAUNTLET':
             'Verify left-associative chained scaling under 10^8 bp.',
+        'ARBITRARY INTEGER DIVISION SUITE':
+            'Verify Round-Half-Even integer division with tie parity.',
         'ROOT MENU': 'Return to the master runner switchboard.',
     }
 
@@ -263,6 +267,21 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
                 src: '>> Executing Chained Scaling Audit...',
             })
             const res = await ste.hunt(ActOlm.CHAIN_AUDIT, {})
+            const lines: string[] =
+                res?.fncBit?.lst ?? (res?.fenBit?.src ? [res.fenBit.src] : [])
+            for (const line of lines) {
+                await lib.hunt(UPDATE_CONSOLE, { idx: 'cns00', src: line })
+            }
+            break
+        }
+
+        case 'ARBITRARY INTEGER DIVISION SUITE':
+        case ActOlm.DIVISION_AUDIT.split(']')[1]: {
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> Executing Arbitrary Integer Division Audit...',
+            })
+            const res = await ste.hunt(ActOlm.DIVISION_AUDIT, {})
             const lines: string[] =
                 res?.fncBit?.lst ?? (res?.fenBit?.src ? [res.fenBit.src] : [])
             for (const line of lines) {

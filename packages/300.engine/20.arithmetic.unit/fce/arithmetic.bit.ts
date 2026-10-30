@@ -63,6 +63,7 @@ export type ArithmeticReceipt =
     | ScalingDivisionResult
     | BigIntScalingDivisionResult
     | boolean
+    | number
 
 /**
  * Action bit envelope carrying computation requests across 99.bus.unit.

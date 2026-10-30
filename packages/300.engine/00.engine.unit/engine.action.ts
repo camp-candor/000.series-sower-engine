@@ -95,6 +95,13 @@ export class ChainAudit implements Action {
     constructor(public bale: EngineBit) {}
 }
 
+export const DIVISION_AUDIT =
+    '[Arithmetic action] Arbitrary Integer Division Suite'
+export class DivisionAudit implements Action {
+    readonly type = DIVISION_AUDIT
+    constructor(public bale: EngineBit) {}
+}
+
 export type Actions =
     | InitEngine
     | UpdateEngine
@@ -111,3 +118,4 @@ export type Actions =
     | ArithmeticAudit
     | BankersRoundingSuite
     | ChainAudit
+    | DivisionAudit

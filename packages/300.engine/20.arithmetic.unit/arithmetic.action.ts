@@ -107,3 +107,56 @@ export function scaleBasisPointsChained(
 
     return current as BasisPoint
 }
+
+/**
+ * Exact integer division with Banker's Rounding (Round-Half-Even).
+ * Divides numerator by denominator and rounds ties to the nearest even integer.
+ */
+export function divRoundHalfEven(
+    numerator: number,
+    denominator: number,
+): number {
+    if (denominator === 0) {
+        throw new RangeError('[DIV_ZERO] Division by zero is prohibited')
+    }
+    if (!Number.isInteger(numerator) || !Number.isInteger(denominator)) {
+        throw new TypeError('[FLOAT_PROHIBITED] Operands must be integers')
+    }
+    if (
+        Math.abs(numerator) > Number.MAX_SAFE_INTEGER ||
+        Math.abs(denominator) > Number.MAX_SAFE_INTEGER
+    ) {
+        throw new RangeError(
+            '[OVERFLOW_HAZARD] Operand exceeds Number.MAX_SAFE_INTEGER',
+        )
+    }
+
+    if (numerator === 0) {
+        return 0
+    }
+
+    const isNegative = numerator < 0 !== denominator < 0
+    const n = Math.abs(numerator)
+    const d = Math.abs(denominator)
+
+    const q = Math.floor(n / d)
+    const r = n % d
+
+    let roundedMagnitude: number
+    const twiceR = 2 * r
+
+    if (twiceR < d) {
+        roundedMagnitude = q
+    } else if (twiceR > d) {
+        roundedMagnitude = q + 1
+    } else {
+        // Exact half-tie: round toward even integer
+        roundedMagnitude = q % 2 === 0 ? q : q + 1
+    }
+
+    if (roundedMagnitude === 0) {
+        return 0
+    }
+
+    return isNegative ? -roundedMagnitude : roundedMagnitude
+}

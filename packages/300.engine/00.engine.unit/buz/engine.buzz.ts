@@ -18,6 +18,7 @@ import {
     scaleBasisPoints,
     scaleBasisPointsChained,
     MAX_INTERMEDIATE_PRODUCT,
+    divRoundHalfEven,
 } from '../../20.arithmetic.unit/arithmetic.action.js'
 import { createRequire } from 'module'
 const req = createRequire(import.meta.url)
@@ -585,6 +586,134 @@ export const chainAudit = (cpy: EngineModel, bal: EngineBit, ste?: State) => {
                 src: ok
                     ? CHAIN_RECEIPT_LINES.join('\n')
                     : `${CHAIN_SUITE_FAIL}: ${detail}`,
+                dat: { ok, detail },
+            },
+        })
+    }
+    return cpy
+}
+
+export const DIVISION_RECEIPT_LINES: readonly string[] = [
+    '>> [DIV_EVEN:AUDIT] Ingesting Arbitrary Integer Division Kernel...',
+    '>> [DIV_EVEN:ZERO_GUARD] Division by zero intercepted with [DIV_ZERO].',
+    '>> [DIV_EVEN:FLOAT_GUARD] Fractional inputs rejected with [FLOAT_PROHIBITED].',
+    '>> [DIV_EVEN:TIE_EVEN] 1/2 -> 0, 3/2 -> 2, 5/2 -> 2, 7/2 -> 4 (PASS).',
+    '>> [DIV_EVEN:TIE_NEG] -1/2 -> 0, -3/2 -> -2, -5/2 -> -2, -7/2 -> -4 (PASS).',
+    '>> [DIV_EVEN:SYMMETRY] Negative denominator sign normalization verified.',
+    '>> [KERNEL:SEALED] Arbitrary integer division certified at T_0 = $0.00.',
+]
+export const DIVISION_SUITE_FAIL =
+    ':: [DIV_EVEN:FAIL] Arbitrary integer division verification tripped'
+
+export const divisionAudit = (
+    cpy: EngineModel,
+    bal: EngineBit,
+    ste?: State,
+) => {
+    void ste
+    let ok = true
+    let detail = 'arbitrary integer division verified end-to-end'
+    const fail = (reason: string) => {
+        ok = false
+        detail = reason
+    }
+    try {
+        // Zero guard
+        try {
+            divRoundHalfEven(10, 0)
+            fail('division by zero accepted without rejection')
+        } catch (err: unknown) {
+            if (
+                !(err instanceof RangeError) ||
+                !(err as Error).message.includes('DIV_ZERO')
+            ) {
+                fail('division by zero guard misfired')
+            }
+        }
+
+        // Float guard
+        if (ok) {
+            try {
+                divRoundHalfEven(10.5, 2)
+                fail('float operand accepted without rejection')
+            } catch (err: unknown) {
+                if (
+                    !(err instanceof TypeError) ||
+                    !(err as Error).message.includes('FLOAT_PROHIBITED')
+                ) {
+                    fail('float guard misfired')
+                }
+            }
+        }
+
+        // Positive half-ties
+        if (ok) {
+            const checks: [number, number, number][] = [
+                [1, 2, 0],
+                [3, 2, 2],
+                [5, 2, 2],
+                [7, 2, 4],
+            ]
+            for (const [num, den, exp] of checks) {
+                const res = divRoundHalfEven(num, den)
+                if (res !== exp) {
+                    fail(
+                        `positive tie drifted: ${num}/${den} expected ${exp}, got ${res}`,
+                    )
+                    break
+                }
+            }
+        }
+
+        // Negative half-ties
+        if (ok) {
+            const negChecks: [number, number, number][] = [
+                [-1, 2, 0],
+                [-3, 2, -2],
+                [-5, 2, -2],
+                [-7, 2, -4],
+            ]
+            for (const [num, den, exp] of negChecks) {
+                const res = divRoundHalfEven(num, den)
+                if (res !== exp) {
+                    fail(
+                        `negative tie drifted: ${num}/${den} expected ${exp}, got ${res}`,
+                    )
+                    break
+                }
+            }
+        }
+
+        // Symmetry with negative denominators
+        if (ok) {
+            const symChecks: [number, number, number][] = [
+                [1, -2, 0],
+                [3, -2, -2],
+                [-3, -2, 2],
+                [-5, -2, 2],
+                [-7, -2, 4],
+            ]
+            for (const [num, den, exp] of symChecks) {
+                const res = divRoundHalfEven(num, den)
+                if (res !== exp) {
+                    fail(
+                        `symmetry drifted: ${num}/${den} expected ${exp}, got ${res}`,
+                    )
+                    break
+                }
+            }
+        }
+    } catch (err: unknown) {
+        fail(err instanceof Error ? err.message : String(err))
+    }
+
+    if (bal.slv != null) {
+        bal.slv({
+            fenBit: {
+                idx: ok ? 'division-audit-ok' : 'division-audit-fail',
+                src: ok
+                    ? DIVISION_RECEIPT_LINES.join('\n')
+                    : `${DIVISION_SUITE_FAIL}: ${detail}`,
                 dat: { ok, detail },
             },
         })

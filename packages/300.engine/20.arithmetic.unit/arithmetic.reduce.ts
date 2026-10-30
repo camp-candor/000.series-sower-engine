@@ -9,10 +9,12 @@ import {
     type ArithmeticActionBit,
     type ScaleScalarPayload,
     type ScaleChainedPayload,
+    type DivideRoundEvenPayload,
 } from './fce/arithmetic.bit.js'
 import {
     evaluateScalingDivision,
     scaleBasisPointsChained,
+    divRoundHalfEven,
 } from './arithmetic.action.js'
 
 export function reduceArithmetic(
@@ -48,6 +50,23 @@ export function reduceArithmetic(
 
             return state.copyWith({
                 lastChainedValue: result,
+                totalCalculations: state.totalCalculations + 1,
+            })
+        }
+
+        case ArithmeticCommand.DIVIDE_ROUND_EVEN: {
+            const payload = bit.dat as DivideRoundEvenPayload
+            const result = divRoundHalfEven(
+                payload.numerator,
+                payload.denominator,
+            )
+
+            if (bit.slv) {
+                bit.slv(result)
+            }
+
+            return state.copyWith({
+                lastDivisionOutput: result,
                 totalCalculations: state.totalCalculations + 1,
             })
         }

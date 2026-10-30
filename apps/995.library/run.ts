@@ -32,6 +32,7 @@ program
     .option('--arithmetic-audit')
     .option('--bankers-rounding')
     .option('--chain-audit')
+    .option('--division-audit')
 program.parse(process.argv)
 const options = program.opts()
 
@@ -679,6 +680,40 @@ const chainAuditHeadless = async () => {
     }
 }
 
+const divisionAuditHeadless = async () => {
+    try {
+        const mod = await import(
+            '../../packages/300.engine/00.engine.unit/buz/engine.buzz.js'
+        )
+        let receipt = ''
+        let ok = false
+        mod.divisionAudit(
+            {} as any,
+            {
+                idx: 'division',
+                slv: (bit: any) => {
+                    receipt = bit.fenBit.src
+                    ok = bit.fenBit.idx === 'division-audit-ok'
+                },
+            } as any,
+        )
+        if (ok) {
+            console.log(receipt)
+            process.exit(0)
+        }
+        console.error(
+            receipt ||
+                ':: [DIV_EVEN:FAIL] Arbitrary integer division produced no receipt',
+        )
+        process.exit(1)
+    } catch (err: any) {
+        console.error(
+            `:: [DIV_EVEN:FAIL] Arbitrary integer division headless execution failed: ${err?.message ?? err}`,
+        )
+        process.exit(1)
+    }
+}
+
 const formatCompilationFeedback = (rawOutput: string): void => {
     const lines = rawOutput.split(/\r?\n/).filter((l) => l.trim().length > 0)
     const errorPattern = /^(.+?)\((\d+),(\d+)\):\s*error\s*(TS\d+):\s*(.+)$/
@@ -802,6 +837,10 @@ const main = async () => {
     }
     if (options.chainAudit) {
         await chainAuditHeadless()
+        return
+    }
+    if (options.divisionAudit) {
+        await divisionAuditHeadless()
         return
     }
     let heartbeat: NodeJS.Timeout | null = null

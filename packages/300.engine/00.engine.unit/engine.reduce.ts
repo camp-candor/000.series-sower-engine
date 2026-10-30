@@ -53,6 +53,9 @@ export function reducer(
         case Act.CHAIN_AUDIT:
             return Buzz.chainAudit(clone(model), act.bale, state as State)
 
+        case Act.DIVISION_AUDIT:
+            return Buzz.divisionAudit(clone(model), act.bale, state as State)
+
         default:
             return model
     }
