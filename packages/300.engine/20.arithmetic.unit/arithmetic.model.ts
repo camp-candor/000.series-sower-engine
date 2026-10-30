@@ -6,6 +6,8 @@
 import type {
     BasisPoint,
     ScalingDivisionResult,
+    BigIntBasisPoint,
+    BigIntScalingDivisionResult
 } from './fce/arithmetic.interface.js'
 import { toBasisPoint } from './fce/arithmetic.interface.js'
 
@@ -15,6 +17,9 @@ export interface ArithmeticState {
     readonly lastChainedValue: BasisPoint | null
     readonly lastDivisionOutput: number | null
     readonly lastReceipt: ScalingDivisionResult | null
+    readonly lastScaledBigIntValue: BigIntBasisPoint | null;
+    readonly lastBigIntReceipt: BigIntScalingDivisionResult | null;
+    readonly lastBigIntDivisionOutput: bigint | null;
     readonly totalCalculations: number
 }
 
@@ -24,6 +29,9 @@ export class ArithmeticModel implements ArithmeticState {
     public readonly lastChainedValue: BasisPoint | null
     public readonly lastDivisionOutput: number | null
     public readonly lastReceipt: ScalingDivisionResult | null
+    public readonly lastScaledBigIntValue: BigIntBasisPoint | null;
+    public readonly lastBigIntReceipt: BigIntScalingDivisionResult | null;
+    public readonly lastBigIntDivisionOutput: bigint | null;
     public readonly totalCalculations: number
 
     constructor(
@@ -32,6 +40,9 @@ export class ArithmeticModel implements ArithmeticState {
         lastChainedValue: BasisPoint | null = null,
         lastDivisionOutput: number | null = null,
         lastReceipt: ScalingDivisionResult | null = null,
+        lastScaledBigIntValue: BigIntBasisPoint | null = null,
+        lastBigIntReceipt: BigIntScalingDivisionResult | null = null,
+        lastBigIntDivisionOutput: bigint | null = null,
         totalCalculations = 0,
     ) {
         this.idx = idx
@@ -39,6 +50,9 @@ export class ArithmeticModel implements ArithmeticState {
         this.lastChainedValue = lastChainedValue
         this.lastDivisionOutput = lastDivisionOutput
         this.lastReceipt = lastReceipt
+        this.lastScaledBigIntValue = lastScaledBigIntValue
+        this.lastBigIntReceipt = lastBigIntReceipt
+        this.lastBigIntDivisionOutput = lastBigIntDivisionOutput
         this.totalCalculations = totalCalculations
         Object.freeze(this)
     }
@@ -56,6 +70,9 @@ export class ArithmeticModel implements ArithmeticState {
             changes.lastReceipt !== undefined
                 ? changes.lastReceipt
                 : this.lastReceipt,
+            changes.lastScaledBigIntValue !== undefined ? changes.lastScaledBigIntValue : this.lastScaledBigIntValue,
+            changes.lastBigIntReceipt !== undefined ? changes.lastBigIntReceipt : this.lastBigIntReceipt,
+            changes.lastBigIntDivisionOutput !== undefined ? changes.lastBigIntDivisionOutput : this.lastBigIntDivisionOutput,
             changes.totalCalculations ?? this.totalCalculations,
         )
     }
