@@ -155,7 +155,7 @@ dist
 !.dependency-cruiser.cjs
 
 # Docs
-docs
+
 
 # Un-ignore bin scripts
 !bin/**/*.js
