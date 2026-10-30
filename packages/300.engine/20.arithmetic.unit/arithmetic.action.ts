@@ -102,3 +102,44 @@ export function scaleBasisPointsChained(
 
   return current as BasisPoint;
 }
+
+/**
+ * Exact integer division implementing Round-Half-Even (Banker's Rounding).
+ * Eliminates directional upward drift.
+ */
+export function divRoundHalfEven(numerator: number, denominator: number): number {
+  if (denominator === 0) {
+    throw new RangeError('[DIV_ZERO] Division by zero in integer arithmetic');
+  }
+
+  let n = numerator;
+  let d = denominator;
+
+  if (d < 0) {
+    n = -n;
+    d = -d;
+  }
+
+  let q = Math.trunc(n / d);
+  let r = n % d;
+
+  if (r === 0) {
+    return q;
+  }
+
+  // Floored Euclidean integer division equivalent for negative numbers to match BigInt
+  if (r < 0) {
+    q -= 1;
+    r += d;
+  }
+
+  const doubleR = r * 2;
+  if (doubleR < d) {
+    return q;
+  }
+  if (doubleR > d) {
+    return q + 1;
+  }
+
+  return q % 2 === 0 ? q : q + 1;
+}
