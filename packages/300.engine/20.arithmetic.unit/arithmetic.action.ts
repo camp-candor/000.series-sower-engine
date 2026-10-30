@@ -47,7 +47,7 @@ export function evaluateScalingDivision(
 
     const rounded = arbitrateRemainder(quotient, remainder, TIE_BREAK_REMAINDER)
 
-    const roundedOutput = toBasisPoint(rounded)
+    const roundedOutput = rounded as BasisPoint
 
     const receipt: ScalingDivisionResult = {
         quotient,
@@ -61,7 +61,7 @@ export function evaluateScalingDivision(
 
 export function scaleBasisPoints(a: number, b: number): BasisPoint {
     const receipt = evaluateScalingDivision(a, b)
-    return receipt.roundedOutput
+    return receipt.roundedOutput as BasisPoint
 }
 
 export const MAX_INTERMEDIATE_PRODUCT = 100_000_000
