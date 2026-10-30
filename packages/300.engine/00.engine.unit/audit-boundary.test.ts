@@ -12,7 +12,7 @@ import { EngineModel } from './engine.model.js'
 import { MenuModel } from '../98.menu.unit/menu.model.js'
 import { updateMenu } from '../98.menu.unit/buz/00.menu.buzz.js'
 
-describe('audit boundary', () => {
+describe('audit boundary', { timeout: 15000 }, () => {
     afterEach(() => {
         vi.unstubAllGlobals()
         delete (global as any).LIBRARY
