@@ -62,6 +62,13 @@ export function reducer(
         case Act.ANTI_GAMING_AUDIT:
             return Buzz.antiGamingAudit(clone(model), act.bale, state as State)
 
+        case Act.RUN_GAUNTLET:
+            return Buzz.runGauntlet(
+                clone(model),
+                act.bale as any,
+                state as State,
+            )
+
         default:
             return model
     }

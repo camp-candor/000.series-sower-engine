@@ -1,12 +1,26 @@
 import { Action } from '../99.core/interface/action.interface.js'
 import EngineBit from './fce/engine.bit.js'
+import type GauntletBit from './fce/gauntlet.bit.js'
 
 // engine actions
 
 export const INIT_ENGINE = '[Engine action] Init Engine'
+export const RUN_GAUNTLET = '[Engine Action] Run Gauntlet'
+export const RUN_GAUNTLET_STAGE = '[Engine Action] Run Gauntlet Stage'
+
 export class InitEngine implements Action {
     readonly type = INIT_ENGINE
-    constructor(public bale: EngineBit) {}
+    constructor(public bale: GauntletBit | EngineBit) {}
+}
+
+export class RunGauntlet implements Action {
+    readonly type = RUN_GAUNTLET
+    constructor(public bale: GauntletBit) {}
+}
+
+export class RunGauntletStage implements Action {
+    readonly type = RUN_GAUNTLET_STAGE
+    constructor(public bale: GauntletBit) {}
 }
 
 export const UPDATE_ENGINE = '[Engine action] Update Engine'
@@ -108,6 +122,7 @@ export class BigIntAudit implements Action {
     constructor(public bale: EngineBit) {}
 }
 
+export const AUDIT_ANTI_GAMING = '[Engine Action] Audit Anti Gaming'
 export const ANTI_GAMING_AUDIT = '[Overlay action] Audit Anti-Gaming Overlay'
 export class AntiGamingAudit implements Action {
     readonly type = ANTI_GAMING_AUDIT
@@ -116,6 +131,8 @@ export class AntiGamingAudit implements Action {
 
 export type Actions =
     | InitEngine
+    | RunGauntlet
+    | RunGauntletStage
     | UpdateEngine
     | TestEngine
     | IntellectEngine

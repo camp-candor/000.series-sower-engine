@@ -8,6 +8,7 @@ import type State from '../../99.core/state.js'
 
 import * as Align from '../../val/align.js'
 import * as Color from '../../val/console-color.js'
+import { openGauntletMenu } from './gauntlet-menu.buzz.js'
 
 let bit: any, lst: any, src: any
 let rootSlv: any
@@ -64,6 +65,7 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
     }
 
     lst = [
+        'OPEN GAUNTLET MENU',
         'AUDIT ZERO-RUNTIME FENCE',
         'AUDIT AST BOUNDARY FIREWALL',
         'AUDIT ANTI-GAMING OVERLAY',
@@ -95,6 +97,8 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
     ]
 
     const descriptions: Record<string, string> = {
+        'OPEN GAUNTLET MENU':
+            'Open the Simulation Engine Cockpit to audit CI gates and tick performance.',
         'AUDIT ZERO-RUNTIME FENCE':
             'Verify zero runtime dependencies at workspace root.',
         'AUDIT AST BOUNDARY FIREWALL':
@@ -145,6 +149,11 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
     src = bit?.chcBit?.src
 
     switch (src) {
+        case 'OPEN GAUNTLET MENU': {
+            await openGauntletMenu(cpy, bal, ste)
+            break
+        }
+
         case 'AUDIT ZERO-RUNTIME FENCE':
         case ActOlm.AUDIT_FENCE.split(']')[1]: {
             await lib.hunt(UPDATE_CONSOLE, {

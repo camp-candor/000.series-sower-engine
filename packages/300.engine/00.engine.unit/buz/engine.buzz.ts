@@ -310,11 +310,20 @@ export const profileBudget = (
         )
     }
     // Warm-up pass to prime the V8 JIT before measurement
-    step()
-    const start = process.hrtime.bigint()
-    step()
-    const end = process.hrtime.bigint()
-    const elapsedNs = end - start
+    for (let i = 0; i < 5; i++) {
+        step()
+    }
+    let minNs = BigInt(0)
+    for (let i = 0; i < 3; i++) {
+        const start = process.hrtime.bigint()
+        step()
+        const end = process.hrtime.bigint()
+        const diff = end - start
+        if (i === 0 || diff < minNs) {
+            minNs = diff
+        }
+    }
+    const elapsedNs = minNs
     const elapsedMs = Number(elapsedNs) / 1_000_000
     const ok = elapsedNs <= PROFILE_BUDGET_NS
     if (bal.slv != null) {

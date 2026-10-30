@@ -7,6 +7,7 @@ import path from 'path'
 import fs from 'fs'
 import { createRequire } from 'module'
 import { fileURLToPath } from 'url'
+import { openGauntletMenu } from '../../packages/300.engine/98.menu.unit/buz/gauntlet-menu.buzz.js'
 
 const require = createRequire(import.meta.url)
 const exec = promisify(execCb)
@@ -38,8 +39,20 @@ program
     .option('--bigint-precision')
     .option('--arithmetic-menu')
     .option('--run-all-levels')
+    .option('--gauntlet')
+    .option('--run-gauntlet')
 program.parse(process.argv)
 const options = program.opts()
+
+export function mountSimulationEngineMenu(lib: any): void {
+    lib.hunt('[Route Action] Register Route', {
+        route: 'SIMULATION ENGINE',
+        description:
+            'Open the Simulation Engine Cockpit\nto audit CI gates and tick performance.',
+        handler: (cpy: any, bal: any, ste: any) =>
+            openGauntletMenu(cpy, bal, ste),
+    })
+}
 
 export interface PackageTerminalMetadata {
     name: string
@@ -291,6 +304,7 @@ const init = async () => {
                 })
 
                 if (pkg.name === '300.engine') {
+                    mountSimulationEngineMenu(LIBRARY)
                     await LIBRARY.hunt(MENU_ACTION_LIBRARY.ROUTE_MENU, {
                         idx: 'ARITHMETIC KERNEL AUDIT',
                         src: 'Open Arithmetic Kernel Cockpit (Bounds, Banker Rounding, Gauntlet).',
@@ -882,6 +896,37 @@ const arithmeticMenuHeadless = async () => {
     }
 }
 
+const gauntletHeadless = async () => {
+    try {
+        const mod = await import(
+            '../../packages/300.engine/00.engine.unit/buz/gauntlet.buzz.js'
+        )
+        let passed = false
+        const bit: any = {
+            idx: 'run-gauntlet',
+            slv: (res: any) => {
+                passed = res.gntBit.val === 0
+                if (res.gntBit.lst) {
+                    for (const line of res.gntBit.lst) {
+                        console.log(line)
+                    }
+                }
+            },
+        }
+        await mod.runGauntlet({}, bit)
+        if (passed) {
+            process.exit(0)
+        } else {
+            process.exit(1)
+        }
+    } catch (err: any) {
+        console.error(
+            `:: [GAUNTLET:FAIL] Headless execution failed: ${err?.message ?? err}`,
+        )
+        process.exit(1)
+    }
+}
+
 const formatCompilationFeedback = (rawOutput: string): void => {
     const lines = rawOutput.split(/\r?\n/).filter((l) => l.trim().length > 0)
     const errorPattern = /^(.+?)\((\d+),(\d+)\):\s*error\s*(TS\d+):\s*(.+)$/
@@ -1021,6 +1066,10 @@ const main = async () => {
     }
     if (options.arithmeticMenu || options.runAllLevels) {
         await arithmeticMenuHeadless()
+        return
+    }
+    if (options.gauntlet || options.runGauntlet) {
+        await gauntletHeadless()
         return
     }
     let heartbeat: NodeJS.Timeout | null = null

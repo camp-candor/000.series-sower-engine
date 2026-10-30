@@ -38,6 +38,7 @@
         "test:golden-failures": "vitest run packages/300.engine/00.engine.unit/test/golden-failures.spec.ts",
         "check:red-green": "npx tsx scripts/red-before-green.ts",
         "check:anti-gaming": "npm run overlay:tests && npm run test:golden-failures && npm run check:red-green",
+        "gauntlet": "npm run check:runner-boundary && npm run check:all && npm run test:pure && npm run check:anti-gaming",
         "//__ CODE QUALITY & HYGIENE _______________": "",
         "fix": "npm run prettier:fix && npm run lint:fix",
         "lint:check": "eslint .",
