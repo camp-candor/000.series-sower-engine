@@ -34,6 +34,7 @@
         "//__ TESTING ______________________________": "",
         "test": "vitest run",
         "test:pure": "vitest run --project engine-core-pure",
+        "test:worker": "npm run test --workspace=@camp_candor/agent",
         "overlay:tests": "npx tsx scripts/test-overlay.ts",
         "test:golden-failures": "vitest run packages/300.engine/00.engine.unit/test/golden-failures.spec.ts",
         "check:red-green": "npx tsx scripts/red-before-green.ts",
