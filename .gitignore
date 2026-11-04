@@ -162,6 +162,9 @@ dist
 !bin/**/*.mjs
 !bin/**/*.cjs
 
+# Un-ignore audit and verification scripts
+!scripts/**/*.cjs
+
 # Un-ignore css & vite module declarations
 !vite-env.d.ts
 !css.d.ts
