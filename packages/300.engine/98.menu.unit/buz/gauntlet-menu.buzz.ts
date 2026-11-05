@@ -91,105 +91,110 @@ export async function openGauntletMenu(
         xSpan: 4,
         ySpan: 8,
     })
-    const choiceBit = await lib.hunt(OPEN_CHOICE, {
-        idx: 'gauntlet-menu',
-        dat: {
-            clr0: Color.BLACK,
-            clr1: Color.GREEN,
-            cb: (choice: string) => {
-                const text = descriptions[choice] || 'No description available.'
-                text.split('\n').forEach((s: string) =>
-                    lib.hunt(UPDATE_CONSOLE, { idx: 'cns00', src: s }),
-                )
+
+    while (true) {
+        const choiceBit = await lib.hunt(OPEN_CHOICE, {
+            idx: 'gauntlet-menu',
+            dat: {
+                clr0: Color.BLACK,
+                clr1: Color.GREEN,
+                cb: (choice: string) => {
+                    const text =
+                        descriptions[choice] || 'No description available.'
+                    text.split('\n').forEach((s: string) =>
+                        lib.hunt(UPDATE_CONSOLE, { idx: 'cns00', src: s }),
+                    )
+                },
             },
-        },
-        src: Align.VERTICAL,
-        lst: choices,
-        net: gridChoice?.grdBit?.dat,
-    })
+            src: Align.VERTICAL,
+            lst: choices,
+            net: gridChoice?.grdBit?.dat,
+        })
 
-    const selected = choiceBit?.chcBit?.src
+        const selected = choiceBit?.chcBit?.src
 
-    switch (selected) {
-        case '1. RUN CONSOLIDATED CI GAUNTLET': {
-            const bit: GauntletBit = { idx: 'run-gauntlet' }
-            await runGauntlet(cpy, bit, ste)
-            break
-        }
-        case '2. AUDIT PERIMETER & WORKSPACE HYGIENE': {
-            const res1 = executeStage({
-                id: 'FENCE',
-                name: 'Immutable Runner & Harness',
-                command:
-                    'git status -s apps/worker/wrangler.jsonc apps/995.library/995.library/',
-            })
-            const res2 = executeStage({
-                id: 'ASCII',
-                name: 'Pure 7-Bit ASCII Compliance',
-                command: 'npm run check:ascii',
-            })
-            const lines = [
-                '>> --------------------------------------------------',
-                '>> [AUDIT:PERIMETER] Workspace Hygiene Telemetry:',
-                `>> - Runner & Harness : ${res1.passed ? '[PASS: CLEAN]' : '[FAIL: DIRTY]'}`,
-                `>> - 7-Bit ASCII Pure : ${res2.passed ? '[PASS: CLEAN]' : '[FAIL: BREACH]'}`,
-                '>> --------------------------------------------------',
-            ]
-            await streamLines(lib, lines)
-            break
-        }
-        case '3. AUDIT AST IMPORT ISOLATION FIREWALL': {
-            const res = executeStage({
-                id: 'AST',
-                name: 'AST Dependency Cruiser',
-                command: 'npm run check:boundary:ast',
-            })
-            const lines = [
-                '>> --------------------------------------------------',
-                '>> [AUDIT:AST] Static AST Isolation Firewall Telemetry:',
-                `>> - Boundary Status  : ${res.passed ? '[PASS: 0 VIOLATIONS]' : '[FAIL: BREACH DETECTED]'}`,
-                `>> - Elapsed Time     : ${res.durationMs.toFixed(2)}ms`,
-                '>> --------------------------------------------------',
-            ]
-            await streamLines(lib, lines)
-            break
-        }
-        case '4. PROFILE TICK EXECUTION BUDGET': {
-            const res = executeStage({
-                id: 'BUDGET',
-                name: 'Pure Engine 2ms Budget',
-                command: 'npm run test:pure',
-            })
-            const lines = [
-                '>> --------------------------------------------------',
-                '>> [PROFILE:BUDGET] Nanosecond BigInt Timing Telemetry:',
-                `>> - Budget Status    : ${res.passed ? '[BUDGET_PASS: <= 2.0ms]' : '[BUDGET_BREACH]'}`,
-                `>> - Elapsed Time     : ${res.durationMs.toFixed(2)}ms`,
-                '>> --------------------------------------------------',
-            ]
-            await streamLines(lib, lines)
-            break
-        }
-        case '5. AUDIT ANTI-GAMING OVERLAY SHIELD': {
-            const res = executeStage({
-                id: 'ANTI_GAMING',
-                name: 'Anti-Gaming Protocol',
-                command: 'npm run check:anti-gaming',
-            })
-            const lines = [
-                '>> --------------------------------------------------',
-                '>> [AUDIT:ANTI-GAMING] Falsification Shield Telemetry:',
-                `>> - Shield Status    : ${res.passed ? '[PASS: BASELINE LOCKED]' : '[FAIL: DEFECT DETECTED]'}`,
-                `>> - Negative Traps   : 5/5 Golden Traps Active`,
-                '>> --------------------------------------------------',
-            ]
-            await streamLines(lib, lines)
-            break
-        }
-        case 'ROOT MENU':
-        default: {
-            await lib.hunt(OPEN_MENU, { src: '' })
-            return cpy
+        switch (selected) {
+            case '1. RUN CONSOLIDATED CI GAUNTLET': {
+                const bit: GauntletBit = { idx: 'run-gauntlet' }
+                await runGauntlet(cpy, bit, ste)
+                break
+            }
+            case '2. AUDIT PERIMETER & WORKSPACE HYGIENE': {
+                const res1 = executeStage({
+                    id: 'FENCE',
+                    name: 'Immutable Runner & Harness',
+                    command:
+                        'git status -s apps/worker/wrangler.jsonc apps/995.library/995.library/',
+                })
+                const res2 = executeStage({
+                    id: 'ASCII',
+                    name: 'Pure 7-Bit ASCII Compliance',
+                    command: 'npm run check:ascii',
+                })
+                const lines = [
+                    '>> --------------------------------------------------',
+                    '>> [AUDIT:PERIMETER] Workspace Hygiene Telemetry:',
+                    `>> - Runner & Harness : ${res1.passed ? '[PASS: CLEAN]' : '[FAIL: DIRTY]'}`,
+                    `>> - 7-Bit ASCII Pure : ${res2.passed ? '[PASS: CLEAN]' : '[FAIL: BREACH]'}`,
+                    '>> --------------------------------------------------',
+                ]
+                await streamLines(lib, lines)
+                break
+            }
+            case '3. AUDIT AST IMPORT ISOLATION FIREWALL': {
+                const res = executeStage({
+                    id: 'AST',
+                    name: 'AST Dependency Cruiser',
+                    command: 'npm run check:boundary:ast',
+                })
+                const lines = [
+                    '>> --------------------------------------------------',
+                    '>> [AUDIT:AST] Static AST Isolation Firewall Telemetry:',
+                    `>> - Boundary Status  : ${res.passed ? '[PASS: 0 VIOLATIONS]' : '[FAIL: BREACH DETECTED]'}`,
+                    `>> - Elapsed Time     : ${res.durationMs.toFixed(2)}ms`,
+                    '>> --------------------------------------------------',
+                ]
+                await streamLines(lib, lines)
+                break
+            }
+            case '4. PROFILE TICK EXECUTION BUDGET': {
+                const res = executeStage({
+                    id: 'BUDGET',
+                    name: 'Pure Engine 2ms Budget',
+                    command: 'npm run test:pure',
+                })
+                const lines = [
+                    '>> --------------------------------------------------',
+                    '>> [PROFILE:BUDGET] Nanosecond BigInt Timing Telemetry:',
+                    `>> - Budget Status    : ${res.passed ? '[BUDGET_PASS: <= 2.0ms]' : '[BUDGET_BREACH]'}`,
+                    `>> - Elapsed Time     : ${res.durationMs.toFixed(2)}ms`,
+                    '>> --------------------------------------------------',
+                ]
+                await streamLines(lib, lines)
+                break
+            }
+            case '5. AUDIT ANTI-GAMING OVERLAY SHIELD': {
+                const res = executeStage({
+                    id: 'ANTI_GAMING',
+                    name: 'Anti-Gaming Protocol',
+                    command: 'npm run check:anti-gaming',
+                })
+                const lines = [
+                    '>> --------------------------------------------------',
+                    '>> [AUDIT:ANTI-GAMING] Falsification Shield Telemetry:',
+                    `>> - Shield Status    : ${res.passed ? '[PASS: BASELINE LOCKED]' : '[FAIL: DEFECT DETECTED]'}`,
+                    `>> - Negative Traps   : 5/5 Golden Traps Active`,
+                    '>> --------------------------------------------------',
+                ]
+                await streamLines(lib, lines)
+                break
+            }
+            case 'ROOT MENU':
+            default: {
+                await lib.hunt(OPEN_MENU, { src: '' })
+                if (bal.slv) bal.slv({ mnuBit: { idx: 'root-menu', val: 0 } })
+                return cpy
+            }
         }
     }
 

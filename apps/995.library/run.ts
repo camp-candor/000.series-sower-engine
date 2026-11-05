@@ -45,12 +45,17 @@ program.parse(process.argv)
 const options = program.opts()
 
 export function mountSimulationEngineMenu(lib: any): void {
-    lib.hunt('[Route Action] Register Route', {
-        route: 'SIMULATION ENGINE',
-        description:
-            'Open the Simulation Engine Cockpit\nto audit CI gates and tick performance.',
-        handler: (cpy: any, bal: any, ste: any) =>
-            openGauntletMenu(cpy, bal, ste),
+    lib.hunt('[Route action] Route Menu', {
+        idx: 'SIMULATION ENGINE',
+        src: 'Open the Simulation Engine Cockpit\nto audit CI gates and tick performance.',
+        fnc: async () => {
+            await new Promise<void>((resolve) => {
+                openGauntletMenu({}, { slv: resolve })
+            })
+            await lib.hunt('[Menu action] Open Menu', {
+                src: '',
+            })
+        },
     })
 }
 
@@ -1132,4 +1137,13 @@ const main = async () => {
     }
 }
 
-main()
+const isDirectExecution = () => {
+    if (!process.argv[1]) return false
+    const entry = path.resolve(process.argv[1]).toLowerCase()
+    const current = path.resolve(fileURLToPath(import.meta.url)).toLowerCase()
+    return entry === current || entry.endsWith('run.ts')
+}
+
+if (isDirectExecution()) {
+    main()
+}
