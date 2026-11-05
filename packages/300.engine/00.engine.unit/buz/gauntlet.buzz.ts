@@ -71,17 +71,23 @@ export const GAUNTLET_STAGES: readonly StageConfig[] = [
     },
 ]
 
-function logToConsolePane(lines: string[]): void {
+async function logToConsolePane(lines: string[]): Promise<void> {
     if (
         typeof global !== 'undefined' &&
         global.LIBRARY &&
         typeof global.LIBRARY.hunt === 'function'
     ) {
-        global.LIBRARY.hunt('[Console Action] Update Console', {
-            idx: 'cns00',
-            lst: lines,
-        })
+        for (const line of lines) {
+            await global.LIBRARY.hunt('[Console action] Update Console', {
+                idx: 'cns00',
+                src: line,
+            })
+        }
     }
+}
+
+async function yieldToPaint(): Promise<void> {
+    await new Promise<void>((resolve) => setImmediate(resolve))
 }
 
 export function executeStage(stage: StageConfig): GauntletStageResult {
@@ -123,20 +129,21 @@ export async function runGauntlet(
         '>> [GAUNTLET:INIT] EXECUTING PHASE 1 CI VERIFICATION GAUNTLET (T_0 = $0.00)',
         '>> ==================================================================',
     ]
-    logToConsolePane(receipts)
+    await logToConsolePane(receipts)
+    await yieldToPaint()
 
     const results: GauntletStageResult[] = []
     let allPassed = true
 
     for (const stage of GAUNTLET_STAGES) {
-        logToConsolePane([`>> [STAGE:RUN] ${stage.name}...`])
         const res = executeStage(stage)
         results.push(res)
 
         if (res.passed) {
             const line = `>> [STAGE:PASS] ${res.name.padEnd(38)} [${res.durationMs.toFixed(2)}ms]`
             receipts.push(line)
-            logToConsolePane([line])
+            await logToConsolePane([line])
+            await yieldToPaint()
         } else {
             allPassed = false
             const line = `>> [STAGE:FAIL] ${res.name.padEnd(38)} [BREACH]`
@@ -144,7 +151,8 @@ export async function runGauntlet(
             if (res.error) {
                 receipts.push(`>>   Error: ${res.error.split('\n')[0]}`)
             }
-            logToConsolePane([line, `>>   Error: ${res.error}`])
+            await logToConsolePane([line, `>>   Error: ${res.error}`])
+            await yieldToPaint()
             break // Fail closed on first violation
         }
     }
@@ -167,7 +175,8 @@ export async function runGauntlet(
     receipts.push(
         '>> ==================================================================',
     )
-    logToConsolePane(receipts.slice(-4))
+    await logToConsolePane(receipts.slice(-4))
+    await yieldToPaint()
 
     bal.val = allPassed ? 0 : -1
     bal.lst = receipts

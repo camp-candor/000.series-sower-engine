@@ -1015,7 +1015,27 @@ const formatCompilationFeedback = (rawOutput: string): void => {
     )
 }
 
+const resolveRepoRoot = (): string => {
+    let curr = __dirname
+    while (curr && curr !== path.dirname(curr)) {
+        const pkgPath = path.join(curr, 'package.json')
+        try {
+            if (fs.existsSync(pkgPath)) {
+                const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'))
+                if (Array.isArray(pkg.workspaces)) return curr
+            }
+        } catch {}
+        curr = path.dirname(curr)
+    }
+    return path.resolve(__dirname, '..', '..')
+}
+
 const main = async () => {
+    const repoRoot = resolveRepoRoot()
+    if (process.cwd() !== repoRoot) {
+        process.chdir(repoRoot)
+        console.log(`>> [CWD] Terminal Orchestrator rooted at: ${repoRoot}`)
+    }
     if (options.auditFence) {
         auditFenceHeadless()
         return
