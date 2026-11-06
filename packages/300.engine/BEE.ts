@@ -20,6 +20,8 @@ import StateUnit from './16.state.unit/state.unit.js'
 import TickUnit from './17.tick.unit/tick.unit.js'
 import TraumaUnit from './18.trauma.unit/trauma.unit.js'
 import WoundsUnit from './19.wounds.unit/wounds.unit.js'
+import ArithmeticUnit from './20.arithmetic.unit/arithmetic.unit.js'
+import CompileUnit from './21.compile.unit/compile.unit.js'
 import CollectUnit from './97.collect.unit/collect.unit.js'
 import MenuUnit from './98.menu.unit/menu.unit.js'
 import BusUnit from './99.bus.unit/bus.unit.js'
@@ -56,7 +58,7 @@ import Sequence from './14.sequence.unit/fce/sequence.interface.js'
 import { SequenceModel } from './14.sequence.unit/sequence.model.js'
 import Series from './15.series.unit/fce/series.interface.js'
 import { SeriesModel } from './15.series.unit/series.model.js'
-import State from './16.state.unit/fce/state.interface.js'
+import StateInterface from './16.state.unit/fce/state.interface.js'
 import { StateModel } from './16.state.unit/state.model.js'
 import Tick from './17.tick.unit/fce/tick.interface.js'
 import { TickModel } from './17.tick.unit/tick.model.js'
@@ -64,6 +66,10 @@ import Trauma from './18.trauma.unit/fce/trauma.interface.js'
 import { TraumaModel } from './18.trauma.unit/trauma.model.js'
 import Wounds from './19.wounds.unit/fce/wounds.interface.js'
 import { WoundsModel } from './19.wounds.unit/wounds.model.js'
+import Arithmetic from './20.arithmetic.unit/fce/arithmetic.interface.js'
+import { ArithmeticModel } from './20.arithmetic.unit/arithmetic.model.js'
+import Compile from './21.compile.unit/fce/compile.interface.js'
+import { CompileModel } from './21.compile.unit/compile.model.js'
 import Collect from './97.collect.unit/fce/collect.interface.js'
 import { CollectModel } from './97.collect.unit/collect.model.js'
 import Menu from './98.menu.unit/fce/menu.interface.js'
@@ -92,6 +98,8 @@ export const list: Array<any> = [
     TickUnit,
     TraumaUnit,
     WoundsUnit,
+    ArithmeticUnit,
+    CompileUnit,
     CollectUnit,
     MenuUnit,
     BusUnit,
@@ -117,6 +125,8 @@ import * as reduceFromState from './16.state.unit/state.reduce.js'
 import * as reduceFromTick from './17.tick.unit/tick.reduce.js'
 import * as reduceFromTrauma from './18.trauma.unit/trauma.reduce.js'
 import * as reduceFromWounds from './19.wounds.unit/wounds.reduce.js'
+import * as reduceFromArithmetic from './20.arithmetic.unit/arithmetic.reduce.js'
+import * as reduceFromCompile from './21.compile.unit/compile.reduce.js'
 import * as reduceFromCollect from './97.collect.unit/collect.reduce.js'
 import * as reduceFromMenu from './98.menu.unit/menu.reduce.js'
 import * as reduceFromBus from './99.bus.unit/bus.reduce.js'
@@ -142,6 +152,8 @@ export const reducer: any = {
     tick: reduceFromTick.reducer,
     trauma: reduceFromTrauma.reducer,
     wounds: reduceFromWounds.reducer,
+    arithmetic: reduceFromArithmetic.reducer,
+    compile: reduceFromCompile.reducer,
     collect: reduceFromCollect.reducer,
     menu: reduceFromMenu.reducer,
     bus: reduceFromBus.reducer,
@@ -164,10 +176,12 @@ export default class UnitData implements Model {
     primordial: Primordial = new PrimordialModel()
     sequence: Sequence = new SequenceModel()
     series: Series = new SeriesModel()
-    state: State = new StateModel()
+    state: StateInterface = new StateModel()
     tick: Tick = new TickModel()
     trauma: Trauma = new TraumaModel()
     wounds: Wounds = new WoundsModel()
+    arithmetic: Arithmetic = new ArithmeticModel()
+    compile: Compile = new CompileModel()
     collect: Collect = new CollectModel()
     menu: Menu = new MenuModel()
     bus: Bus = new BusModel()

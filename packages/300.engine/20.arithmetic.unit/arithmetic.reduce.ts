@@ -3,6 +3,7 @@
  * Pure deterministic state fold for arithmetic action bits.
  */
 
+import clone from 'clone-deep'
 import { ArithmeticModel } from './arithmetic.model.js'
 import {
     ArithmeticCommand,
@@ -13,6 +14,7 @@ import {
     type DivideRoundEvenPayload,
     type DivideRoundEvenBigIntPayload,
 } from './fce/arithmetic.bit.js'
+import * as Act from './arithmetic.action.js'
 import {
     evaluateScalingDivision,
     divRoundHalfEven,
@@ -114,5 +116,34 @@ export function reduceArithmetic(
 
         default:
             return state
+    }
+}
+
+export function reducer(
+    model: ArithmeticModel = new ArithmeticModel(),
+    act: any,
+    _state?: any,
+): ArithmeticModel {
+    if (!act) return model
+
+    switch (act.type) {
+        case Act.INIT_ARITHMETIC: {
+            const next = clone(model)
+            if (act.bale?.slv) {
+                act.bale.slv({ armBit: { idx: 'init-arithmetic', val: 1 } })
+            }
+            return next
+        }
+
+        case Act.UPDATE_ARITHMETIC: {
+            const next = clone(model)
+            if (act.bale?.slv) {
+                act.bale.slv({ armBit: { idx: 'update-arithmetic', val: 1 } })
+            }
+            return next
+        }
+
+        default:
+            return model
     }
 }

@@ -49,7 +49,14 @@ export const initMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             idx: 'cns00',
             src: 'SIMULATION ENGINE',
         })
-
+        bit = await lib.hunt(UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: '>> [BEE:MANIFEST] 25 Sovereign Units Synchronized & Online',
+        })
+        bit = await lib.hunt(UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: '>> [OK] packages/300.engine active in local isolate (Zero VRAM)',
+        })
         bit = await lib.hunt(UPDATE_CONSOLE, {
             idx: 'cns00',
             src: '-----------',

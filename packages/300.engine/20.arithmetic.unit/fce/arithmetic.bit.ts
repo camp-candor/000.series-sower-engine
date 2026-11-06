@@ -75,3 +75,13 @@ export interface ArithmeticActionBit {
     readonly dat: ArithmeticBitData
     readonly slv?: (receipt: ArithmeticReceipt) => void
 }
+
+export default interface ArithmeticBit {
+    idx?: string
+    src?: string
+    val?: number
+    dex?: number
+    dat?: any
+    bit?: any
+    slv?: Function
+}

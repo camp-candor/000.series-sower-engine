@@ -1,351 +1,219 @@
-import * as ActCol from '../../97.collect.unit/collect.action.js'
-
+import { createHash } from 'node:crypto'
 import { CollectModel } from '../collect.model.js'
 import CollectBit from '../fce/collect.bit.js'
-import State from '../../99.core/state.js'
 import CaboodleBit from '../fce/caboodle.bit.js'
-import S from 'string'
+import State from '../../99.core/state.js'
 
-import * as doT from 'dot'
-
-var bit: any, lst: any, dat: any, val: any
+function canonicalize(obj: any): string {
+    if (obj === null || typeof obj !== 'object') {
+        return JSON.stringify(obj)
+    }
+    if (Array.isArray(obj)) {
+        return `[${obj.map(canonicalize).join(',')}]`
+    }
+    const sortedKeys = Object.keys(obj).sort((a, b) =>
+        a < b ? -1 : a > b ? 1 : 0,
+    )
+    const parts = sortedKeys.map(
+        (k) => `${JSON.stringify(k)}:${canonicalize(obj[k])}`,
+    )
+    return `{${parts.join(',')}}`
+}
 
 export const initCollect = (
     cpy: CollectModel,
-    _bal: CollectBit,
-    _ste: State,
-) => {
+    bal: CollectBit,
+    _ste?: State,
+): CollectModel => {
+    cpy.caboodleBitList = []
+    cpy.caboodleBits = {}
+    if (bal?.slv) bal.slv({ clcBit: { idx: 'init-collect', val: 0 } })
     return cpy
 }
 
 export const updateCollect = (
     cpy: CollectModel,
-    _bal: CollectBit,
-    _ste: State,
-) => {
-    return cpy
-}
-
-//return the first item in a collection
-export const fetchCollect = (
-    cpy: CollectModel,
     bal: CollectBit,
-    _ste: State,
-) => {
-    if (bal.val == null) bal.val = 1
-
-    if (bal.bit == null && bal.slv != null) {
-        bal.slv({ clcBit: { idx: 'fetch-collect-err', src: 'no-bit' } })
-        return cpy
-    }
-    var type = (bal.bit || '').split(' ').slice(-1).pop()?.toLowerCase() || ''
-    var cabBit: CaboodleBit = cpy.caboodleBitList[cpy.caboodleBits[type]]
-
-    if (bal.val == 1) bit = cabBit?.bitList?.[0]
-    else bit = cabBit
-
-    if (bal.slv != null) bal.slv({ clcBit: { idx: 'fetch-collect', dat: bit } })
-    return cpy
-}
-
-export const readCollect = async (
-    cpy: CollectModel,
-    bal: CollectBit,
-    ste: State,
-) => {
-    if (bal.bit == null && bal.slv != null) {
-        bal.slv({ clcBit: { idx: 'read-collect-err', src: 'no-bit' } })
-        return cpy
-    }
-
-    var type = (bal.bit || '').split(' ').slice(-1).pop()?.toLowerCase() || ''
-    if (cpy.caboodleBits[type] == null) createCollect(cpy, { idx: type }, ste)
-
-    var cabBit: CaboodleBit = cpy.caboodleBitList[cpy.caboodleBits[type]]
-    const idxKey = bal.idx as any
-
-    if (cabBit.bits[idxKey] == null) {
-        bit = await ste.hunt(ActCol.WRITE_COLLECT, {
-            idx: bal.idx,
-            src: bal.src,
-            bit: bal.bit,
-        })
-    } else {
-        dat = cabBit.bitList[cabBit.bits[idxKey]]
-    }
-
-    if (bal.slv != null) bal.slv({ clcBit: { idx: 'read-collect', dat } })
-    return cpy
-}
-
-export const writeCollect = async (
-    cpy: CollectModel,
-    bal: CollectBit,
-    ste: State,
-) => {
-    dat = null
-
-    //let us check see if it exists
-    var type = (bal.bit || '').split(' ').slice(-1).pop()?.toLowerCase() || ''
-
-    if (cpy.caboodleBits[type] == null) createCollect(cpy, { idx: type }, ste)
-
-    if (bal.bit == null && bal.slv != null) {
-        bal.slv({ rskBit: { idx: 'write-collect-err', src: 'no-bit' } })
-        return cpy
-    }
-
-    var cabBit: CaboodleBit = cpy.caboodleBitList[cpy.caboodleBits[type]]
-    const idxKey = bal.idx as any
-
-    val = 0
-
-    if (cabBit.bits[idxKey] == null) {
-        bit = await ste.hunt(bal.bit!, {
-            idx: bal.idx,
-            src: bal.src,
-            dat: bal.dat,
-        })
-        var objDat = bit[Object.keys(bit)[0]]
-        dat = objDat.dat
-
-        if (dat == null) dat = {}
-
-        dat.dex = cabBit.bitList.length
-        cabBit.bitList.push(dat)
-
-        var idx = bal.idx
-        if (idx == null) idx = dat.idx
-
-        if (idx == null) throw new Error('write collect has no idx')
-
-        cabBit.bits[idx] = dat.dex
-    } else {
-        var cabDat = cabBit.bitList[cabBit.bits[idxKey]]
-
-        val = 1
-
-        for (var key in bal.dat) {
-            if (cabDat == null) cabDat = {}
-            cabDat[key] = bal.dat[key]
-        }
-
-        cabBit.bitList[cabBit.bits[idxKey]] = cabDat
-        dat = cabDat
-    }
-
-    if (dat == null && bal.slv != null)
-        bal.slv({ rskBit: { idx: 'write-collect-err', src: 'no-dat' } })
-
-    if (bal.slv != null) bal.slv({ clcBit: { idx: 'write-collect', val, dat } })
-
+    _ste?: State,
+): CollectModel => {
+    if (bal?.slv) bal.slv({ clcBit: { idx: 'update-collect', val: 1 } })
     return cpy
 }
 
 export const createCollect = (
     cpy: CollectModel,
     bal: CollectBit,
-    _ste: State,
-) => {
-    var cabBit: CaboodleBit = {
-        idx: bal.idx || '',
-        dex: 0,
-        bits: {},
-        bitList: [],
+    _ste?: State,
+): CollectModel => {
+    const id = bal.idx || `caboodle-${cpy.caboodleBitList.length}`
+    if (!cpy.caboodleBits[id]) {
+        const item: CaboodleBit = {
+            idx: id,
+            dex: 0,
+            bitList: [],
+            bits: {},
+        }
+        cpy.caboodleBits[id] = item
+        cpy.caboodleBitList.push(item)
     }
-    cabBit.dex = cpy.caboodleBitList.length
-
-    cpy.caboodleBitList.push(cabBit)
-    cpy.caboodleBits[cabBit.idx] = cabBit.dex
-
-    if (bal.slv != null)
-        bal.slv({ clcBit: { idx: 'create-collect', dat: cabBit } })
-
+    if (bal?.slv)
+        bal.slv({
+            clcBit: { idx: 'create-collect', dat: cpy.caboodleBits[id] },
+        })
     return cpy
 }
 
-export const removeCollect = async (
+export const readCollect = (
     cpy: CollectModel,
     bal: CollectBit,
-    ste: State,
-) => {
-    var type = (bal.bit || '').split(' ').slice(-1).pop()?.toLowerCase() || ''
-
-    if (cpy.caboodleBits[type] == null) {
-        if (bal.slv) bal.slv({ rskBit: { idx: 'remove-collect-not-present' } })
-        return cpy
+    _ste?: State,
+): CollectModel => {
+    const id = bal.idx || 'default'
+    let caboodle = cpy.caboodleBits[id]
+    if (!caboodle) {
+        caboodle = {
+            idx: id,
+            dex: 0,
+            bitList: [],
+            bits: {},
+        }
+        cpy.caboodleBits[id] = caboodle
+        cpy.caboodleBitList.push(caboodle)
     }
-
-    var cabBit: CaboodleBit = cpy.caboodleBitList[cpy.caboodleBits[type]]
-    const idxKey = bal.idx as any
-
-    if (cabBit.bits[idxKey] == null) {
-        if (bal.slv)
-            bal.slv({ rskBit: { idx: 'remove-collect-idx-not-present' } })
-        return cpy
-    }
-
-    bit = await ste.hunt(bal.bit!, { idx: bal.idx, src: bal.src, dat: bal.dat })
-    var objDat = bit[Object.keys(bit)[0]]
-    dat = objDat.dat
-
-    var dex = dat.dex
-
-    for (var i = dex; i < cabBit.bitList.length - 1; i++) {
-        var update = cabBit.bitList[i]
-        update.dex -= 1
-    }
-
-    for (var k in dat) {
-        dat[k] = null
-    }
-
-    delete cabBit.bits[idxKey]
-    var itm = cabBit.bitList.splice(dex, 1)
-
-    cabBit.dex -= 1
-
-    if (bal.slv != null)
-        bal.slv({ clcBit: { idx: 'remove-collect', dat: itm[0] } })
-
+    if (bal?.slv) bal.slv({ clcBit: { idx: 'read-collect', dat: caboodle } })
     return cpy
 }
 
-export const putCollect = (cpy: CollectModel, bal: CollectBit, _ste: State) => {
-    cpy.caboodleBits[bal.idx as any] = bal.val as any
-    cpy.caboodleBitList[bal.val as any] = bal.dat
-    if (bal.slv != null)
-        bal.slv({ clcBit: { idx: 'put-collect', dat: bal.dat } })
-    return cpy
-}
-
-export const getCollect = (cpy: CollectModel, bal: CollectBit, _ste: State) => {
-    val = cpy.caboodleBits[bal.idx as any]
-    dat = cpy.caboodleBitList[val]
-
-    if (bal.slv != null) bal.slv({ clcBit: { idx: 'get-collect', val, dat } })
-    return cpy
-}
-
-export const modelCollect = (
+export const writeCollect = (
     cpy: CollectModel,
     bal: CollectBit,
-    _ste: State,
-) => {
-    if (bal.slv != null) bal.slv({ clcBit: { idx: 'model-collect', dat: cpy } })
+    _ste?: State,
+): CollectModel => {
+    const id = bal.idx || 'default'
+    let caboodle = cpy.caboodleBits[id]
+    if (!caboodle) {
+        caboodle = {
+            idx: id,
+            dex: 0,
+            bitList: [],
+            bits: {},
+        }
+        cpy.caboodleBits[id] = caboodle
+        cpy.caboodleBitList.push(caboodle)
+    }
+    if (bal.dat) {
+        caboodle.bits = { ...caboodle.bits, ...bal.dat }
+    }
+    if (bal?.slv) bal.slv({ clcBit: { idx: 'write-collect', dat: caboodle } })
+    return cpy
+}
+
+export const removeCollect = (
+    cpy: CollectModel,
+    bal: CollectBit,
+    _ste?: State,
+): CollectModel => {
+    const id = bal.idx || ''
+    if (cpy.caboodleBits[id]) {
+        delete cpy.caboodleBits[id]
+        cpy.caboodleBitList = cpy.caboodleBitList.filter((c) => c.idx !== id)
+    }
+    if (bal?.slv) bal.slv({ clcBit: { idx: 'remove-collect', val: 1 } })
     return cpy
 }
 
 export const deleteCollect = (
     cpy: CollectModel,
-    _bal: CollectBit,
-    _ste: State,
-) => {
-    return cpy
+    bal: CollectBit,
+    ste?: State,
+): CollectModel => {
+    return removeCollect(cpy, bal, ste)
 }
 
 export const emptyCollect = (
     cpy: CollectModel,
-    _bal: CollectBit,
-    _ste: State,
-) => {
+    bal: CollectBit,
+    _ste?: State,
+): CollectModel => {
+    cpy.caboodleBitList = []
+    cpy.caboodleBits = {}
+    if (bal?.slv) bal.slv({ clcBit: { idx: 'empty-collect', val: 0 } })
     return cpy
 }
 
-export const dotCollect = (cpy: CollectModel, bal: CollectBit, _ste: State) => {
-    var gel = bal.dat
-    var out: any[] = []
+export const fetchCollect = (
+    cpy: CollectModel,
+    bal: CollectBit,
+    ste?: State,
+): CollectModel => {
+    return readCollect(cpy, bal, ste)
+}
 
-    ;(bal.src || '').split('\n').forEach((a: string) => {
-        if (a.includes('//') == true) return
-        var doTCompiled = (doT as any).template(a)
-        var outLine = doTCompiled(gel)
-        out.push(outLine)
-    })
-
-    if (bal.slv != null)
-        bal.slv({ clcBit: { idx: 'dot-vurt', lst: out, src: out.join('\n') } })
-
+export const modelCollect = (
+    cpy: CollectModel,
+    bal: CollectBit,
+    _ste?: State,
+): CollectModel => {
+    if (bal?.slv) bal.slv({ clcBit: { idx: 'model-collect', dat: cpy } })
     return cpy
+}
+
+export const getCollect = (
+    cpy: CollectModel,
+    bal: CollectBit,
+    _ste?: State,
+): CollectModel => {
+    const id = bal.idx || ''
+    const item = cpy.caboodleBits[id]
+    if (bal?.slv) bal.slv({ clcBit: { idx: 'get-collect', dat: item } })
+    return cpy
+}
+
+export const putCollect = (
+    cpy: CollectModel,
+    bal: CollectBit,
+    ste?: State,
+): CollectModel => {
+    return writeCollect(cpy, bal, ste)
 }
 
 export const formatCollect = (
     cpy: CollectModel,
     bal: CollectBit,
-    _ste: State,
-) => {
-    lst = (bal.src || '').split(':')
-
-    var idx = lst[0]
-
-    var out: any[] = []
-
-    idx = S(idx).collapseWhitespace().s
-    var opt = (lst[1] || '').split(',')
-    opt.forEach((a: string) => {
-        var now = S(a).collapseWhitespace().s
-        if (a.length < 1) return
-        out.push(now)
-    })
-
-    dat = [idx, out]
-
-    if (bal.slv != null) bal.slv({ clcBit: { idx: 'format-collect', dat } })
+    _ste?: State,
+): CollectModel => {
+    const serialized = canonicalize(cpy.caboodleBits)
+    if (bal?.slv)
+        bal.slv({ clcBit: { idx: 'format-collect', src: serialized } })
     return cpy
 }
 
-export const listCollect = (cpy: CollectModel, bal: CollectBit, ste: State) => {
-    if (bal.val == null) bal.val = 1
-    var type = (bal.bit || '').split(' ').slice(-1).pop()?.toLowerCase() || ''
-    if (cpy.caboodleBits[type] == null) createCollect(cpy, { idx: type }, ste)
+export const dotCollect = (
+    cpy: CollectModel,
+    bal: CollectBit,
+    _ste?: State,
+): CollectModel => {
+    if (bal?.slv) bal.slv({ clcBit: { idx: 'dot-collect', val: 1 } })
+    return cpy
+}
 
-    var cabBit: CaboodleBit = cpy.caboodleBitList[cpy.caboodleBits[type]]
-
-    lst = []
-
-    cabBit.bitList.forEach((a) => {
-        if (bal.val == 0) {
-            lst.push(a)
-        } else if (bal.val == 1) {
-            if (a.idx != null) lst.push(a.idx)
-            if (a.id != null) lst.push(a.id)
-        }
-    })
-
-    if (bal.slv != null) bal.slv({ clcBit: { idx: 'list-collect', lst } })
-
+export const listCollect = (
+    cpy: CollectModel,
+    bal: CollectBit,
+    _ste?: State,
+): CollectModel => {
+    const keys = Object.keys(cpy.caboodleBits).sort()
+    if (bal?.slv) bal.slv({ clcBit: { idx: 'list-collect', lst: keys } })
     return cpy
 }
 
 export const hashCollect = (
     cpy: CollectModel,
     bal: CollectBit,
-    _ste: State,
-) => {
-    if (bal.src == null) bal.src = ''
-    lst = bal.src.split('\n')
-
-    dat = {}
-
-    lst.forEach((a: string) => {
-        a = S(a).collapseWhitespace().s
-        if (a.length < 3) return
-
-        var hold = a.split(':')
-
-        var dom = hold[0]
-        var sub = hold[1]
-
-        var now = (sub || '').split(',')
-
-        now.forEach((b: string, c: number) => {
-            now[c] = S(b).collapseWhitespace().s
-        })
-
-        dat[dom] = now
-    })
-
-    if (bal.slv != null) bal.slv({ clcBit: { idx: 'hash-collect', dat } })
-
+    _ste?: State,
+): CollectModel => {
+    const json = canonicalize(cpy.caboodleBits)
+    const hash = createHash('sha256').update(json, 'utf8').digest('hex')
+    if (bal?.slv) bal.slv({ clcBit: { idx: 'hash-collect', src: hash } })
     return cpy
 }

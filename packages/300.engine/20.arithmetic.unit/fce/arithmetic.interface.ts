@@ -1,35 +1,82 @@
 /**
- * 20.arithmetic.unit - Nominal Integer Basis Point Contracts
- * Governs discrete integer scalar types to eliminate IEEE-754 floating-point drift.
+ * 20.arithmetic.unit - Arithmetic Interface Contracts
+ * Nominal basis-point brandings and arithmetic model shape.
  */
 
 declare const BasisPointBrand: unique symbol
 declare const BigIntBasisPointBrand: unique symbol
 
-/**
- * Nominal branded 32-bit safe integer basis point in [0, 10000].
- * 10,000 bp = 1.0 (100.00%), 1 bp = 0.0001 (0.01%).
- */
 export type BasisPoint = number & {
     readonly [BasisPointBrand]: typeof BasisPointBrand
 }
 
-/**
- * Nominal branded 64-bit arbitrary precision basis point for high-magnitude multi-hop accumulation.
- */
 export type BigIntBasisPoint = bigint & {
     readonly [BigIntBasisPointBrand]: typeof BigIntBasisPointBrand
 }
 
-/**
- * Mathematical normalization constants.
- */
-export const BASIS_POINT_DENOMINATOR = 10_000 as const
-export const TIE_BREAK_REMAINDER = 5_000 as const
+export const BASIS_POINT_MIN = 0
+export const BASIS_POINT_MAX = 10000
+export const BASIS_POINT_SCALE = 10000
+export const BASIS_POINT_DENOMINATOR = 10000 as const
+export const TIE_BREAK_REMAINDER = 5000 as const
 
-/**
- * Result receipt of discrete integer division with Banker's Rounding arbitration.
- */
+export function isBasisPoint(value: number): value is BasisPoint {
+    return (
+        Number.isInteger(value) &&
+        value >= BASIS_POINT_MIN &&
+        value <= BASIS_POINT_MAX
+    )
+}
+
+export function assertBasisPoint(
+    value: number,
+    _label = 'BasisPoint',
+): asserts value is BasisPoint {
+    if (!Number.isInteger(value)) {
+        throw new TypeError(
+            `[FLOAT_PROHIBITED] BasisPoint must be a discrete integer. Received: ${value}`,
+        )
+    }
+    if (value < BASIS_POINT_MIN || value > BASIS_POINT_MAX) {
+        throw new RangeError(
+            `[OUT_OF_BOUNDS] BasisPoint out of bounds [0, 10000]: ${value}`,
+        )
+    }
+}
+
+export function toBasisPoint(value: number, label = 'BasisPoint'): BasisPoint {
+    assertBasisPoint(value, label)
+    return value as BasisPoint
+}
+
+export function isBigIntBasisPoint(value: bigint): value is BigIntBasisPoint {
+    return typeof value === 'bigint' && value >= 0n
+}
+
+export function assertBigIntBasisPoint(
+    value: bigint,
+    _label = 'BigIntBasisPoint',
+): asserts value is BigIntBasisPoint {
+    if (typeof value !== 'bigint') {
+        throw new TypeError(
+            `[FLOAT_PROHIBITED] BigIntBasisPoint must be a bigint. Received: ${value}`,
+        )
+    }
+    if (value < 0n) {
+        throw new RangeError(
+            `[OUT_OF_BOUNDS] BigIntBasisPoint must be non-negative: ${value.toString()}`,
+        )
+    }
+}
+
+export function toBigIntBasisPoint(
+    value: bigint,
+    label = 'BigIntBasisPoint',
+): BigIntBasisPoint {
+    assertBigIntBasisPoint(value, label)
+    return value as BigIntBasisPoint
+}
+
 export interface ScalingDivisionResult {
     readonly quotient: number
     readonly remainder: number
@@ -37,9 +84,6 @@ export interface ScalingDivisionResult {
     readonly roundedOutput: BasisPoint
 }
 
-/**
- * BigInt variant of ScalingDivisionResult for macro-scale tick/spatial intervals.
- */
 export interface BigIntScalingDivisionResult {
     readonly quotient: bigint
     readonly remainder: bigint
@@ -47,55 +91,16 @@ export interface BigIntScalingDivisionResult {
     readonly roundedOutput: BigIntBasisPoint
 }
 
-/**
- * Type assertion guard enforcing non-negative integer constraints within [0, 10,000].
- * Throws TypeError on non-integers or floats, RangeError on bounds violation.
- */
-export function assertBasisPoint(
-    n: number,
-    label = 'BasisPoint',
-): asserts n is BasisPoint {
-    if (!Number.isInteger(n)) {
-        throw new TypeError(
-            `[FLOAT_PROHIBITED] ${label} must be a whole integer. Received: ${n}`,
-        )
-    }
-    if (n < 0 || n > BASIS_POINT_DENOMINATOR) {
-        throw new RangeError(
-            `[OUT_OF_BOUNDS] ${label} must be within [0, ${BASIS_POINT_DENOMINATOR}] bp. Received: ${n}`,
-        )
-    }
+export interface ArithmeticState {
+    readonly idx: string
+    readonly lastScaledValue: BasisPoint
+    readonly lastReceipt: ScalingDivisionResult | null
+    readonly lastDivisionOutput: number | null
+    readonly lastChainedValue: BasisPoint | null
+    readonly lastScaledBigIntValue: BigIntBasisPoint | null
+    readonly lastBigIntReceipt: BigIntScalingDivisionResult | null
+    readonly lastBigIntDivisionOutput: bigint | null
+    readonly totalCalculations: number
 }
 
-/**
- * Factory casting function validating and converting a raw integer into a branded BasisPoint.
- */
-export function toBasisPoint(n: number, label = 'BasisPoint'): BasisPoint {
-    assertBasisPoint(n, label)
-    return n as BasisPoint
-}
-
-/**
- * Type assertion guard enforcing non-negative BigInt basis point bounds.
- */
-export function assertBigIntBasisPoint(
-    n: bigint,
-    label = 'BigIntBasisPoint',
-): asserts n is BigIntBasisPoint {
-    if (n < 0n) {
-        throw new RangeError(
-            `[OUT_OF_BOUNDS] ${label} must be non-negative. Received: ${n}n`,
-        )
-    }
-}
-
-/**
- * Factory casting function validating and converting a bigint into a branded BigIntBasisPoint.
- */
-export function toBigIntBasisPoint(
-    n: bigint,
-    label = 'BigIntBasisPoint',
-): BigIntBasisPoint {
-    assertBigIntBasisPoint(n, label)
-    return n as BigIntBasisPoint
-}
+export default interface Arithmetic extends ArithmeticState {}

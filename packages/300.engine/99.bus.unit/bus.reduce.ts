@@ -23,7 +23,8 @@ export function reducer(
             return Buzz.createBus(clone(model), act.bale, state as State)
 
         case Act.MESSAGE_BUS:
-            return Buzz.connectBus(clone(model), act.bale, state as State)
+            Buzz.messageBus(clone(model), act.bale, state as State)
+            return model
 
         case Act.INIT_BUS:
             return Buzz.initBus(clone(model), act.bale, state as State)

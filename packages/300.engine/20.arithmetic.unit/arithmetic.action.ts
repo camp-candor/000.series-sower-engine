@@ -1,10 +1,27 @@
+import { Action } from '../99.core/interface/action.interface.js'
+import type ArithmeticBit from './fce/arithmetic.bit.js'
 import {
     BASIS_POINT_DENOMINATOR,
     TIE_BREAK_REMAINDER,
     type BasisPoint,
     type ScalingDivisionResult,
-    toBasisPoint,
 } from './fce/arithmetic.interface.js'
+
+export const MAX_INTERMEDIATE_PRODUCT = 100000000
+
+export const INIT_ARITHMETIC = '[Arithmetic action] Init Arithmetic'
+export class InitArithmetic implements Action {
+    readonly type = INIT_ARITHMETIC
+    constructor(public bale: ArithmeticBit) {}
+}
+
+export const UPDATE_ARITHMETIC = '[Arithmetic action] Update Arithmetic'
+export class UpdateArithmetic implements Action {
+    readonly type = UPDATE_ARITHMETIC
+    constructor(public bale: ArithmeticBit) {}
+}
+
+export type Actions = InitArithmetic | UpdateArithmetic
 
 export function arbitrateRemainder(
     quotient: number,
@@ -46,8 +63,7 @@ export function evaluateScalingDivision(
     const tieDetected = remainder === TIE_BREAK_REMAINDER
 
     const rounded = arbitrateRemainder(quotient, remainder, TIE_BREAK_REMAINDER)
-
-    const roundedOutput = toBasisPoint(rounded)
+    const roundedOutput = rounded as BasisPoint
 
     const receipt: ScalingDivisionResult = {
         quotient,
@@ -63,8 +79,6 @@ export function scaleBasisPoints(a: number, b: number): BasisPoint {
     const receipt = evaluateScalingDivision(a, b)
     return receipt.roundedOutput
 }
-
-export const MAX_INTERMEDIATE_PRODUCT = 100_000_000
 
 export function scaleBasisPointsChained(
     baseValue: number,
@@ -108,10 +122,6 @@ export function scaleBasisPointsChained(
     return current as BasisPoint
 }
 
-/**
- * Exact integer division with Banker's Rounding (Round-Half-Even).
- * Divides numerator by denominator and rounds ties to the nearest even integer.
- */
 export function divRoundHalfEven(
     numerator: number,
     denominator: number,
@@ -150,7 +160,6 @@ export function divRoundHalfEven(
     } else if (twiceR > d) {
         roundedMagnitude = q + 1
     } else {
-        // Exact half-tie: round toward even integer
         roundedMagnitude = q % 2 === 0 ? q : q + 1
     }
 
