@@ -49,9 +49,24 @@ export function mountSimulationEngineMenu(lib: any): void {
         idx: 'SIMULATION ENGINE',
         src: 'Open the Simulation Engine Cockpit\nto audit CI gates and tick performance.',
         fnc: async () => {
-            await new Promise<void>((resolve) => {
-                openGauntletMenu({}, { slv: resolve })
-            })
+            const engine =
+                (global as any).ENGINE ||
+                (global as any).PIVOTS?.['300.engine']
+            if (engine) {
+                const MENU_ACTION = require(
+                    path.join(
+                        path.resolve(__dirname, '../../packages/300.engine'),
+                        '98.menu.unit/menu.action',
+                    ),
+                )
+                await new Promise<void>((resolve) => {
+                    engine.hunt(MENU_ACTION.INIT_MENU, { slv: resolve })
+                })
+            } else {
+                await new Promise<void>((resolve) => {
+                    openGauntletMenu({}, { slv: resolve })
+                })
+            }
             await lib.hunt('[Menu action] Open Menu', {
                 src: '',
             })
