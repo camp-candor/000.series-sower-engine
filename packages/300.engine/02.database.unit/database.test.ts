@@ -294,6 +294,71 @@ describe('02.database.unit - Four-Vector Table Memory Structures Battery', () =>
         )
     })
 
+    it('rolls back batch atomically when a constraint violation occurs', async () => {
+        const model = new DatabaseModel()
+        await ensureSchemaDatabase(model, { idx: 'test-rollback' }, {} as any)
+
+        const validClock = {
+            clock_id: 'clk_atomic_test',
+            entity_id: 'char_bog',
+            clock_name: 'PRESSURE',
+            value_bps: 2000,
+            threshold_bps: 5000,
+            decay_rate_bps: 50,
+            is_triggered: 0,
+            updated_at_ms: 1700000000000,
+        }
+        const invalidDebt = {
+            relation_id: 'rel_atomic_self',
+            holder_id: 'char_wart',
+            debtor_id: 'char_wart',
+            weight_bps: 3000,
+            strings_count: 1,
+            updated_at_ms: 1700000000000,
+        }
+
+        const slv = vi.fn()
+        await execBatchDatabase(
+            model,
+            {
+                idx: 'batch-rollback',
+                dat: {
+                    operations: [
+                        {
+                            table: 'paranoia_clocks',
+                            action: 'INSERT',
+                            key: validClock.clock_id,
+                            record: validClock as any,
+                        },
+                        {
+                            table: 'strings_ledger',
+                            action: 'INSERT',
+                            key: invalidDebt.relation_id,
+                            record: invalidDebt as any,
+                        },
+                    ],
+                },
+                slv,
+            },
+            {} as any,
+        )
+
+        expect(slv).toHaveBeenCalledWith(
+            expect.objectContaining({
+                databaseBit: expect.objectContaining({
+                    val: 0,
+                    idx: 'exec-batch-fail',
+                    dat: expect.objectContaining({
+                        error: expect.stringContaining(
+                            'ANTI_REFLEXIVITY_BREACH',
+                        ),
+                    }),
+                }),
+            }),
+        )
+        expect(model.tables.paranoia_clocks.has('clk_atomic_test')).toBe(false)
+    })
+
     it('routes database actions cleanly through reducer using clone-deep', async () => {
         const model = new DatabaseModel()
         const slv = vi.fn()

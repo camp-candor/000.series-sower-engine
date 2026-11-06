@@ -3,6 +3,8 @@ import * as ActMnu from '../menu.action.js'
 import * as ActOlm from '../../00.engine.unit/engine.action.js'
 import * as ActSeq from '../../14.sequence.unit/sequence.action.js'
 import * as ActDba from '../../02.database.unit/database.action.js'
+import { DatabaseModel } from '../../02.database.unit/database.model.js'
+import { auditDatabaseTriggers } from '../../02.database.unit/buz/database.buzz.js'
 
 import type { MenuModel } from '../menu.model.js'
 import type MenuBit from '../fce/menu.bit.js'
@@ -93,6 +95,7 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         'EXECUTE BIGINT PRECISION SUITE',
         'AUDIT SEQUENCE CONCURRENCY GATE',
         'INSPECT RELATIONAL LEDGER TABLES',
+        'AUDIT RELATIONAL INTEGRITY TRIGGERS',
         'ROOT MENU',
         ActOlm.UPDATE_ENGINE.split(']')[1],
         ActOlm.TEST_ENGINE.split(']')[1],
@@ -143,6 +146,10 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             'Verify OCC sequence token validation, monotonic progression, and continuity.',
         'INSPECT RELATIONAL LEDGER TABLES':
             'Inspect in-memory Four-Vector relational ledger tables and audit zero-IO status.',
+        'AUDIT RELATIONAL INTEGRITY TRIGGERS':
+            'Audit Four-Vector relational integrity triggers and immutability tripwires.',
+        '[3] EXECUTE STAGE 0 AUDIT PROBES':
+            'Audit Four-Vector relational integrity triggers and immutability tripwires.',
         'ROOT MENU': 'Return to the master runner switchboard.',
     }
 
@@ -425,6 +432,17 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         case ActDba.CHECK_INTEGRITY_DATABASE.split(']')[1]: {
             await ste.hunt(ActDba.ENSURE_SCHEMA_DATABASE, {})
             await ste.hunt(ActDba.CHECK_INTEGRITY_DATABASE, {})
+            break
+        }
+
+        case 'AUDIT RELATIONAL INTEGRITY TRIGGERS':
+        case '[3] EXECUTE STAGE 0 AUDIT PROBES':
+        case 'EXECUTE STAGE 0 AUDIT PROBES': {
+            await auditDatabaseTriggers(
+                new DatabaseModel(),
+                { idx: 'audit-triggers' },
+                ste,
+            )
             break
         }
 

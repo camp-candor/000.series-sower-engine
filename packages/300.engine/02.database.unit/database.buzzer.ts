@@ -9,6 +9,7 @@ export {
     execBatchDatabase,
     checkIntegrityDatabase,
     resetLocalDatabase,
+    auditDatabaseTriggers,
 } from './buz/database.buzz.js'
 export type {
     EventLogRecord,
