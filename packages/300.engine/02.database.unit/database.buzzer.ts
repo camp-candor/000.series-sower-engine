@@ -9,7 +9,13 @@ export {
     execBatchDatabase,
     checkIntegrityDatabase,
     resetLocalDatabase,
-    auditDatabaseTriggers,
+    insertFact,
+    updateFactClaim,
+    setFactStanding,
+    registerScene,
+    addSceneDependency,
+    queryWhyDirty,
+    getFactCentralityTelemetry,
 } from './buz/database.buzz.js'
 export type {
     EventLogRecord,
@@ -19,11 +25,21 @@ export type {
     ParanoiaClockRecord,
     ActorBeliefRecord,
     UnratifiedDetailRecord,
+    FactRecord,
+    SceneRecord,
+    SceneFactDependencyRecord,
+    FactCentralityTelemetry,
     TableStatusReport,
     DatabaseStateReport,
+    FactScope,
+    FactAuthorityLevel,
+    FactStanding,
+    SceneStatus,
+    DependencyEntityType,
 } from './fce/database.interface.js'
 export type {
     DatabaseTableName,
     DatabaseOperation,
     DatabasePayload,
 } from './fce/database.bit.js'
+export { auditDatabaseTriggers } from './buz/database.buzz.js'

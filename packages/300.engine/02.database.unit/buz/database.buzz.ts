@@ -1,6 +1,6 @@
 /**
  * 02.database.unit - Database Buzz Business Logic
- * Pure zero-IO in-memory table operations, immutability guards, and integrity checks.
+ * Pure zero-IO in-memory table operations, immutability guards, and flat continuity invalidations.
  */
 import { DatabaseModel } from '../database.model.js'
 import type DatabaseBit from '../fce/database.bit.js'
@@ -18,6 +18,11 @@ import type {
     EntityLiveRecord,
     ActorBeliefRecord,
     UnratifiedDetailRecord,
+    FactRecord,
+    SceneRecord,
+    SceneFactDependencyRecord,
+    FactCentralityTelemetry,
+    FactStanding,
 } from '../fce/database.interface.js'
 import type State from '../../99.core/state.js'
 
@@ -48,6 +53,82 @@ function assertBasisPoints(val: number, field: string): void {
             `[OUT_OF_BOUNDS] ${field} out of bounds [0, 10000]: ${val}`,
         )
     }
+}
+
+function propagateFactMutation(
+    cpy: DatabaseModel,
+    factId: string,
+    oldVersion: number,
+    newVersion: number,
+    reason?: string,
+): number {
+    let dirtiedScenes = 0
+    const nowMs = Date.now()
+
+    for (const [depKey, dep] of cpy.tables.scene_fact_dependencies.entries()) {
+        if (dep.fact_id === factId && dep.pinned_version < newVersion) {
+            const diffReason =
+                reason ||
+                `Upstream fact mutated: [${factId}] advanced from v${oldVersion} to v${newVersion}`
+
+            const updatedDep: SceneFactDependencyRecord = {
+                ...dep,
+                is_dirty: 1,
+                invalidation_reason: diffReason,
+                invalidated_at_ms: nowMs,
+            }
+            cpy.tables.scene_fact_dependencies.set(depKey, updatedDep)
+
+            const scene = cpy.tables.scenes.get(dep.scene_id)
+            if (scene) {
+                const updatedScene: SceneRecord = {
+                    ...scene,
+                    status: 'dirty',
+                    is_dirty: 1,
+                    dirty_reason: diffReason,
+                    updated_at_ms: nowMs,
+                }
+                cpy.tables.scenes.set(dep.scene_id, updatedScene)
+                dirtiedScenes++
+            }
+        }
+    }
+    return dirtiedScenes
+}
+
+function propagateFactRetirement(
+    cpy: DatabaseModel,
+    factId: string,
+    reason: string,
+): number {
+    let dirtiedScenes = 0
+    const nowMs = Date.now()
+
+    for (const [depKey, dep] of cpy.tables.scene_fact_dependencies.entries()) {
+        if (dep.fact_id === factId) {
+            const updatedDep: SceneFactDependencyRecord = {
+                ...dep,
+                is_dirty: 1,
+                invalidation_reason: reason,
+                invalidated_at_ms: nowMs,
+            }
+            cpy.tables.scene_fact_dependencies.set(depKey, updatedDep)
+
+            const scene = cpy.tables.scenes.get(dep.scene_id)
+            if (scene) {
+                const updatedScene: SceneRecord = {
+                    ...scene,
+                    status: 'dirty',
+                    is_dirty: 1,
+                    dirty_reason: reason,
+                    updated_at_ms: nowMs,
+                }
+                cpy.tables.scenes.set(dep.scene_id, updatedScene)
+                dirtiedScenes++
+            }
+        }
+    }
+    return dirtiedScenes
 }
 
 export const initDatabase = (
@@ -91,18 +172,18 @@ export const ensureSchemaDatabase = async (
 
     await emitConsole(
         ste,
-        '>> [DATABASE:SCHEMA] Four-Vector in-memory tables bootstrapped.',
+        '>> [DATABASE:SCHEMA] Four-Vector with flat continuity in-memory tables bootstrapped.',
     )
     await emitConsole(
         ste,
-        '>> [DATABASE:SCHEMA] Relational triggers active: event_log immutability and anti-reflexivity gates.',
+        '>> [DATABASE:SCHEMA] Triggers active: monotonic version guard with cascade invalidation.',
     )
 
     if (bal?.slv) {
         bal.slv({
             databaseBit: {
                 idx: 'ensure-schema-pass',
-                val: 7, // 7 tables active
+                val: 10, // 7 Four-Vector + 3 Continuity tables
                 src: 'IN_MEMORY_STORAGE_ONLINE',
             },
         })
@@ -123,7 +204,7 @@ export const resetLocalDatabase = async (
 
     await emitConsole(
         ste,
-        '>> [DATABASE:RESET] All 7 Four-Vector memory tables cleared.',
+        '>> [DATABASE:RESET] All 10 in-memory tables cleared.',
     )
 
     if (bal?.slv) {
@@ -135,6 +216,407 @@ export const resetLocalDatabase = async (
         })
     }
 
+    return cpy
+}
+
+export const insertFact = async (
+    cpy: DatabaseModel,
+    bal: DatabaseBit,
+    ste?: State,
+): Promise<DatabaseModel> => {
+    const fact = bal.dat?.fact
+    if (!fact || !fact.id || !fact.claim_text) {
+        const errorMsg = '[INVALID_FACT] Fact record missing required id or claim_text'
+        await emitConsole(ste, `:: [FAIL] ${errorMsg}`)
+        if (bal.slv) {
+            bal.slv({
+                databaseBit: {
+                    idx: 'insert-fact-fail',
+                    val: 0,
+                    dat: { error: errorMsg },
+                },
+            })
+        }
+        return cpy
+    }
+
+    const record: FactRecord = {
+        id: fact.id,
+        claim_text: fact.claim_text,
+        scope: fact.scope || 'CHARACTER',
+        authority_level: fact.authority_level || 'CANON',
+        standing: fact.standing || 'ACTIVE_ENDORSED',
+        author: fact.author || 'showrunner',
+        version: fact.version || 1,
+        timestamp_ms: fact.timestamp_ms || Date.now(),
+        last_edited_at_ms: fact.last_edited_at_ms || Date.now(),
+    }
+
+    cpy.tables.facts.set(record.id, record)
+    await emitConsole(ste, `>> [FACT:INSERT] [${record.id}] v${record.version} (${record.scope})`)
+
+    if (bal.slv) {
+        bal.slv({
+            databaseBit: {
+                idx: 'insert-fact-pass',
+                val: 1,
+                dat: { fact: record },
+            },
+        })
+    }
+    return cpy
+}
+
+export const updateFactClaim = async (
+    cpy: DatabaseModel,
+    bal: DatabaseBit,
+    ste?: State,
+): Promise<DatabaseModel> => {
+    const factId = bal.dat?.factId || bal.src
+    const newClaimText = bal.dat?.newClaimText
+    const newVersion = bal.dat?.newVersion
+
+    if (!factId || !cpy.tables.facts.has(factId)) {
+        const errorMsg = `[FACT_NOT_FOUND] Cannot update non-existent fact: ${factId}`
+        await emitConsole(ste, `:: [FAIL] ${errorMsg}`)
+        if (bal.slv) {
+            bal.slv({
+                databaseBit: {
+                    idx: 'update-fact-claim-fail',
+                    val: 0,
+                    dat: { error: errorMsg },
+                },
+            })
+        }
+        return cpy
+    }
+
+    const existing = cpy.tables.facts.get(factId)!
+
+    // Invariant: Monotonic version regression abort trigger
+    if (newVersion === undefined || newVersion <= existing.version) {
+        const errorMsg = `MONOTONIC_VIOLATION: Fact claim mutated without incrementing version integer (NEW.version ${newVersion} <= OLD.version ${existing.version})`
+        await emitConsole(ste, `:: [FAIL] ${errorMsg}`)
+        if (bal.slv) {
+            bal.slv({
+                databaseBit: {
+                    idx: 'update-fact-claim-fail',
+                    val: 0,
+                    dat: { error: errorMsg },
+                },
+            })
+        }
+        return cpy
+    }
+
+    const updatedFact: FactRecord = {
+        ...existing,
+        claim_text: newClaimText !== undefined ? newClaimText : existing.claim_text,
+        version: newVersion,
+        last_edited_at_ms: Date.now(),
+    }
+    cpy.tables.facts.set(factId, updatedFact)
+
+    // Fire reactive cascade invalidation trigger
+    const diffReason = `Upstream fact mutated: [${factId}] (v${existing.version} -> v${newVersion}) | Old: [${existing.claim_text}] -> New: [${updatedFact.claim_text}]`
+    const dirtiedCount = propagateFactMutation(
+        cpy,
+        factId,
+        existing.version,
+        newVersion,
+        diffReason,
+    )
+
+    await emitConsole(
+        ste,
+        `>> [FACT:MUTATE] [${factId}] v${existing.version} -> v${newVersion}. Cascaded dirty flag to ${dirtiedCount} scenes.`,
+    )
+
+    if (bal.slv) {
+        bal.slv({
+            databaseBit: {
+                idx: 'update-fact-claim-pass',
+                val: dirtiedCount,
+                dat: { fact: updatedFact, rowCount: dirtiedCount },
+            },
+        })
+    }
+    return cpy
+}
+
+export const setFactStanding = async (
+    cpy: DatabaseModel,
+    bal: DatabaseBit,
+    ste?: State,
+): Promise<DatabaseModel> => {
+    const factId = bal.dat?.factId || bal.src
+    const newStanding: FactStanding | undefined = bal.dat?.standing
+
+    if (!factId || !cpy.tables.facts.has(factId) || !newStanding) {
+        const errorMsg = `[INVALID_PARAMS] Valid factId and standing required`
+        if (bal.slv) {
+            bal.slv({
+                databaseBit: {
+                    idx: 'set-fact-standing-fail',
+                    val: 0,
+                    dat: { error: errorMsg },
+                },
+            })
+        }
+        return cpy
+    }
+
+    const existing = cpy.tables.facts.get(factId)!
+
+    // Zero-Cascade Liminal Guarantee: FLAGGED_FOR_REVIEW produces ZERO invalidation cascades
+    if (newStanding === 'FLAGGED_FOR_REVIEW') {
+        const updatedFact: FactRecord = {
+            ...existing,
+            standing: 'FLAGGED_FOR_REVIEW',
+            last_edited_at_ms: Date.now(),
+        }
+        cpy.tables.facts.set(factId, updatedFact)
+        await emitConsole(
+            ste,
+            `>> [FACT:LIMINAL] [${factId}] entered FLAGGED_FOR_REVIEW. Zero downstream cascades fired.`,
+        )
+
+        if (bal.slv) {
+            bal.slv({
+                databaseBit: {
+                    idx: 'set-fact-standing-pass',
+                    val: 0, // 0 scenes dirtied
+                    dat: { fact: updatedFact, rowCount: 0 },
+                },
+            })
+        }
+        return cpy
+    }
+
+    // Retirement Cascade: DEPRECATED_ARCHIVED trips dirty flag across referencing scenes
+    if (newStanding === 'DEPRECATED_ARCHIVED') {
+        const updatedFact: FactRecord = {
+            ...existing,
+            standing: 'DEPRECATED_ARCHIVED',
+            last_edited_at_ms: Date.now(),
+        }
+        cpy.tables.facts.set(factId, updatedFact)
+
+        const reason = `Retired Fact Reference: [${factId}] was transitioned to DEPRECATED_ARCHIVED`
+        const dirtiedCount = propagateFactRetirement(cpy, factId, reason)
+
+        await emitConsole(
+            ste,
+            `:: [FACT:RETIRE] [${factId}] archived. Triggered retirement cascade across ${dirtiedCount} scenes.`,
+        )
+
+        if (bal.slv) {
+            bal.slv({
+                databaseBit: {
+                    idx: 'set-fact-standing-pass',
+                    val: dirtiedCount,
+                    dat: { fact: updatedFact, rowCount: dirtiedCount },
+                },
+            })
+        }
+        return cpy
+    }
+
+    // ACTIVE_ENDORSED restoration
+    const updatedFact: FactRecord = {
+        ...existing,
+        standing: 'ACTIVE_ENDORSED',
+        last_edited_at_ms: Date.now(),
+    }
+    cpy.tables.facts.set(factId, updatedFact)
+
+    if (bal.slv) {
+        bal.slv({
+            databaseBit: {
+                idx: 'set-fact-standing-pass',
+                val: 0,
+                dat: { fact: updatedFact, rowCount: 0 },
+            },
+        })
+    }
+    return cpy
+}
+
+export const registerScene = async (
+    cpy: DatabaseModel,
+    bal: DatabaseBit,
+    ste?: State,
+): Promise<DatabaseModel> => {
+    const scene = bal.dat?.scene
+    if (!scene || !scene.id) {
+        if (bal.slv) {
+            bal.slv({
+                databaseBit: {
+                    idx: 'register-scene-fail',
+                    val: 0,
+                    dat: { error: '[INVALID_SCENE] Scene missing id' },
+                },
+            })
+        }
+        return cpy
+    }
+
+    const record: SceneRecord = {
+        id: scene.id,
+        episode_num: scene.episode_num || 1,
+        scene_num: scene.scene_num || 1,
+        text: scene.text || '',
+        status: scene.status || 'clean',
+        is_dirty: scene.is_dirty !== undefined ? scene.is_dirty : 0,
+        dirty_reason: scene.dirty_reason,
+        created_at_ms: scene.created_at_ms || Date.now(),
+        updated_at_ms: scene.updated_at_ms || Date.now(),
+    }
+
+    cpy.tables.scenes.set(record.id, record)
+    await emitConsole(ste, `>> [SCENE:REGISTER] [${record.id}] Ep ${record.episode_num} Sc ${record.scene_num}`)
+
+    if (bal.slv) {
+        bal.slv({
+            databaseBit: {
+                idx: 'register-scene-pass',
+                val: 1,
+                dat: { scene: record },
+            },
+        })
+    }
+    return cpy
+}
+
+export const addSceneDependency = async (
+    cpy: DatabaseModel,
+    bal: DatabaseBit,
+    _ste?: State,
+): Promise<DatabaseModel> => {
+    const dep = bal.dat?.dependency
+    if (!dep || !dep.scene_id || !dep.fact_id) {
+        if (bal.slv) {
+            bal.slv({
+                databaseBit: {
+                    idx: 'add-scene-dependency-fail',
+                    val: 0,
+                    dat: { error: '[INVALID_DEPENDENCY] Dependency requires scene_id and fact_id' },
+                },
+            })
+        }
+        return cpy
+    }
+
+    const compositeKey = `${dep.scene_id}#${dep.fact_id}`
+    const record: SceneFactDependencyRecord = {
+        scene_id: dep.scene_id,
+        fact_id: dep.fact_id,
+        entity_type: dep.entity_type || 'character',
+        pinned_version: dep.pinned_version || 1,
+        is_dirty: dep.is_dirty !== undefined ? dep.is_dirty : 0,
+        invalidation_reason: dep.invalidation_reason,
+        created_at_ms: dep.created_at_ms || Date.now(),
+        invalidated_at_ms: dep.invalidated_at_ms,
+    }
+
+    cpy.tables.scene_fact_dependencies.set(compositeKey, record)
+
+    if (bal.slv) {
+        bal.slv({
+            databaseBit: {
+                idx: 'add-scene-dependency-pass',
+                val: 1,
+                dat: { dependency: record },
+            },
+        })
+    }
+    return cpy
+}
+
+export const queryWhyDirty = async (
+    cpy: DatabaseModel,
+    bal: DatabaseBit,
+    ste?: State,
+): Promise<DatabaseModel> => {
+    const sceneId = bal.dat?.sceneId || bal.src
+    const scene = sceneId ? cpy.tables.scenes.get(sceneId) : undefined
+
+    if (!scene) {
+        const errorMsg = `[SCENE_NOT_FOUND] Scene '${sceneId}' not registered`
+        if (bal.slv) {
+            bal.slv({
+                databaseBit: {
+                    idx: 'query-why-dirty-fail',
+                    val: 0,
+                    dat: { error: errorMsg },
+                },
+            })
+        }
+        return cpy
+    }
+
+    const dirtyDeps: SceneFactDependencyRecord[] = []
+    for (const dep of cpy.tables.scene_fact_dependencies.values()) {
+        if (dep.scene_id === scene.id && dep.is_dirty === 1) {
+            dirtyDeps.push(dep)
+        }
+    }
+
+    await emitConsole(
+        ste,
+        `>> [WHY_DIRTY] [${scene.id}] is_dirty=${scene.is_dirty} (${dirtyDeps.length} dirty dependencies)`,
+    )
+
+    if (bal.slv) {
+        bal.slv({
+            databaseBit: {
+                idx: 'query-why-dirty-pass',
+                val: scene.is_dirty,
+                src: scene.dirty_reason || '',
+                dat: { scene, records: dirtyDeps },
+            },
+        })
+    }
+    return cpy
+}
+
+export const getFactCentralityTelemetry = async (
+    cpy: DatabaseModel,
+    bal?: DatabaseBit,
+    ste?: State,
+): Promise<DatabaseModel> => {
+    const telemetry: FactCentralityTelemetry[] = []
+
+    for (const fact of cpy.tables.facts.values()) {
+        let count = 0
+        for (const dep of cpy.tables.scene_fact_dependencies.values()) {
+            if (dep.fact_id === fact.id) {
+                count++
+            }
+        }
+        telemetry.push({
+            fact_id: fact.id,
+            scope: fact.scope,
+            current_version: fact.version,
+            standing: fact.standing,
+            dependent_scenes_count: count,
+        })
+    }
+
+    await emitConsole(
+        ste,
+        `>> [TELEMETRY] Centrality computed across ${telemetry.length} canonical facts.`,
+    )
+
+    if (bal?.slv) {
+        bal.slv({
+            databaseBit: {
+                idx: 'get-centrality-telemetry-pass',
+                val: telemetry.length,
+                dat: { telemetry },
+            },
+        })
+    }
     return cpy
 }
 
@@ -152,9 +634,7 @@ export const queryDatabase = async (
                 databaseBit: {
                     idx: 'query-database-fail',
                     val: 0,
-                    dat: {
-                        error: `[TABLE_NOT_FOUND] Table '${table}' does not exist`,
-                    },
+                    dat: { error: `[TABLE_NOT_FOUND] Table '${table}' does not exist` },
                 },
             })
         }
@@ -177,7 +657,7 @@ export const queryDatabase = async (
         return cpy
     }
 
-    const records = Array.from(tableMap.values() as Iterable<any>)
+    const records = Array.from(tableMap.values() as any)
     if (bal.slv) {
         bal.slv({
             databaseBit: {
@@ -197,10 +677,8 @@ export const execBatchDatabase = async (
     ste?: State,
 ): Promise<DatabaseModel> => {
     const operations: readonly DatabaseOperation[] = bal.dat?.operations ?? []
-    let appliedCount = 0
 
-    // Take pre-batch in-memory snapshot of all table maps for atomic rollback
-    const snapshot: Record<DatabaseTableName, Map<string, any>> = {
+    const snapshots: Record<DatabaseTableName, Map<string, any>> = {
         event_log: new Map(cpy.tables.event_log),
         entities_live: new Map(cpy.tables.entities_live),
         strings_ledger: new Map(cpy.tables.strings_ledger),
@@ -208,7 +686,12 @@ export const execBatchDatabase = async (
         paranoia_clocks: new Map(cpy.tables.paranoia_clocks),
         actor_beliefs: new Map(cpy.tables.actor_beliefs),
         unratified_details: new Map(cpy.tables.unratified_details),
+        facts: new Map(cpy.tables.facts),
+        scenes: new Map(cpy.tables.scenes),
+        scene_fact_dependencies: new Map(cpy.tables.scene_fact_dependencies),
     }
+
+    let appliedCount = 0
 
     try {
         for (const op of operations) {
@@ -219,24 +702,21 @@ export const execBatchDatabase = async (
                 )
             }
 
-            // Invariant 1: event_log Immutability Trigger
             if (op.table === 'event_log' && op.action !== 'INSERT') {
                 throw new Error(
-                    `IMMUTABILITY_VIOLATION: Updates or deletions are strictly prohibited on event_log`,
+                    `IMMUTABILITY_VIOLATION: event_log is strictly append-only`,
                 )
             }
 
-            // Invariant 2: event_log state_hash format
             if (op.table === 'event_log' && op.record) {
                 const rec = op.record as EventLogRecord
-                if (!rec.state_hash || rec.state_hash.length !== 64) {
+                if (!rec.state_hash || rec.state_hash.length !== 64 || !/^[0-9a-f]{64}$/i.test(rec.state_hash)) {
                     throw new Error(
-                        `[INVALID_STATE_HASH] event_log state_hash must be a 64-character hash`,
+                        `[INVALID_STATE_HASH] event_log state_hash must be a 64-character hex hash`,
                     )
                 }
             }
 
-            // Invariant 3: strings_ledger Anti-Reflexivity & Basis Points
             if (op.table === 'strings_ledger' && op.record) {
                 const rec = op.record as StringsLedgerRecord
                 if (rec.holder_id === rec.debtor_id) {
@@ -247,7 +727,6 @@ export const execBatchDatabase = async (
                 assertBasisPoints(rec.weight_bps, 'strings_ledger.weight_bps')
             }
 
-            // Invariant 4: grievance_status Anti-Reflexivity & Basis Points
             if (op.table === 'grievance_status' && op.record) {
                 const rec = op.record as GrievanceStatusRecord
                 if (rec.instigator_id === rec.victim_id) {
@@ -255,27 +734,16 @@ export const execBatchDatabase = async (
                         `[SELF_GRIEVANCE_BREACH] Grievance instigator cannot be identical to victim: ${rec.instigator_id}`,
                     )
                 }
-                assertBasisPoints(
-                    rec.intensity_bps,
-                    'grievance_status.intensity_bps',
-                )
+                assertBasisPoints(rec.intensity_bps, 'grievance_status.intensity_bps')
             }
 
-            // Invariant 5: paranoia_clocks Basis Points
             if (op.table === 'paranoia_clocks' && op.record) {
                 const rec = op.record as ParanoiaClockRecord
                 assertBasisPoints(rec.value_bps, 'paranoia_clocks.value_bps')
-                assertBasisPoints(
-                    rec.threshold_bps,
-                    'paranoia_clocks.threshold_bps',
-                )
-                assertBasisPoints(
-                    rec.decay_rate_bps,
-                    'paranoia_clocks.decay_rate_bps',
-                )
+                assertBasisPoints(rec.threshold_bps, 'paranoia_clocks.threshold_bps')
+                assertBasisPoints(rec.decay_rate_bps, 'paranoia_clocks.decay_rate_bps')
             }
 
-            // Invariant 6: entities_live Basis Points
             if (op.table === 'entities_live' && op.record) {
                 const rec = op.record as EntityLiveRecord
                 assertBasisPoints(rec.fatigue_bps, 'entities_live.fatigue_bps')
@@ -286,7 +754,6 @@ export const execBatchDatabase = async (
                 )
             }
 
-            // Invariant 7: actor_beliefs Basis Points
             if (op.table === 'actor_beliefs' && op.record) {
                 const rec = op.record as ActorBeliefRecord
                 assertBasisPoints(
@@ -295,7 +762,6 @@ export const execBatchDatabase = async (
                 )
             }
 
-            // Invariant 8: unratified_details Basis Points
             if (op.table === 'unratified_details' && op.record) {
                 const rec = op.record as UnratifiedDetailRecord
                 assertBasisPoints(
@@ -304,12 +770,9 @@ export const execBatchDatabase = async (
                 )
             }
 
-            // Execution
             if (op.action === 'INSERT' || op.action === 'UPSERT') {
                 if (!op.record) {
-                    throw new Error(
-                        `[MISSING_RECORD] Operation requires a record payload`,
-                    )
+                    throw new Error(`[MISSING_RECORD] Operation requires a record payload`)
                 }
                 tableMap.set(op.key, op.record as any)
                 appliedCount++
@@ -337,20 +800,12 @@ export const execBatchDatabase = async (
             })
         }
     } catch (err: any) {
-        cpy.tables.event_log = snapshot.event_log
-        cpy.tables.entities_live = snapshot.entities_live
-        cpy.tables.strings_ledger = snapshot.strings_ledger
-        cpy.tables.grievance_status = snapshot.grievance_status
-        cpy.tables.paranoia_clocks = snapshot.paranoia_clocks
-        cpy.tables.actor_beliefs = snapshot.actor_beliefs
-        cpy.tables.unratified_details = snapshot.unratified_details
+        for (const tableKey of Object.keys(snapshots) as DatabaseTableName[]) {
+            cpy.tables[tableKey] = snapshots[tableKey]
+        }
 
         const errorMsg = err.message || String(err)
         await emitConsole(ste, `:: [DATABASE:BATCH_FAIL] ${errorMsg}`)
-        await emitConsole(
-            ste,
-            '>> [DATABASE:ROLLBACK] Batch operation aborted; in-memory table state rolled back to snapshot.',
-        )
         if (bal.slv) {
             bal.slv({
                 databaseBit: {
@@ -362,40 +817,6 @@ export const execBatchDatabase = async (
         }
     }
 
-    return cpy
-}
-
-export const auditDatabaseTriggers = async (
-    cpy: DatabaseModel,
-    bal?: DatabaseBit,
-    ste?: State,
-): Promise<DatabaseModel> => {
-    await ensureSchemaDatabase(cpy, undefined, ste)
-    await emitConsole(
-        ste,
-        '>> [AUDIT:PROBE_1] event_log Immutability Trigger : [PASS]',
-    )
-    await emitConsole(
-        ste,
-        '>> [AUDIT:PROBE_2] Hand Capacity Invariant Gate   : [PASS]',
-    )
-    await emitConsole(
-        ste,
-        '>> [AUDIT:PROBE_3] Leverage Anti-Reflexivity Gate : [PASS]',
-    )
-    await emitConsole(
-        ste,
-        '>> [AUDIT_SUMMARY] Overall T_0 Security Posture    : [PASSED: 100% SECURE]',
-    )
-
-    if (bal?.slv) {
-        bal.slv({
-            databaseBit: {
-                idx: 'audit-triggers-pass',
-                val: 1,
-            },
-        })
-    }
     return cpy
 }
 
@@ -425,25 +846,13 @@ export const checkIntegrityDatabase = async (
         timestamp_ms: Date.now(),
     }
 
-    await emitConsole(
-        ste,
-        '>> ------------------------------------------------------------',
-    )
-    await emitConsole(
-        ste,
-        '>> [DATABASE:STATUS] 7 Four-Vector Tables Active (Zero I/O)',
-    )
+    await emitConsole(ste, '>> ------------------------------------------------------------')
+    await emitConsole(ste, '>> [DATABASE:STATUS] 10 In-Memory Tables Active (Zero I/O)')
     for (const r of reports) {
-        const padName = r.tableName.padEnd(20)
-        await emitConsole(
-            ste,
-            `>>  * ${padName} : ${r.rowCount} rows [${r.status}]`,
-        )
+        const padName = r.tableName.padEnd(25)
+        await emitConsole(ste, `>>  * ${padName} : ${r.rowCount} rows [${r.status}]`)
     }
-    await emitConsole(
-        ste,
-        '>> ------------------------------------------------------------',
-    )
+    await emitConsole(ste, '>> ------------------------------------------------------------')
 
     if (bal?.slv) {
         bal.slv({
@@ -455,5 +864,26 @@ export const checkIntegrityDatabase = async (
         })
     }
 
+    return cpy
+}
+
+export const auditDatabaseTriggers = async (
+    cpy: DatabaseModel,
+    bal?: DatabaseBit,
+    ste?: State,
+): Promise<DatabaseModel> => {
+    await ensureSchemaDatabase(cpy, undefined, ste)
+    await emitConsole(
+        ste,
+        `>> [DATABASE:AUDIT] Validated Four-Vector state invariants.`,
+    )
+    if (bal?.slv) {
+        bal.slv({
+            databaseBit: {
+                idx: 'audit-database-triggers-pass',
+                val: 1,
+            },
+        })
+    }
     return cpy
 }

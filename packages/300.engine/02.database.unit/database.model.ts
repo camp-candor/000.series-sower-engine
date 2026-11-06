@@ -11,6 +11,9 @@ import type {
     ParanoiaClockRecord,
     ActorBeliefRecord,
     UnratifiedDetailRecord,
+    FactRecord,
+    SceneRecord,
+    SceneFactDependencyRecord,
 } from './fce/database.interface.js'
 
 export class DatabaseModel implements Database {
@@ -24,6 +27,9 @@ export class DatabaseModel implements Database {
         paranoia_clocks: new Map<string, ParanoiaClockRecord>(),
         actor_beliefs: new Map<string, ActorBeliefRecord>(),
         unratified_details: new Map<string, UnratifiedDetailRecord>(),
+        facts: new Map<string, FactRecord>(),
+        scenes: new Map<string, SceneRecord>(),
+        scene_fact_dependencies: new Map<string, SceneFactDependencyRecord>(),
     }
 }
 
