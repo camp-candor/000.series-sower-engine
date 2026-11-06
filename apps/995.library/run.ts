@@ -40,6 +40,9 @@ program
     .option('--arithmetic-menu')
     .option('--sequence-audit')
     .option('--audit-sequence')
+    .option('--database-audit')
+    .option('--audit-database')
+    .option('--inspect-tables')
     .option('--run-all-levels')
     .option('--gauntlet')
     .option('--run-gauntlet')
@@ -1008,6 +1011,54 @@ const sequenceAuditHeadless = async () => {
     }
 }
 
+const databaseAuditHeadless = async () => {
+    try {
+        const { DatabaseModel } = require(
+            path.resolve(
+                __dirname,
+                '../../packages/300.engine/02.database.unit/database.model.ts',
+            ),
+        )
+        const { ensureSchemaDatabase, checkIntegrityDatabase } = require(
+            path.resolve(
+                __dirname,
+                '../../packages/300.engine/02.database.unit/buz/database.buzz.ts',
+            ),
+        )
+        const model = new DatabaseModel()
+        await ensureSchemaDatabase(model, {}, null)
+        let report: any = null
+        await checkIntegrityDatabase(
+            model,
+            { slv: (r: any) => { report = r.databaseBit } },
+            null,
+        )
+        console.log(
+            '>> ------------------------------------------------------------',
+        )
+        console.log(
+            '>> [DATABASE:STATUS] 7 Four-Vector Tables Active (Zero I/O)',
+        )
+        if (report?.dat?.reports) {
+            for (const r of report.dat.reports) {
+                const padName = r.tableName.padEnd(20)
+                console.log(
+                    `>>  * ${padName} : ${r.rowCount} rows [${r.status}]`,
+                )
+            }
+        }
+        console.log(
+            '>> ------------------------------------------------------------',
+        )
+        process.exit(0)
+    } catch (err: any) {
+        console.error(
+            `:: [DATABASE:FAIL] Headless execution failed: ${err?.message ?? err}`,
+        )
+        process.exit(1)
+    }
+}
+
 const formatCompilationFeedback = (rawOutput: string): void => {
     const lines = rawOutput.split(/\r?\n/).filter((l) => l.trim().length > 0)
     const errorPattern = /^(.+?)\((\d+),(\d+)\):\s*error\s*(TS\d+):\s*(.+)$/
@@ -1171,6 +1222,14 @@ const main = async () => {
     }
     if (options.sequenceAudit || options.auditSequence) {
         await sequenceAuditHeadless()
+        return
+    }
+    if (
+        options.databaseAudit ||
+        options.auditDatabase ||
+        options.inspectTables
+    ) {
+        await databaseAuditHeadless()
         return
     }
     if (options.gauntlet || options.runGauntlet) {

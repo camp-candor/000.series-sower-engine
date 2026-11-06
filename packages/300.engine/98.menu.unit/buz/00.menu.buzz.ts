@@ -2,6 +2,7 @@
 import * as ActMnu from '../menu.action.js'
 import * as ActOlm from '../../00.engine.unit/engine.action.js'
 import * as ActSeq from '../../14.sequence.unit/sequence.action.js'
+import * as ActDba from '../../02.database.unit/database.action.js'
 
 import type { MenuModel } from '../menu.model.js'
 import type MenuBit from '../fce/menu.bit.js'
@@ -91,6 +92,7 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         'ARBITRARY INTEGER DIVISION SUITE',
         'EXECUTE BIGINT PRECISION SUITE',
         'AUDIT SEQUENCE CONCURRENCY GATE',
+        'INSPECT RELATIONAL LEDGER TABLES',
         'ROOT MENU',
         ActOlm.UPDATE_ENGINE.split(']')[1],
         ActOlm.TEST_ENGINE.split(']')[1],
@@ -139,6 +141,8 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             'Verify 64-bit high magnitude BigInt precision and Round-Half-Even.',
         'AUDIT SEQUENCE CONCURRENCY GATE':
             'Verify OCC sequence token validation, monotonic progression, and continuity.',
+        'INSPECT RELATIONAL LEDGER TABLES':
+            'Inspect in-memory Four-Vector relational ledger tables and audit zero-IO status.',
         'ROOT MENU': 'Return to the master runner switchboard.',
     }
 
@@ -411,6 +415,16 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
                     envelopes: [{ sequenceId: 104 }, { sequenceId: 105 }],
                 },
             })
+            break
+        }
+
+        case 'INSPECT RELATIONAL LEDGER TABLES':
+        case 'AUDIT 4-VECTOR STATE & TABLES':
+        case 'INSPECT 4-VECTOR STATE & SQLITE TABLES':
+        case ActDba.CHECK_INTEGRITY_DATABASE:
+        case ActDba.CHECK_INTEGRITY_DATABASE.split(']')[1]: {
+            await ste.hunt(ActDba.ENSURE_SCHEMA_DATABASE, {})
+            await ste.hunt(ActDba.CHECK_INTEGRITY_DATABASE, {})
             break
         }
 
