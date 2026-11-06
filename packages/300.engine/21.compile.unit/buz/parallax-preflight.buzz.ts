@@ -35,6 +35,47 @@ export interface ParallaxPreflightViolation {
     readonly entityId?: string
     readonly lineNumber?: number
     readonly message: string
+    includes(substr: string): boolean
+}
+
+export class ParallaxViolationItem implements ParallaxPreflightViolation {
+    readonly code: ParallaxViolationCode
+    readonly entityId?: string
+    readonly lineNumber?: number
+    readonly message: string
+
+    constructor(init: {
+        code: ParallaxViolationCode
+        entityId?: string
+        lineNumber?: number
+        message: string
+    }) {
+        this.code = init.code
+        this.entityId = init.entityId
+        this.lineNumber = init.lineNumber
+        this.message = init.message
+    }
+
+    includes(substr: string): boolean {
+        return (
+            this.code.includes(substr) ||
+            this.message.includes(substr) ||
+            (this.entityId !== undefined && this.entityId.includes(substr))
+        )
+    }
+
+    toString(): string {
+        return `[${this.code}] ${this.message}`
+    }
+}
+
+function makeViolation(init: {
+    code: ParallaxViolationCode
+    entityId?: string
+    lineNumber?: number
+    message: string
+}): ParallaxPreflightViolation {
+    return new ParallaxViolationItem(init)
 }
 
 export interface ParallaxPreflightReport {
@@ -44,6 +85,9 @@ export interface ParallaxPreflightReport {
     readonly contdTurns: number
     readonly johnnyTurns: number
     readonly orbieTurns: number
+    readonly totalCues: number
+    readonly contdCues: number
+    readonly bareCues: number
     readonly turns: readonly FountainDialogueTurn[]
     readonly violations: readonly ParallaxPreflightViolation[]
 }
@@ -208,31 +252,37 @@ export function runParallaxPreflightGate(
             corpus.characters,
         )
         if (!character) {
-            violations.push({
-                code: 'ERR_UNKNOWN_SPEAKER',
-                lineNumber: turn.lineNumber,
-                message: `Line ${turn.lineNumber}: Unknown speaker cue "${turn.rawCue}" has no matching entity in corpus.characters.`,
-            })
+            violations.push(
+                makeViolation({
+                    code: 'ERR_UNKNOWN_SPEAKER',
+                    lineNumber: turn.lineNumber,
+                    message: `Line ${turn.lineNumber}: Unknown speaker cue "${turn.rawCue}" has no matching entity in corpus.characters.`,
+                }),
+            )
             continue
         }
 
         if (character.speakable === false) {
-            violations.push({
-                code: 'ERR_MUTE_CHARACTER_DIALOGUE',
-                entityId: character.id,
-                lineNumber: turn.lineNumber,
-                message: `Line ${turn.lineNumber}: Non-speaking character "${character.id}" ("${turn.speakerCue}") cannot be assigned spoken dialogue.`,
-            })
+            violations.push(
+                makeViolation({
+                    code: 'ERR_MUTE_CHARACTER_DIALOGUE',
+                    entityId: character.id,
+                    lineNumber: turn.lineNumber,
+                    message: `Line ${turn.lineNumber}: Non-speaking character "${character.id}" ("${turn.speakerCue}") cannot be assigned spoken dialogue.`,
+                }),
+            )
         }
 
         const mask = character.somaticState?.motorCapabilityMask ?? []
         if (!mask.includes('VOCAL_TRACT')) {
-            violations.push({
-                code: 'ERR_MISSING_MOTOR_CAPABILITY',
-                entityId: character.id,
-                lineNumber: turn.lineNumber,
-                message: `Line ${turn.lineNumber}: Speaker "${character.id}" lacks mandatory "VOCAL_TRACT" motor capability.`,
-            })
+            violations.push(
+                makeViolation({
+                    code: 'ERR_MISSING_MOTOR_CAPABILITY',
+                    entityId: character.id,
+                    lineNumber: turn.lineNumber,
+                    message: `Line ${turn.lineNumber}: Speaker "${character.id}" lacks mandatory "VOCAL_TRACT" motor capability.`,
+                }),
+            )
         }
     }
 
@@ -242,21 +292,25 @@ export function runParallaxPreflightGate(
     )) {
         const character = corpus.characters.find((c) => c.id === charId)
         if (!character) {
-            violations.push({
-                code: 'ERR_UNKNOWN_SPEAKER',
-                entityId: charId,
-                message: `Required cast entity "${charId}" is missing from corpus.characters.`,
-            })
+            violations.push(
+                makeViolation({
+                    code: 'ERR_UNKNOWN_SPEAKER',
+                    entityId: charId,
+                    message: `Required cast entity "${charId}" is missing from corpus.characters.`,
+                }),
+            )
             continue
         }
         const mask = character.somaticState?.motorCapabilityMask ?? []
         for (const cap of requiredCaps) {
             if (!mask.includes(cap)) {
-                violations.push({
-                    code: 'ERR_MISSING_MOTOR_CAPABILITY',
-                    entityId: charId,
-                    message: `Character "${charId}" is missing required somatic motor capability "${cap}".`,
-                })
+                violations.push(
+                    makeViolation({
+                        code: 'ERR_MISSING_MOTOR_CAPABILITY',
+                        entityId: charId,
+                        message: `Character "${charId}" is missing required somatic motor capability "${cap}".`,
+                    }),
+                )
             }
         }
     }
@@ -265,11 +319,13 @@ export function runParallaxPreflightGate(
     const possessionIds = new Set(corpus.possessions.map((p) => p.id))
     for (const propId of REQUIRED_PROPS) {
         if (!possessionIds.has(propId)) {
-            violations.push({
-                code: 'ERR_MISSING_REQUIRED_PROP',
-                entityId: propId,
-                message: `Required screenplay prop "${propId}" is missing from corpus.possessions.`,
-            })
+            violations.push(
+                makeViolation({
+                    code: 'ERR_MISSING_REQUIRED_PROP',
+                    entityId: propId,
+                    message: `Required screenplay prop "${propId}" is missing from corpus.possessions.`,
+                }),
+            )
         }
     }
 
@@ -277,11 +333,13 @@ export function runParallaxPreflightGate(
     const locationIds = new Set(corpus.locations.map((l) => l.id))
     for (const locId of REQUIRED_LOCATIONS) {
         if (!locationIds.has(locId)) {
-            violations.push({
-                code: 'ERR_MISSING_REQUIRED_LOCATION',
-                entityId: locId,
-                message: `Required screenplay location "${locId}" is missing from corpus.locations.`,
-            })
+            violations.push(
+                makeViolation({
+                    code: 'ERR_MISSING_REQUIRED_LOCATION',
+                    entityId: locId,
+                    message: `Required screenplay location "${locId}" is missing from corpus.locations.`,
+                }),
+            )
         }
     }
 
@@ -292,6 +350,9 @@ export function runParallaxPreflightGate(
         contdTurns: summary.contdTurns,
         johnnyTurns: summary.johnnyTurns,
         orbieTurns: summary.orbieTurns,
+        totalCues: summary.totalTurns,
+        contdCues: summary.contdTurns,
+        bareCues: summary.bareTurns,
         turns: summary.turns,
         violations,
     }
