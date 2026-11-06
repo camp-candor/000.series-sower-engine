@@ -41,7 +41,7 @@ describe('02.database.unit - Four-Vector Table Memory Structures Battery', () =>
         expect(slv).toHaveBeenCalledWith(
             expect.objectContaining({
                 databaseBit: expect.objectContaining({
-                    val: 7,
+                    val: 10,
                     idx: 'ensure-schema-pass',
                 }),
             }),
