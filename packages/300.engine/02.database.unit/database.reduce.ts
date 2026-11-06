@@ -34,6 +34,30 @@ export function reducer(
         case Act.RESET_LOCAL_DATABASE:
             return Buzz.resetLocalDatabase(clone(model), act.bale, state)
 
+        case Act.INSERT_FACT:
+            return Buzz.insertFact(clone(model), act.bale as any, state)
+
+        case Act.UPDATE_FACT_CLAIM:
+            return Buzz.updateFactClaim(clone(model), act.bale as any, state)
+
+        case Act.SET_FACT_STANDING:
+            return Buzz.setFactStanding(clone(model), act.bale as any, state)
+
+        case Act.REGISTER_SCENE:
+            return Buzz.registerScene(clone(model), act.bale as any, state)
+
+        case Act.ADD_SCENE_DEPENDENCY:
+            return Buzz.addSceneDependency(clone(model), act.bale as any, state)
+
+        case Act.QUERY_WHY_DIRTY:
+            return Buzz.queryWhyDirty(clone(model), act.bale as any, state)
+
+        case Act.GET_CENTRALITY_TELEMETRY:
+            return Buzz.getFactCentralityTelemetry(clone(model), act.bale, state)
+
+        case Act.AUDIT_DATABASE_TRIGGERS:
+            return Buzz.auditDatabaseTriggers(clone(model), act.bale, state)
+
         default:
             return model
     }

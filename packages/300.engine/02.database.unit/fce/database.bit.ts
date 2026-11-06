@@ -9,8 +9,13 @@ import type {
     ParanoiaClockRecord,
     ActorBeliefRecord,
     UnratifiedDetailRecord,
+    FactRecord,
+    SceneRecord,
+    SceneFactDependencyRecord,
+    FactCentralityTelemetry,
     TableStatusReport,
     DatabaseStateReport,
+    FactStanding,
 } from './database.interface.js'
 
 export type DatabaseTableName =
@@ -21,6 +26,9 @@ export type DatabaseTableName =
     | 'paranoia_clocks'
     | 'actor_beliefs'
     | 'unratified_details'
+    | 'facts'
+    | 'scenes'
+    | 'scene_fact_dependencies'
 
 export type DatabaseRecordUnion =
     | EventLogRecord
@@ -30,6 +38,9 @@ export type DatabaseRecordUnion =
     | ParanoiaClockRecord
     | ActorBeliefRecord
     | UnratifiedDetailRecord
+    | FactRecord
+    | SceneRecord
+    | SceneFactDependencyRecord
 
 export interface DatabaseOperation {
     readonly table: DatabaseTableName
@@ -44,7 +55,15 @@ export interface DatabasePayload {
     readonly record?: DatabaseRecordUnion
     readonly records?: readonly DatabaseRecordUnion[]
     readonly operations?: readonly DatabaseOperation[]
-    readonly query?: string
+    readonly fact?: FactRecord
+    readonly scene?: SceneRecord
+    readonly dependency?: SceneFactDependencyRecord
+    readonly factId?: string
+    readonly sceneId?: string
+    readonly newClaimText?: string
+    readonly newVersion?: number
+    readonly standing?: FactStanding
+    readonly telemetry?: readonly FactCentralityTelemetry[]
     readonly reports?: readonly TableStatusReport[]
     readonly stateReport?: DatabaseStateReport
     readonly rowCount?: number

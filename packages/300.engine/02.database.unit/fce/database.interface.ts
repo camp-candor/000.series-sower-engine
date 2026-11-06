@@ -1,7 +1,74 @@
 /**
  * 02.database.unit - Database Interface Contracts
- * Four-Vector runtime state records, append-only event log, and in-memory tables.
+ * Four-Vector runtime state records, flat continuity tables, and invalidation views.
  */
+
+export type FactScope = 'CHARACTER' | 'LOCATION' | 'LOGISTIC' | 'LAW'
+
+export type FactAuthorityLevel =
+    | 'AXIOM'
+    | 'CANON'
+    | 'EVENT'
+    | 'RUNTIME_STATE'
+    | 'PROJECTION'
+    | 'SPECULATION'
+
+export type FactStanding =
+    | 'ACTIVE_ENDORSED'
+    | 'FLAGGED_FOR_REVIEW'
+    | 'DEPRECATED_ARCHIVED'
+
+export type SceneStatus = 'clean' | 'dirty' | 'reviewed'
+
+export type DependencyEntityType =
+    | 'character'
+    | 'location'
+    | 'possession'
+    | 'grievance'
+    | 'axiom'
+
+export interface FactRecord {
+    readonly id: string
+    readonly claim_text: string
+    readonly scope: FactScope
+    readonly authority_level: FactAuthorityLevel
+    readonly standing: FactStanding
+    readonly author: string
+    readonly version: number
+    readonly timestamp_ms: number
+    readonly last_edited_at_ms: number
+}
+
+export interface SceneRecord {
+    readonly id: string
+    readonly episode_num: number
+    readonly scene_num: number
+    readonly text: string
+    readonly status: SceneStatus
+    readonly is_dirty: number // 0 | 1
+    readonly dirty_reason?: string
+    readonly created_at_ms: number
+    readonly updated_at_ms: number
+}
+
+export interface SceneFactDependencyRecord {
+    readonly scene_id: string
+    readonly fact_id: string
+    readonly entity_type: DependencyEntityType
+    readonly pinned_version: number
+    readonly is_dirty: number // 0 | 1
+    readonly invalidation_reason?: string
+    readonly created_at_ms: number
+    readonly invalidated_at_ms?: number
+}
+
+export interface FactCentralityTelemetry {
+    readonly fact_id: string
+    readonly scope: FactScope
+    readonly current_version: number
+    readonly standing: FactStanding
+    readonly dependent_scenes_count: number
+}
 
 export interface EventLogRecord {
     readonly sequence_id: number
@@ -14,8 +81,12 @@ export interface EventLogRecord {
     readonly target_id?: string
     readonly seed: string
     readonly payload_json: string
+    readonly topology_hash?: string
+    readonly overlay_hash?: string
+    readonly query_hash?: string
+    readonly receipt_hash?: string
     readonly prev_hash: string
-    readonly state_hash: string // 64-char lowercase hex
+    readonly state_hash: string
     readonly timestamp_ms: number
 }
 
@@ -24,13 +95,13 @@ export interface EntityLiveRecord {
     readonly location_id: string
     readonly q: number
     readonly r: number
-    readonly arms_available: number // [0, 2]
-    readonly legs_available: number // [0, 2]
+    readonly arms_available: number
+    readonly legs_available: number
     readonly locomotion_tier: 'UNRESTRICTED' | 'LIMPING' | 'IMMOBILIZED'
-    readonly concussion_level: number // [0, 3]
-    readonly fatigue_bps: number // [0, 10000]
-    readonly pain_bps: number // [0, 10000]
-    readonly refusal_strain_bps: number // [0, 10000]
+    readonly concussion_level: number
+    readonly fatigue_bps: number
+    readonly pain_bps: number
+    readonly refusal_strain_bps: number
     readonly open_wounds_json: string
     readonly banned_kinetic_verbs_json: string
     readonly held_items_json: string
@@ -44,7 +115,7 @@ export interface StringsLedgerRecord {
     readonly relation_id: string
     readonly holder_id: string
     readonly debtor_id: string
-    readonly weight_bps: number // [0, 10000]
+    readonly weight_bps: number
     readonly strings_count: number
     readonly updated_at_ms: number
 }
@@ -55,7 +126,7 @@ export interface GrievanceStatusRecord {
     readonly victim_id: string
     readonly escalation_depth: number
     readonly cooldown_cycles: number
-    readonly intensity_bps: number // [0, 10000]
+    readonly intensity_bps: number
     readonly status: 'DORMANT' | 'ACTIVE' | 'SIMMERING' | 'RESOLVED'
     readonly updated_at_ms: number
 }
@@ -64,10 +135,10 @@ export interface ParanoiaClockRecord {
     readonly clock_id: string
     readonly entity_id: string
     readonly clock_name: string
-    readonly value_bps: number // [0, 10000]
-    readonly threshold_bps: number // [0, 10000]
-    readonly decay_rate_bps: number // [0, 10000]
-    readonly is_triggered: number // 0 | 1
+    readonly value_bps: number
+    readonly threshold_bps: number
+    readonly decay_rate_bps: number
+    readonly is_triggered: number
     readonly updated_at_ms: number
 }
 
@@ -75,9 +146,9 @@ export interface ActorBeliefRecord {
     readonly belief_id: string
     readonly observer_id: string
     readonly fact_id: string
-    readonly subjective_probability_bps: number // [0, 10000]
+    readonly subjective_probability_bps: number
     readonly source_type: 'INFERENCE' | 'TESTIMONY' | 'DIRECT_OBSERVATION'
-    readonly is_false_belief: number // 0 | 1
+    readonly is_false_belief: number
     readonly learned_at_ms: number
     readonly updated_at_ms: number
 }
@@ -86,7 +157,7 @@ export interface UnratifiedDetailRecord {
     readonly detail_id: string
     readonly scene_id: string
     readonly entity_id?: string
-    readonly salience_bps: number // [0, 10000]
+    readonly salience_bps: number
     readonly claim_proposal: string
     readonly status: 'STAGED' | 'DISCARDED' | 'RATIFIED'
     readonly created_at_ms: number
@@ -117,5 +188,8 @@ export default interface Database {
         paranoia_clocks: Map<string, ParanoiaClockRecord>
         actor_beliefs: Map<string, ActorBeliefRecord>
         unratified_details: Map<string, UnratifiedDetailRecord>
+        facts: Map<string, FactRecord>
+        scenes: Map<string, SceneRecord>
+        scene_fact_dependencies: Map<string, SceneFactDependencyRecord>
     }
 }
