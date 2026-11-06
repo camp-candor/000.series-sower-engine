@@ -16,6 +16,53 @@ export type CompileActionType =
     | 'gate0-verify'
     | 'offline-deletion-test'
 
+export interface CompileCharacterEntity {
+    readonly id: string
+    readonly name: string
+    readonly aliases?: readonly string[]
+    readonly vocalCue?: string
+    readonly speakable?: boolean
+    readonly somaticState?: {
+        readonly motorCapabilityMask?: readonly string[]
+        readonly enduranceBp?: number
+        readonly stressBp?: number
+        readonly coherenceBp?: number
+    }
+    readonly [key: string]: unknown
+}
+
+export interface CompileLocationEntity {
+    readonly id: string
+    readonly name: string
+    readonly connectedLocationIds: readonly string[]
+    readonly capacityBp?: number
+    readonly [key: string]: unknown
+}
+
+export interface CompilePossessionEntity {
+    readonly id: string
+    readonly name: string
+    readonly holderCharacterId: string
+    readonly durabilityBp?: number
+    readonly [key: string]: unknown
+}
+
+export interface CompileGrievanceEntity {
+    readonly id: string
+    readonly sourceCharacterId: string
+    readonly targetCharacterId: string
+    readonly intensityBp: number
+    readonly dependsOnGrievanceIds?: readonly string[]
+    readonly [key: string]: unknown
+}
+
+export interface CompileCorpusPayload {
+    readonly characters: readonly CompileCharacterEntity[]
+    readonly locations: readonly CompileLocationEntity[]
+    readonly possessions: readonly CompilePossessionEntity[]
+    readonly grievances: readonly CompileGrievanceEntity[]
+}
+
 export interface CompileExecutionOptions {
     seriesSlug?: string
     sourceDir?: string
@@ -24,6 +71,9 @@ export interface CompileExecutionOptions {
     skipArchive?: boolean
     verifyDriftTripwire?: boolean
     strictFailClosed?: boolean
+    corpus?: CompileCorpusPayload
+    expectedRootMerkleHash?: string
+    timestamp?: string
 }
 
 export interface CompileResultPayload {

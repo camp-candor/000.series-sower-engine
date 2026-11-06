@@ -3,14 +3,14 @@ const fs = require('node:fs')
 const path = require('node:path')
 
 const rootDir = path.resolve(__dirname, '..')
+const TARGET_DIRS = ['packages/300.engine', 'scripts', 'drafts']
 const scanTargets = [
     path.join(rootDir, 'package.json'),
     path.join(rootDir, 'tsconfig.base.json'),
-    path.join(rootDir, 'packages', '300.engine'),
-    path.join(rootDir, 'scripts'),
+    ...TARGET_DIRS.map((dir) => path.join(rootDir, dir)),
 ]
 
-const scannedExtensions = ['.ts', '.json', '.cjs', '.js', '.md']
+const scannedExtensions = ['.ts', '.json', '.cjs', '.js', '.md', '.fountain']
 const violations = []
 
 function scanFile(filePath) {

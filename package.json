@@ -29,6 +29,7 @@
         "check:harness-boundary": "node scripts/check-harness-boundary.cjs",
         "check:artifacts": "node scripts/check-artifacts.cjs",
         "check:ascii": "node scripts/check-ascii.cjs",
+        "sanitize:fountain": "node scripts/sanitize-fountain-ingress.cjs",
         "check:preflight": "npm run check:runner-boundary && npm run check:harness-boundary && npm run check:artifacts && npm run check:ascii",
         "check:zero-runtime": "node -e \"const pkg = JSON.parse(require('fs').readFileSync('package.json', 'utf8')); if (pkg.dependencies && Object.keys(pkg.dependencies).length > 0) { console.error('FAIL: Root dependencies must be empty'); process.exit(1); } console.log('PASS: Zero root runtime dependencies verified');\"",
         "//__ TESTING ______________________________": "",

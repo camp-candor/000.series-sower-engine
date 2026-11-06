@@ -9,6 +9,10 @@ import type State from '../../99.core/state.js'
 import * as Align from '../../val/align.js'
 import * as Color from '../../val/console-color.js'
 import { openGauntletMenu } from './gauntlet-menu.buzz.js'
+import {
+    openCompileMenu,
+    runParallaxCompileAudit,
+} from './compile-menu.buzz.js'
 
 let bit: any, lst: any, src: any
 let rootSlv: any
@@ -66,6 +70,7 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
 
     lst = [
         'OPEN GAUNTLET MENU',
+        'COMPILE & PREFLIGHT PARALLAX DINNER',
         'AUDIT ZERO-RUNTIME FENCE',
         'AUDIT AST BOUNDARY FIREWALL',
         'AUDIT ANTI-GAMING OVERLAY',
@@ -99,6 +104,8 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
     const descriptions: Record<string, string> = {
         'OPEN GAUNTLET MENU':
             'Open the Simulation Engine Cockpit to audit CI gates and tick performance.',
+        'COMPILE & PREFLIGHT PARALLAX DINNER':
+            'Execute 3-pass Wiregrass Basin canon compilation and Parallax Dinner pre-flight gate.',
         'AUDIT ZERO-RUNTIME FENCE':
             'Verify zero runtime dependencies at workspace root.',
         'AUDIT AST BOUNDARY FIREWALL':
@@ -151,6 +158,12 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
     switch (src) {
         case 'OPEN GAUNTLET MENU': {
             await openGauntletMenu(cpy, bal, ste)
+            break
+        }
+
+        case 'COMPILE & PREFLIGHT PARALLAX DINNER': {
+            await runParallaxCompileAudit(cpy, bal, ste)
+            await openCompileMenu(cpy, bal, ste)
             break
         }
 
