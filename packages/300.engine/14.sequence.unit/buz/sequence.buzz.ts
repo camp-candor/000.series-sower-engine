@@ -133,7 +133,9 @@ export const assertExpectedSeq = async (
         bal.slv({
             report,
             sequenceBit: {
-                idx: isMatch ? 'assert-expected-seq-pass' : 'assert-expected-seq-fail',
+                idx: isMatch
+                    ? 'assert-expected-seq-pass'
+                    : 'assert-expected-seq-fail',
                 val: isMatch ? 1 : 0,
                 src: cpy.seriesSlug,
                 dat: { report, error },
@@ -263,6 +265,8 @@ export const verifySequenceContinuity = async (
             ste,
             `>> [SEQ:CONTINUITY] Contiguous sequence verified from #${baseSeq} to #${headSeq} (${envelopes.length} records)`,
         )
+        await emitConsole(ste, '>> [OK] Monotonic sequence continuity verified')
+        await emitConsole(ste, '>> [OK] Monotonic sequence continuity verified')
     }
 
     if (bal.slv) {

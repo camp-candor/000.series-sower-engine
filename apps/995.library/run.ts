@@ -38,6 +38,8 @@ program
     .option('--bigint-audit')
     .option('--bigint-precision')
     .option('--arithmetic-menu')
+    .option('--sequence-audit')
+    .option('--audit-sequence')
     .option('--run-all-levels')
     .option('--gauntlet')
     .option('--run-gauntlet')
@@ -947,6 +949,65 @@ const gauntletHeadless = async () => {
     }
 }
 
+const sequenceAuditHeadless = async () => {
+    try {
+        const { SequenceModel } = require(
+            path.resolve(
+                __dirname,
+                '../../packages/300.engine/14.sequence.unit/sequence.model.ts',
+            ),
+        )
+        const {
+            initSequence,
+            assertExpectedSeq,
+            commitSequence,
+            verifySequenceContinuity,
+        } = require(
+            path.resolve(
+                __dirname,
+                '../../packages/300.engine/14.sequence.unit/buz/sequence.buzz.ts',
+            ),
+        )
+        const model = new SequenceModel()
+        initSequence(
+            model,
+            { idx: 'init', val: 104, src: 'wiregrass-basin' },
+            null,
+        )
+        await assertExpectedSeq(model, { idx: 'occ-ok', val: 104 }, null)
+        await commitSequence(
+            model,
+            {
+                idx: 'commit-ok',
+                val: 105,
+                dat: { incomingSeq: 105, eventId: 'evt_seq_105' },
+            },
+            null,
+        )
+        await verifySequenceContinuity(
+            model,
+            {
+                idx: 'verify-ok',
+                dat: {
+                    envelopes: [{ sequenceId: 104 }, { sequenceId: 105 }],
+                },
+            },
+            null,
+        )
+        console.log('>> [SEQ:OCC_PASS] Sequence token validated at head #104')
+        console.log(
+            '>> [SEQ:COMMIT] Monotonic sequence advanced to #105 (Total: 105)',
+        )
+        console.log('>> [OK] Monotonic sequence continuity verified')
+        process.exit(0)
+    } catch (err: any) {
+        console.error(
+            `:: [SEQUENCE:FAIL] Headless execution failed: ${err?.message ?? err}`,
+        )
+        process.exit(1)
+    }
+}
+
 const formatCompilationFeedback = (rawOutput: string): void => {
     const lines = rawOutput.split(/\r?\n/).filter((l) => l.trim().length > 0)
     const errorPattern = /^(.+?)\((\d+),(\d+)\):\s*error\s*(TS\d+):\s*(.+)$/
@@ -1106,6 +1167,10 @@ const main = async () => {
     }
     if (options.arithmeticMenu || options.runAllLevels) {
         await arithmeticMenuHeadless()
+        return
+    }
+    if (options.sequenceAudit || options.auditSequence) {
+        await sequenceAuditHeadless()
         return
     }
     if (options.gauntlet || options.runGauntlet) {

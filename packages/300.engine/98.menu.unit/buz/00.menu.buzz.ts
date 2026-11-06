@@ -1,6 +1,7 @@
 /* eslint-disable */
 import * as ActMnu from '../menu.action.js'
 import * as ActOlm from '../../00.engine.unit/engine.action.js'
+import * as ActSeq from '../../14.sequence.unit/sequence.action.js'
 
 import type { MenuModel } from '../menu.model.js'
 import type MenuBit from '../fce/menu.bit.js'
@@ -89,6 +90,7 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         'RUN 100,000 BOUNDARY TIE-BREAK GAUNTLET',
         'ARBITRARY INTEGER DIVISION SUITE',
         'EXECUTE BIGINT PRECISION SUITE',
+        'AUDIT SEQUENCE CONCURRENCY GATE',
         'ROOT MENU',
         ActOlm.UPDATE_ENGINE.split(']')[1],
         ActOlm.TEST_ENGINE.split(']')[1],
@@ -135,6 +137,8 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             'Verify Round-Half-Even integer division with tie parity.',
         'EXECUTE BIGINT PRECISION SUITE':
             'Verify 64-bit high magnitude BigInt precision and Round-Half-Even.',
+        'AUDIT SEQUENCE CONCURRENCY GATE':
+            'Verify OCC sequence token validation, monotonic progression, and continuity.',
         'ROOT MENU': 'Return to the master runner switchboard.',
     }
 
@@ -389,6 +393,26 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
                 src: bit?.fenBit?.src,
             })
             break
+
+        case 'AUDIT SEQUENCE CONCURRENCY GATE': {
+            await ste.hunt(ActSeq.INIT_SEQUENCE, {
+                val: 104,
+                src: 'wiregrass-basin',
+            })
+            await ste.hunt(ActSeq.ASSERT_EXPECTED_SEQ, {
+                val: 104,
+            })
+            await ste.hunt(ActSeq.COMMIT_SEQUENCE, {
+                val: 105,
+                dat: { incomingSeq: 105, eventId: 'evt_seq_105' },
+            })
+            await ste.hunt(ActSeq.VERIFY_SEQUENCE_CONTINUITY, {
+                dat: {
+                    envelopes: [{ sequenceId: 104 }, { sequenceId: 105 }],
+                },
+            })
+            break
+        }
 
         case 'ROOT MENU':
             if (rootSlv != null) rootSlv({ mnuBit: { idx: 'root-menu' } })

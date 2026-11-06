@@ -28,13 +28,20 @@ describe('14.sequence.unit - Monotonic Sequence & OCC Concurrency Gating Battery
     it('initializes SequenceModel to a designated starting head integer', () => {
         const model = new SequenceModel()
         const slv = vi.fn()
-        initSequence(model, { idx: 'init', val: 42, src: 'under-the-floorboards', slv }, {} as any)
+        initSequence(
+            model,
+            { idx: 'init', val: 42, src: 'under-the-floorboards', slv },
+            {} as any,
+        )
 
         expect(model.currentHeadSeq).toBe(42)
         expect(model.seriesSlug).toBe('under-the-floorboards')
         expect(slv).toHaveBeenCalledWith(
             expect.objectContaining({
-                sequenceBit: expect.objectContaining({ val: 42, src: 'under-the-floorboards' }),
+                sequenceBit: expect.objectContaining({
+                    val: 42,
+                    src: 'under-the-floorboards',
+                }),
             }),
         )
     })
@@ -58,12 +65,22 @@ describe('14.sequence.unit - Monotonic Sequence & OCC Concurrency Gating Battery
         model.currentHeadSeq = 100
 
         const slv = vi.fn()
-        await assertExpectedSeq(model, { idx: 'assert', val: 100, slv }, {} as any)
+        await assertExpectedSeq(
+            model,
+            { idx: 'assert', val: 100, slv },
+            {} as any,
+        )
 
         expect(slv).toHaveBeenCalledWith(
             expect.objectContaining({
-                report: expect.objectContaining({ valid: true, presentedSeq: 100 }),
-                sequenceBit: expect.objectContaining({ val: 1, idx: 'assert-expected-seq-pass' }),
+                report: expect.objectContaining({
+                    valid: true,
+                    presentedSeq: 100,
+                }),
+                sequenceBit: expect.objectContaining({
+                    val: 1,
+                    idx: 'assert-expected-seq-pass',
+                }),
             }),
         )
     })
@@ -73,7 +90,11 @@ describe('14.sequence.unit - Monotonic Sequence & OCC Concurrency Gating Battery
         model.currentHeadSeq = 100
 
         const slv = vi.fn()
-        await assertExpectedSeq(model, { idx: 'assert', val: 99, slv }, {} as any)
+        await assertExpectedSeq(
+            model,
+            { idx: 'assert', val: 99, slv },
+            {} as any,
+        )
 
         expect(slv).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -81,7 +102,10 @@ describe('14.sequence.unit - Monotonic Sequence & OCC Concurrency Gating Battery
                     valid: false,
                     error: expect.stringContaining('OCC_SEQUENCE_CONFLICT'),
                 }),
-                sequenceBit: expect.objectContaining({ val: 0, idx: 'assert-expected-seq-fail' }),
+                sequenceBit: expect.objectContaining({
+                    val: 0,
+                    idx: 'assert-expected-seq-fail',
+                }),
             }),
         )
     })
@@ -103,7 +127,10 @@ describe('14.sequence.unit - Monotonic Sequence & OCC Concurrency Gating Battery
         expect(slv).toHaveBeenCalledWith(
             expect.objectContaining({
                 committedSeq: 6,
-                sequenceBit: expect.objectContaining({ val: 6, idx: 'commit-sequence-pass' }),
+                sequenceBit: expect.objectContaining({
+                    val: 6,
+                    idx: 'commit-sequence-pass',
+                }),
             }),
         )
     })
@@ -119,7 +146,10 @@ describe('14.sequence.unit - Monotonic Sequence & OCC Concurrency Gating Battery
         expect(slv).toHaveBeenCalledWith(
             expect.objectContaining({
                 err: expect.stringContaining('SEQUENCE_VIOLATION'),
-                sequenceBit: expect.objectContaining({ val: 0, idx: 'commit-sequence-fail' }),
+                sequenceBit: expect.objectContaining({
+                    val: 0,
+                    idx: 'commit-sequence-fail',
+                }),
             }),
         )
     })
