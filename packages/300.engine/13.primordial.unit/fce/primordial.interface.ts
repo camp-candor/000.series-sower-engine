@@ -1,7 +1,70 @@
-// import  PrimordialBit  from "./primordial.bit.js";
+/**
+ * 13.primordial.unit - Primordial Genesis Interface Contracts
+ * Byte-0 universe baseline payloads, Genesis state seeding, and Merkle root locks.
+ */
+
+export interface PrimordialEntitySeed {
+    readonly entityId: string
+    readonly locationId: string
+    readonly coordQ: number
+    readonly coordR: number
+    readonly armsAvailable: number // [0, 2]
+    readonly legsAvailable: number // [0, 2]
+    readonly locomotionTier: 'UNRESTRICTED' | 'LIMPING' | 'IMMOBILIZED'
+    readonly concussionLevel: number // [0, 3]
+    readonly fatigueBps: number // [0, 10000]
+    readonly painBps: number // [0, 10000]
+    readonly refusalStrainBps: number // [0, 10000]
+    readonly openWounds: readonly string[]
+    readonly bannedKineticVerbs: readonly string[]
+    readonly heldItems: readonly string[]
+    readonly wornGear: readonly string[]
+    readonly slungItems: readonly string[]
+    readonly cachedItems: readonly string[]
+}
+
+export interface PrimordialGrievanceSeed {
+    readonly grievanceId: string
+    readonly instigatorId: string
+    readonly victimId: string
+    readonly escalationDepth: number
+    readonly cooldownCycles: number
+    readonly intensityBps: number // [0, 10000]
+    readonly status: 'DORMANT' | 'ACTIVE' | 'SIMMERING' | 'RESOLVED'
+}
+
+export interface PrimordialClockSeed {
+    readonly clockId: string
+    readonly entityId: string
+    readonly clockName: string
+    readonly valueBps: number // [0, 10000]
+    readonly thresholdBps: number // [0, 10000]
+    readonly decayRateBps: number // [0, 10000]
+}
+
+export interface PrimordialBaselinePayload {
+    readonly seriesSlug: string
+    readonly founderTokenId: string
+    readonly originLocationId: string
+    readonly entities: readonly PrimordialEntitySeed[]
+    readonly grievances: readonly PrimordialGrievanceSeed[]
+    readonly clocks: readonly PrimordialClockSeed[]
+}
+
+export interface GenesisSeedingResult {
+    readonly seeded: boolean
+    readonly seriesSlug: string
+    readonly hRoot: string
+    readonly eventHash: string
+    readonly entitiesCount: number
+    readonly grievancesCount: number
+    readonly clocksCount: number
+    readonly seededAtMs: number
+}
 
 export default interface Primordial {
-    // idx:string;
-    // primordialBitList: PrimordialBit[];
-    // primordialBits:any;
+    idx: string
+    hRoot: string
+    genesisSeeded: boolean
+    baseline: PrimordialBaselinePayload
 }
