@@ -16,6 +16,7 @@ export {
     addSceneDependency,
     queryWhyDirty,
     getFactCentralityTelemetry,
+    inspectContinuityDatabase,
 } from './buz/database.buzz.js'
 export type {
     EventLogRecord,

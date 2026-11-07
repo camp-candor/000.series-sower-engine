@@ -46,6 +46,9 @@ program
     .option('--trigger-audit')
     .option('--audit-triggers')
     .option('--audit-stage-0')
+    .option('--continuity-audit')
+    .option('--audit-continuity')
+    .option('--inspect-continuity')
     .option('--run-all-levels')
     .option('--gauntlet')
     .option('--run-gauntlet')
@@ -1091,6 +1094,38 @@ const triggerAuditHeadless = async () => {
     }
 }
 
+const continuityAuditHeadless = async () => {
+    try {
+        const { DatabaseModel } = require(
+            path.resolve(
+                __dirname,
+                '../../packages/300.engine/02.database.unit/database.model.ts',
+            ),
+        )
+        const { inspectContinuityDatabase } = require(
+            path.resolve(
+                __dirname,
+                '../../packages/300.engine/02.database.unit/buz/database.buzz.ts',
+            ),
+        )
+        const model = new DatabaseModel()
+        const consoleMock = {
+            hunt: async (_act: string, bale: any) => {
+                if (bale?.src) {
+                    console.log(bale.src)
+                }
+            },
+        }
+        await inspectContinuityDatabase(model, undefined, consoleMock as any)
+        process.exit(0)
+    } catch (err: any) {
+        console.error(
+            `:: [CONTINUITY:FAIL] Headless execution failed: ${err?.message ?? err}`,
+        )
+        process.exit(1)
+    }
+}
+
 const formatCompilationFeedback = (rawOutput: string): void => {
     const lines = rawOutput.split(/\r?\n/).filter((l) => l.trim().length > 0)
     const errorPattern = /^(.+?)\((\d+),(\d+)\):\s*error\s*(TS\d+):\s*(.+)$/
@@ -1270,6 +1305,14 @@ const main = async () => {
         options.auditStage0
     ) {
         await triggerAuditHeadless()
+        return
+    }
+    if (
+        options.continuityAudit ||
+        options.auditContinuity ||
+        options.inspectContinuity
+    ) {
+        await continuityAuditHeadless()
         return
     }
     if (options.gauntlet || options.runGauntlet) {

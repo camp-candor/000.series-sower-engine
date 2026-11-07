@@ -4,7 +4,10 @@ import * as ActOlm from '../../00.engine.unit/engine.action.js'
 import * as ActSeq from '../../14.sequence.unit/sequence.action.js'
 import * as ActDba from '../../02.database.unit/database.action.js'
 import { DatabaseModel } from '../../02.database.unit/database.model.js'
-import { auditDatabaseTriggers } from '../../02.database.unit/buz/database.buzz.js'
+import {
+    auditDatabaseTriggers,
+    inspectContinuityDatabase,
+} from '../../02.database.unit/buz/database.buzz.js'
 
 import type { MenuModel } from '../menu.model.js'
 import type MenuBit from '../fce/menu.bit.js'
@@ -96,6 +99,8 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         'AUDIT SEQUENCE CONCURRENCY GATE',
         'INSPECT RELATIONAL LEDGER TABLES',
         'AUDIT RELATIONAL INTEGRITY TRIGGERS',
+        '[4] INSPECT CONTINUITY & DIRTY SCENES',
+        'Inspect Continuity & Dirty Scenes',
         'ROOT MENU',
         ActOlm.UPDATE_ENGINE.split(']')[1],
         ActOlm.TEST_ENGINE.split(']')[1],
@@ -150,6 +155,10 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             'Audit Four-Vector relational integrity triggers and immutability tripwires.',
         '[3] EXECUTE STAGE 0 AUDIT PROBES':
             'Audit Four-Vector relational integrity triggers and immutability tripwires.',
+        '[4] INSPECT CONTINUITY & DIRTY SCENES':
+            'Inspect flat continuity table invalidations, monotonic version guards, and dirty scenes.',
+        'Inspect Continuity & Dirty Scenes':
+            'Inspect flat continuity table invalidations, monotonic version guards, and dirty scenes.',
         'ROOT MENU': 'Return to the master runner switchboard.',
     }
 
@@ -441,6 +450,17 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             await auditDatabaseTriggers(
                 new DatabaseModel(),
                 { idx: 'audit-triggers' },
+                ste,
+            )
+            break
+        }
+
+        case '[4] INSPECT CONTINUITY & DIRTY SCENES':
+        case 'INSPECT CONTINUITY & DIRTY SCENES':
+        case 'Inspect Continuity & Dirty Scenes': {
+            await inspectContinuityDatabase(
+                new DatabaseModel(),
+                { idx: 'inspect-continuity' },
                 ste,
             )
             break

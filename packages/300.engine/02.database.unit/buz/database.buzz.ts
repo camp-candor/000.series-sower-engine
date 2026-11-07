@@ -615,7 +615,7 @@ export const getFactCentralityTelemetry = async (
 
     await emitConsole(
         ste,
-        `>> [TELEMETRY] Centrality computed across ${telemetry.length} canonical facts.`,
+        '>> [TELEMETRY] Centrality computed across canonical facts.',
     )
 
     if (bal?.slv) {
@@ -933,6 +933,110 @@ export const auditDatabaseTriggers = async (
         bal.slv({
             databaseBit: {
                 idx: 'audit-triggers-pass',
+                val: 1,
+            },
+        })
+    }
+    return cpy
+}
+
+export const inspectContinuityDatabase = async (
+    cpy: DatabaseModel,
+    bal?: DatabaseBit,
+    ste?: State,
+): Promise<DatabaseModel> => {
+    await ensureSchemaDatabase(cpy, undefined, ste)
+
+    await insertFact(
+        cpy,
+        {
+            idx: 'f1',
+            dat: {
+                fact: {
+                    id: 'fact_silas_arm',
+                    claim_text: 'Silas right brachial plexus is intact.',
+                    scope: 'CHARACTER',
+                    authority_level: 'CANON',
+                    standing: 'ACTIVE_ENDORSED',
+                    author: 'showrunner',
+                    version: 1,
+                    timestamp_ms: 1700000000000,
+                    last_edited_at_ms: 1700000000000,
+                },
+            },
+        },
+        undefined,
+    )
+
+    await registerScene(
+        cpy,
+        {
+            idx: 's1',
+            dat: {
+                scene: {
+                    id: 'ep101_sc03',
+                    episode_num: 101,
+                    scene_num: 3,
+                    text: 'Silas lifts the iron bar.',
+                    status: 'clean',
+                    is_dirty: 0,
+                    created_at_ms: 1700000000000,
+                    updated_at_ms: 1700000000000,
+                },
+            },
+        },
+        undefined,
+    )
+
+    await addSceneDependency(
+        cpy,
+        {
+            idx: 'd1',
+            dat: {
+                dependency: {
+                    scene_id: 'ep101_sc03',
+                    fact_id: 'fact_silas_arm',
+                    entity_type: 'character',
+                    pinned_version: 1,
+                    is_dirty: 0,
+                    created_at_ms: 1700000000000,
+                },
+            },
+        },
+        undefined,
+    )
+
+    await updateFactClaim(
+        cpy,
+        {
+            idx: 'bump',
+            dat: {
+                factId: 'fact_silas_arm',
+                newClaimText:
+                    'Silas right arm is supported by an experimental steel brace.',
+                newVersion: 2,
+            },
+        },
+        ste,
+    )
+
+    await queryWhyDirty(
+        cpy,
+        {
+            idx: 'why',
+            dat: {
+                sceneId: 'ep101_sc03',
+            },
+        },
+        ste,
+    )
+
+    await getFactCentralityTelemetry(cpy, undefined, ste)
+
+    if (bal?.slv) {
+        bal.slv({
+            databaseBit: {
+                idx: 'inspect-continuity-pass',
                 val: 1,
             },
         })
