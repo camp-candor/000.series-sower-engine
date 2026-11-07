@@ -44,7 +44,9 @@ async function emitConsole(ste: State | undefined, src: string): Promise<void> {
     }
 }
 
-export function computeBaselineHRoot(baseline: PrimordialBaselinePayload): string {
+export function computeBaselineHRoot(
+    baseline: PrimordialBaselinePayload,
+): string {
     const canonical = canonicalizeJson(baseline)
     return sha256Hex(canonical)
 }
@@ -137,7 +139,10 @@ export const seedPrimordialAction = async (
         const checkRes: any = await ste.hunt(ActDbs.QUERY_DATABASE, {
             dat: { table: 'event_log', key: 'evt_genesis_000' },
         })
-        if (checkRes?.databaseBit?.val === 1 && checkRes?.databaseBit?.dat?.record) {
+        if (
+            checkRes?.databaseBit?.val === 1 &&
+            checkRes?.databaseBit?.dat?.record
+        ) {
             cpy.genesisSeeded = true
             await emitConsole(
                 ste,
@@ -176,7 +181,9 @@ export const seedPrimordialAction = async (
                 pain_bps: ent.painBps,
                 refusal_strain_bps: ent.refusalStrainBps,
                 open_wounds_json: canonicalizeJson(ent.openWounds),
-                banned_kinetic_verbs_json: canonicalizeJson(ent.bannedKineticVerbs),
+                banned_kinetic_verbs_json: canonicalizeJson(
+                    ent.bannedKineticVerbs,
+                ),
                 held_items_json: canonicalizeJson(ent.heldItems),
                 worn_gear_json: canonicalizeJson(ent.wornGear),
                 slung_items_json: canonicalizeJson(ent.slungItems),
@@ -262,7 +269,10 @@ export const seedPrimordialAction = async (
             timestampMs: seededAtMs,
         }
 
-        const eventHash = computeChainedEventHash(GENESIS_HASH_64, unsealedEnvelope)
+        const eventHash = computeChainedEventHash(
+            GENESIS_HASH_64,
+            unsealedEnvelope,
+        )
 
         const eventRecord: EventLogRecord = {
             sequence_id: unsealedEnvelope.sequenceId,
@@ -378,11 +388,14 @@ export const verifyGenesisPrimordialAction = async (
             dat: { table: 'entities_live' },
         })
 
-        const hasGenesisEvent = eventRes?.databaseBit?.val === 1 && eventRes?.databaseBit?.dat?.record
+        const hasGenesisEvent =
+            eventRes?.databaseBit?.val === 1 &&
+            eventRes?.databaseBit?.dat?.record
         entitiesCount = entityRes?.databaseBit?.val || 0
         isSeeded = Boolean(hasGenesisEvent && entitiesCount > 0)
         if (hasGenesisEvent) {
-            recordedHash = eventRes.databaseBit.dat.record.state_hash || recordedHash
+            recordedHash =
+                eventRes.databaseBit.dat.record.state_hash || recordedHash
         }
     } else {
         isSeeded = cpy.genesisSeeded
