@@ -9,9 +9,7 @@ export {
     appendEvent,
     streamEvents,
 } from './buz/event.buzz.js'
-export {
-    createDefaultUpcasterRegistry,
-} from './event.model.js'
+export { createDefaultUpcasterRegistry } from './event.model.js'
 export type {
     CanonicalSimulationEventType,
     EventDomain,
@@ -28,9 +26,7 @@ export type {
     UnratifiedDetailStagedPayload,
     SimulationTickCommittedPayload,
 } from './fce/event.interface.js'
-export {
-    CURRENT_EVENT_VERSIONS,
-} from './fce/event.interface.js'
+export { CURRENT_EVENT_VERSIONS } from './fce/event.interface.js'
 export type {
     AppendEventParams,
     StreamEventsParams,

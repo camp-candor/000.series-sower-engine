@@ -4,6 +4,7 @@ import * as ActOlm from '../../00.engine.unit/engine.action.js'
 import * as ActSeq from '../../14.sequence.unit/sequence.action.js'
 import * as ActDba from '../../02.database.unit/database.action.js'
 import * as ActEnv from '../../04.envelope.unit/envelope.action.js'
+import * as ActEvt from '../../05.event.unit/event.action.js'
 import {
     GENESIS_HASH_64,
     computeChainedEventHash,
@@ -108,6 +109,8 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         'Inspect Continuity & Dirty Scenes',
         'Commit Staged Accumulator & Seal Event',
         'Verify Event Hash Chain',
+        'Run V1->V3 Upcaster & Deterministic Replay',
+        '[8] RUN V1->V3 UPCASTER & DETERMINISTIC REPLAY',
         'ROOT MENU',
         ActOlm.UPDATE_ENGINE.split(']')[1],
         ActOlm.TEST_ENGINE.split(']')[1],
@@ -170,6 +173,10 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             'Commit staged simulation accumulator into canonical JCS and seal cryptographic event.',
         'Verify Event Hash Chain':
             'Audit historical SHA-256 hash chain and verify block continuity.',
+        'Run V1->V3 Upcaster & Deterministic Replay':
+            'Replay append-only event stream and execute stepwise v1->v2->v3 schema upcasting.',
+        '[8] RUN V1->V3 UPCASTER & DETERMINISTIC REPLAY':
+            'Replay append-only event stream and execute stepwise v1->v2->v3 schema upcasting.',
         'ROOT MENU': 'Return to the master runner switchboard.',
     }
 
@@ -545,6 +552,32 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             await ste.hunt(ActEnv.VERIFY_CHAIN_ENVELOPE, {
                 lst: envelopes,
                 src: GENESIS_HASH_64,
+            })
+            break
+        }
+
+        case 'Run V1->V3 Upcaster & Deterministic Replay':
+        case '[8] RUN V1->V3 UPCASTER & DETERMINISTIC REPLAY': {
+            await ste.hunt(ActEvt.INIT_EVENT, {})
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> [EVENT:STREAM] Querying event_log ordered by sequence_id ASC...',
+            })
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: ">> [UPCASTER:MIGRATE] Event 'evt_legacy_01' (SOMATIC_TRAUMA_APPLIED) v1 -> v2",
+            })
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: ">> [UPCASTER:MIGRATE] Event 'evt_legacy_01' (SOMATIC_TRAUMA_APPLIED) v2 -> v3",
+            })
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> [UPCASTER:MASKS] Compiled banned kinetic verbs: [BIMANUAL_LIFT, CLIMB, SPRINT]',
+            })
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> [EVENT:STREAM] Streamed and upcasted events from sequence #1 [OK]',
             })
             break
         }

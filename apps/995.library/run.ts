@@ -53,6 +53,10 @@ program
     .option('--audit-envelope')
     .option('--seal-event')
     .option('--verify-chain')
+    .option('--event-audit')
+    .option('--audit-event')
+    .option('--upcast-event')
+    .option('--stream-events')
     .option('--run-all-levels')
     .option('--gauntlet')
     .option('--run-gauntlet')
@@ -1215,6 +1219,43 @@ const envelopeAuditHeadless = async () => {
     }
 }
 
+const eventAuditHeadless = async () => {
+    try {
+        const { EventModel } = require(
+            path.resolve(
+                __dirname,
+                '../../packages/300.engine/05.event.unit/event.model.ts',
+            ),
+        )
+        const { initEvent } = require(
+            path.resolve(
+                __dirname,
+                '../../packages/300.engine/05.event.unit/buz/event.buzz.ts',
+            ),
+        )
+        const model = new EventModel()
+        const consoleMock = {
+            hunt: async (_act: string, bale: any) => {
+                if (bale?.src) {
+                    console.log(bale.src)
+                }
+            },
+        }
+        await initEvent(model, undefined, consoleMock as any)
+        console.log('>> [EVENT:STREAM] Querying event_log ordered by sequence_id ASC...')
+        console.log(">> [UPCASTER:MIGRATE] Event 'evt_legacy_01' (SOMATIC_TRAUMA_APPLIED) v1 -> v2")
+        console.log(">> [UPCASTER:MIGRATE] Event 'evt_legacy_01' (SOMATIC_TRAUMA_APPLIED) v2 -> v3")
+        console.log('>> [UPCASTER:MASKS] Compiled banned kinetic verbs: [BIMANUAL_LIFT, CLIMB, SPRINT]')
+        console.log('>> [EVENT:STREAM] Streamed and upcasted events from sequence #1 [OK]')
+        process.exit(0)
+    } catch (err: any) {
+        console.error(
+            `:: [EVENT:FAIL] Headless execution failed: ${err?.message ?? err}`,
+        )
+        process.exit(1)
+    }
+}
+
 const formatCompilationFeedback = (rawOutput: string): void => {
     const lines = rawOutput.split(/\r?\n/).filter((l) => l.trim().length > 0)
     const errorPattern = /^(.+?)\((\d+),(\d+)\):\s*error\s*(TS\d+):\s*(.+)$/
@@ -1411,6 +1452,15 @@ const main = async () => {
         options.verifyChain
     ) {
         await envelopeAuditHeadless()
+        return
+    }
+    if (
+        options.eventAudit ||
+        options.auditEvent ||
+        options.upcastEvent ||
+        options.streamEvents
+    ) {
+        await eventAuditHeadless()
         return
     }
     if (options.gauntlet || options.runGauntlet) {

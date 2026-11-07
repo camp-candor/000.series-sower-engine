@@ -109,7 +109,10 @@ export type DomainEventPayloadMap = {
     SIMULATION_TICK_COMMITTED: SimulationTickCommittedPayload
 }
 
-export const CURRENT_EVENT_VERSIONS: Record<CanonicalSimulationEventType, number> = {
+export const CURRENT_EVENT_VERSIONS: Record<
+    CanonicalSimulationEventType,
+    number
+> = {
     SOMATIC_TRAUMA_APPLIED: 3,
     INVENTORY_TRANSFERRED: 1,
     LEVERAGE_STRING_MUTATED: 1,
@@ -134,15 +137,18 @@ export class EventUpcasterRegistry {
     }
 
     has(type: string, fromVersion: number): boolean {
-        return this.upcasters.has(`${type}:v${fromVersion}->v${fromVersion + 1}`)
+        return this.upcasters.has(
+            `${type}:v${fromVersion}->v${fromVersion + 1}`,
+        )
     }
 
     upcast<T = unknown>(envelope: EventEnvelope<any>): EventEnvelope<T> {
         let currentVersion = envelope.schemaVersion
         let currentPayload = envelope.payload
         const targetVersion =
-            CURRENT_EVENT_VERSIONS[envelope.eventType as CanonicalSimulationEventType] ||
-            envelope.schemaVersion
+            CURRENT_EVENT_VERSIONS[
+                envelope.eventType as CanonicalSimulationEventType
+            ] || envelope.schemaVersion
 
         while (currentVersion < targetVersion) {
             const key = `${envelope.eventType}:v${currentVersion}->v${currentVersion + 1}`

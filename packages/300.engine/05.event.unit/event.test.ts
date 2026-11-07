@@ -1,13 +1,7 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 import { EventModel } from './event.model.js'
-import {
-    upcastEvent,
-    appendEvent,
-    streamEvents,
-} from './buz/event.buzz.js'
-import {
-    APPEND_EVENT,
-} from './event.action.js'
+import { upcastEvent, appendEvent, streamEvents } from './buz/event.buzz.js'
+import { APPEND_EVENT } from './event.action.js'
 import { reducer } from './event.reduce.js'
 import type { EventEnvelope } from '../04.envelope.unit/fce/envelope.interface.js'
 import type { SomaticTraumaPayloadV3 } from './fce/event.interface.js'
@@ -51,10 +45,15 @@ describe('05.event.unit - Append-Only Event Stream & Upcaster Battery', () => {
         }
 
         const slv = vi.fn()
-        upcastEvent(model, { idx: 'test-upcast', dat: { envelope: legacyV1Envelope }, slv }, {} as any)
+        upcastEvent(
+            model,
+            { idx: 'test-upcast', dat: { envelope: legacyV1Envelope }, slv },
+            {} as any,
+        )
 
         expect(slv).toHaveBeenCalled()
-        const result = slv.mock.calls[0][0].envelope as EventEnvelope<SomaticTraumaPayloadV3>
+        const result = slv.mock.calls[0][0]
+            .envelope as EventEnvelope<SomaticTraumaPayloadV3>
 
         expect(result.schemaVersion).toBe(3)
         expect(result.payload.painBps).toBe(8000)
@@ -82,7 +81,11 @@ describe('05.event.unit - Append-Only Event Stream & Upcaster Battery', () => {
         }
 
         const slv = vi.fn()
-        upcastEvent(model, { idx: 'test-missing', dat: { envelope: unmigratedEnvelope }, slv }, {} as any)
+        upcastEvent(
+            model,
+            { idx: 'test-missing', dat: { envelope: unmigratedEnvelope }, slv },
+            {} as any,
+        )
 
         expect(slv).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -102,7 +105,10 @@ describe('05.event.unit - Append-Only Event Stream & Upcaster Battery', () => {
                 if (actionType === '[Database action] Query Database') {
                     // Simulate existing event found
                     return {
-                        databaseBit: { val: 1, dat: { record: { event_id: 'evt_existing_01' } } },
+                        databaseBit: {
+                            val: 1,
+                            dat: { record: { event_id: 'evt_existing_01' } },
+                        },
                     }
                 }
                 return {}
@@ -189,7 +195,12 @@ describe('05.event.unit - Append-Only Event Stream & Upcaster Battery', () => {
                     appendParams: {
                         eventId: 'evt_new_105',
                         eventType: 'LEVERAGE_STRING_MUTATED',
-                        payload: { holderId: 'char_bog', debtorId: 'char_wart', weightBps: 2000, deltaStrings: 1 },
+                        payload: {
+                            holderId: 'char_bog',
+                            debtorId: 'char_wart',
+                            weightBps: 2000,
+                            deltaStrings: 1,
+                        },
                         tick: 42,
                     },
                 },
@@ -200,8 +211,12 @@ describe('05.event.unit - Append-Only Event Stream & Upcaster Battery', () => {
 
         expect(dispatchedActions).toContain('[Database action] Query Database')
         expect(dispatchedActions).toContain('[Sequence action] Next Sequence')
-        expect(dispatchedActions).toContain('[Envelope action] Seal Event Envelope')
-        expect(dispatchedActions).toContain('[Database action] Exec Batch Database')
+        expect(dispatchedActions).toContain(
+            '[Envelope action] Seal Event Envelope',
+        )
+        expect(dispatchedActions).toContain(
+            '[Database action] Exec Batch Database',
+        )
         expect(dispatchedActions).toContain('[Sequence action] Commit Sequence')
 
         expect(model.lastSequenceId).toBe(105)
@@ -209,7 +224,10 @@ describe('05.event.unit - Append-Only Event Stream & Upcaster Battery', () => {
         expect(model.totalAppended).toBe(1)
         expect(slv).toHaveBeenCalledWith(
             expect.objectContaining({
-                eventBit: expect.objectContaining({ val: 105, idx: 'append-event-pass' }),
+                eventBit: expect.objectContaining({
+                    val: 105,
+                    idx: 'append-event-pass',
+                }),
             }),
         )
     })
@@ -289,13 +307,23 @@ describe('05.event.unit - Append-Only Event Stream & Upcaster Battery', () => {
             },
             {
                 hunt: async (actionType: string) => {
-                    if (actionType === '[Database action] Query Database') return { databaseBit: { val: 0 } }
-                    if (actionType === '[Sequence action] Next Sequence') return { nextSeq: 1 }
-                    if (actionType === '[Envelope action] Seal Event Envelope') return { envelope: { eventHash: '0000000000000000000000000000000000000000000000000000000000000000' } }
-                    if (actionType === '[Database action] Exec Batch Database') return { databaseBit: { val: 1 } }
-                    if (actionType === '[Sequence action] Commit Sequence') return { committedSeq: 1 }
+                    if (actionType === '[Database action] Query Database')
+                        return { databaseBit: { val: 0 } }
+                    if (actionType === '[Sequence action] Next Sequence')
+                        return { nextSeq: 1 }
+                    if (actionType === '[Envelope action] Seal Event Envelope')
+                        return {
+                            envelope: {
+                                eventHash:
+                                    '0000000000000000000000000000000000000000000000000000000000000000',
+                            },
+                        }
+                    if (actionType === '[Database action] Exec Batch Database')
+                        return { databaseBit: { val: 1 } }
+                    if (actionType === '[Sequence action] Commit Sequence')
+                        return { committedSeq: 1 }
                     return {}
-                }
+                },
             } as any,
         )) as EventModel
 

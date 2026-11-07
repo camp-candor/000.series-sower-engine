@@ -95,7 +95,9 @@ export const registerUpcaster = (
                 eventBit: {
                     idx: 'register-upcaster-fail',
                     val: 0,
-                    dat: { error: '[INVALID_UPCASTER_PARAMS] Missing eventType, fromVersion, or fn' },
+                    dat: {
+                        error: '[INVALID_UPCASTER_PARAMS] Missing eventType, fromVersion, or fn',
+                    },
                 },
             })
         }
@@ -115,7 +117,9 @@ export const upcastEvent = (
                 eventBit: {
                     idx: 'upcast-event-fail',
                     val: 0,
-                    dat: { error: '[MISSING_ENVELOPE] No envelope provided to upcast' },
+                    dat: {
+                        error: '[MISSING_ENVELOPE] No envelope provided to upcast',
+                    },
                 },
             })
         }
@@ -174,7 +178,10 @@ export const appendEvent = async (
         const queryRes: any = await ste.hunt(ActDbs.QUERY_DATABASE, {
             dat: { table: 'event_log', key: params.eventId },
         })
-        if (queryRes?.databaseBit?.val === 1 && queryRes?.databaseBit?.dat?.record) {
+        if (
+            queryRes?.databaseBit?.val === 1 &&
+            queryRes?.databaseBit?.dat?.record
+        ) {
             await emitConsole(
                 ste,
                 `>> [EVENT:IDEMPOTENT] Duplicate event '${params.eventId}' ignored without mutation.`,
@@ -205,7 +212,9 @@ export const appendEvent = async (
     // 3. Cryptographic Sealing via 04.envelope.unit
     const targetVersion =
         params.schemaVersion ||
-        CURRENT_EVENT_VERSIONS[params.eventType as CanonicalSimulationEventType] ||
+        CURRENT_EVENT_VERSIONS[
+            params.eventType as CanonicalSimulationEventType
+        ] ||
         1
 
     let sealedEnvelope: EventEnvelope
@@ -228,7 +237,9 @@ export const appendEvent = async (
         })
 
         if (!sealRes?.envelope) {
-            throw new Error(`[SEAL_FAILED] 04.envelope.unit failed to seal event envelope`)
+            throw new Error(
+                `[SEAL_FAILED] 04.envelope.unit failed to seal event envelope`,
+            )
         }
         sealedEnvelope = sealRes.envelope
     } else {
@@ -283,7 +294,8 @@ export const appendEvent = async (
         })
 
         if (dbRes?.databaseBit?.val === 0) {
-            const err = dbRes?.databaseBit?.dat?.error || 'Database insert rejected'
+            const err =
+                dbRes?.databaseBit?.dat?.error || 'Database insert rejected'
             throw new Error(`[APPEND_DB_FAILURE] ${err}`)
         }
 
@@ -311,7 +323,10 @@ export const appendEvent = async (
                 idx: 'append-event-pass',
                 val: sealedEnvelope.sequenceId,
                 src: sealedEnvelope.eventHash,
-                dat: { envelope: sealedEnvelope, totalCount: cpy.totalAppended },
+                dat: {
+                    envelope: sealedEnvelope,
+                    totalCount: cpy.totalAppended,
+                },
             },
         })
     }
@@ -389,7 +404,10 @@ export const streamEvents = async (
             eventBit: {
                 idx: 'stream-events-pass',
                 val: upgradedEnvelopes.length,
-                dat: { envelopes: upgradedEnvelopes, totalCount: upgradedEnvelopes.length },
+                dat: {
+                    envelopes: upgradedEnvelopes,
+                    totalCount: upgradedEnvelopes.length,
+                },
                 lst: upgradedEnvelopes,
             },
         })
