@@ -3,6 +3,11 @@ import * as ActMnu from '../menu.action.js'
 import * as ActOlm from '../../00.engine.unit/engine.action.js'
 import * as ActSeq from '../../14.sequence.unit/sequence.action.js'
 import * as ActDba from '../../02.database.unit/database.action.js'
+import * as ActEnv from '../../04.envelope.unit/envelope.action.js'
+import {
+    GENESIS_HASH_64,
+    computeChainedEventHash,
+} from '../../04.envelope.unit/envelope.buzzer.js'
 import { DatabaseModel } from '../../02.database.unit/database.model.js'
 import {
     auditDatabaseTriggers,
@@ -101,6 +106,8 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         'AUDIT RELATIONAL INTEGRITY TRIGGERS',
         '[4] INSPECT CONTINUITY & DIRTY SCENES',
         'Inspect Continuity & Dirty Scenes',
+        'Commit Staged Accumulator & Seal Event',
+        'Verify Event Hash Chain',
         'ROOT MENU',
         ActOlm.UPDATE_ENGINE.split(']')[1],
         ActOlm.TEST_ENGINE.split(']')[1],
@@ -159,6 +166,10 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             'Inspect flat continuity table invalidations, monotonic version guards, and dirty scenes.',
         'Inspect Continuity & Dirty Scenes':
             'Inspect flat continuity table invalidations, monotonic version guards, and dirty scenes.',
+        'Commit Staged Accumulator & Seal Event':
+            'Commit staged simulation accumulator into canonical JCS and seal cryptographic event.',
+        'Verify Event Hash Chain':
+            'Audit historical SHA-256 hash chain and verify block continuity.',
         'ROOT MENU': 'Return to the master runner switchboard.',
     }
 
@@ -463,6 +474,78 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
                 { idx: 'inspect-continuity' },
                 ste,
             )
+            break
+        }
+
+        case 'Commit Staged Accumulator & Seal Event':
+        case 'COMMIT STAGED ACCUMULATOR & SEAL EVENT': {
+            await ste.hunt(ActEnv.INIT_ENVELOPE, {})
+            await ste.hunt(ActEnv.SEAL_EVENT_ENVELOPE, {
+                dat: {
+                    eventId: 'evt_som_202',
+                    sequenceId: 105,
+                    tick: 1,
+                    eventType: 'SOMATIC_TRAUMA_APPLIED',
+                    payload: { actorId: 'char_bog', painBps: 2500 },
+                },
+            })
+            const envelopes: any[] = []
+            let prevHash = GENESIS_HASH_64
+            for (let i = 1; i <= 142; i++) {
+                const raw = {
+                    eventId: `evt_block_${i}`,
+                    streamId: 'main',
+                    sequenceId: i,
+                    tick: i,
+                    eventType: 'SIMULATION_TICK_COMMITTED',
+                    schemaVersion: 1,
+                    seed: `seed_${i}`,
+                    payload: { tick: i },
+                    prevEventHash: prevHash,
+                    stateHash: '0'.repeat(64),
+                    timestampMs: 1000 + i,
+                }
+                const hash = computeChainedEventHash(prevHash, raw)
+                envelopes.push({ ...raw, eventHash: hash })
+                prevHash = hash
+            }
+            await ste.hunt(ActEnv.VERIFY_CHAIN_ENVELOPE, {
+                lst: envelopes,
+                src: GENESIS_HASH_64,
+            })
+            await ste.hunt(ActEnv.HASH_STATE_ENVELOPE, {
+                dat: { rawObject: { tick: 1, sequenceId: 105 } },
+            })
+            break
+        }
+
+        case 'Verify Event Hash Chain':
+        case 'VERIFY EVENT HASH CHAIN': {
+            await ste.hunt(ActEnv.INIT_ENVELOPE, {})
+            const envelopes: any[] = []
+            let prevHash = GENESIS_HASH_64
+            for (let i = 1; i <= 142; i++) {
+                const raw = {
+                    eventId: `evt_block_${i}`,
+                    streamId: 'main',
+                    sequenceId: i,
+                    tick: i,
+                    eventType: 'SIMULATION_TICK_COMMITTED',
+                    schemaVersion: 1,
+                    seed: `seed_${i}`,
+                    payload: { tick: i },
+                    prevEventHash: prevHash,
+                    stateHash: '0'.repeat(64),
+                    timestampMs: 1000 + i,
+                }
+                const hash = computeChainedEventHash(prevHash, raw)
+                envelopes.push({ ...raw, eventHash: hash })
+                prevHash = hash
+            }
+            await ste.hunt(ActEnv.VERIFY_CHAIN_ENVELOPE, {
+                lst: envelopes,
+                src: GENESIS_HASH_64,
+            })
             break
         }
 

@@ -16,15 +16,11 @@ export {
     computeStateHash,
     verifyHashChain,
 } from './buz/envelope.buzz.js'
-export {
-    GENESIS_HASH_64,
-} from './envelope.model.js'
+export { GENESIS_HASH_64 } from './envelope.model.js'
 export type {
     EventEnvelope,
     SpatialProof,
     HashChainValidationReport,
     StateHashReceipt,
 } from './fce/envelope.interface.js'
-export type {
-    EnvelopePayload,
-} from './fce/envelope.bit.js'
+export type { EnvelopePayload } from './fce/envelope.bit.js'

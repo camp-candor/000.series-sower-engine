@@ -74,7 +74,11 @@ export function canonicalizeJson(value: unknown): string {
 
         for (const key of sortedKeys) {
             const val = (value as Record<string, unknown>)[key]
-            if (val !== undefined && typeof val !== 'function' && typeof val !== 'symbol') {
+            if (
+                val !== undefined &&
+                typeof val !== 'function' &&
+                typeof val !== 'symbol'
+            ) {
                 entries.push(
                     `${JSON.stringify(key.normalize('NFC'))}:${canonicalizeJson(val)}`,
                 )
@@ -159,7 +163,10 @@ export function verifyHashChain(
 
         // Re-evaluate canonical hash
         const { eventHash, ...withoutHash } = envelope
-        const recomputedHash = computeChainedEventHash(previousHash, withoutHash)
+        const recomputedHash = computeChainedEventHash(
+            previousHash,
+            withoutHash,
+        )
 
         if (recomputedHash !== eventHash) {
             return {
@@ -270,16 +277,22 @@ export const sealEventEnvelopeAction = async (
     try {
         const raw = bal.dat
         if (!raw || !raw.eventId || raw.sequenceId === undefined) {
-            throw new Error('[INVALID_ENVELOPE_DATA] Missing mandatory envelope fields')
+            throw new Error(
+                '[INVALID_ENVELOPE_DATA] Missing mandatory envelope fields',
+            )
         }
 
         const prevHash = raw.prevEventHash || cpy.lastSealedHash
         if (!HEX_64_REGEX.test(prevHash)) {
-            throw new Error(`[INVALID_PREV_HASH] prevEventHash must be a 64-char hex string: ${prevHash}`)
+            throw new Error(
+                `[INVALID_PREV_HASH] prevEventHash must be a 64-char hex string: ${prevHash}`,
+            )
         }
 
         if (raw.spatialProof && !isValidSpatialProof(raw.spatialProof)) {
-            throw new Error('[INVALID_SPATIAL_PROOF] SpatialProof contains non-64-hex hash elements')
+            throw new Error(
+                '[INVALID_SPATIAL_PROOF] SpatialProof contains non-64-hex hash elements',
+            )
         }
 
         const envelopeWithoutHash: Omit<EventEnvelope, 'eventHash'> = {
@@ -411,9 +424,7 @@ export const verifyChainEnvelopeAction = async (
         bal.slv({
             report,
             envelopeBit: {
-                idx: report.valid
-                    ? 'verify-chain-pass'
-                    : 'verify-chain-fail',
+                idx: report.valid ? 'verify-chain-pass' : 'verify-chain-fail',
                 val: report.valid ? 1 : 0,
                 src: report.headHash,
                 dat: { report, error: report.error },
@@ -435,7 +446,9 @@ export const validateSpatialProofAction = (
         bal.slv({
             isValidSpatial: isValid,
             envelopeBit: {
-                idx: isValid ? 'validate-spatial-pass' : 'validate-spatial-fail',
+                idx: isValid
+                    ? 'validate-spatial-pass'
+                    : 'validate-spatial-fail',
                 val: isValid ? 1 : 0,
                 dat: { isValidSpatial: isValid },
             },
@@ -443,4 +456,3 @@ export const validateSpatialProofAction = (
     }
     return cpy
 }
-

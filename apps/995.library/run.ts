@@ -49,6 +49,10 @@ program
     .option('--continuity-audit')
     .option('--audit-continuity')
     .option('--inspect-continuity')
+    .option('--envelope-audit')
+    .option('--audit-envelope')
+    .option('--seal-event')
+    .option('--verify-chain')
     .option('--run-all-levels')
     .option('--gauntlet')
     .option('--run-gauntlet')
@@ -1126,6 +1130,91 @@ const continuityAuditHeadless = async () => {
     }
 }
 
+const envelopeAuditHeadless = async () => {
+    try {
+        const { EnvelopeModel } = require(
+            path.resolve(
+                __dirname,
+                '../../packages/300.engine/04.envelope.unit/envelope.model.ts',
+            ),
+        )
+        const {
+            initEnvelope,
+            sealEventEnvelopeAction,
+            verifyChainEnvelopeAction,
+            hashStateEnvelopeAction,
+            computeChainedEventHash,
+            GENESIS_HASH_64,
+        } = require(
+            path.resolve(
+                __dirname,
+                '../../packages/300.engine/04.envelope.unit/envelope.buzzer.ts',
+            ),
+        )
+        const model = new EnvelopeModel()
+        const consoleMock = {
+            hunt: async (_act: string, bale: any) => {
+                if (bale?.src) {
+                    console.log(bale.src)
+                }
+            },
+        }
+        await initEnvelope(model, undefined, consoleMock as any)
+        await sealEventEnvelopeAction(
+            model,
+            {
+                dat: {
+                    eventId: 'evt_som_202',
+                    sequenceId: 105,
+                    tick: 1,
+                    eventType: 'SOMATIC_TRAUMA_APPLIED',
+                    payload: { actorId: 'char_bog', painBps: 2500 },
+                },
+            },
+            consoleMock as any,
+        )
+
+        const envelopes: any[] = []
+        let prevHash = GENESIS_HASH_64
+        for (let i = 1; i <= 142; i++) {
+            const raw = {
+                eventId: `evt_block_${i}`,
+                streamId: 'main',
+                sequenceId: i,
+                tick: i,
+                eventType: 'SIMULATION_TICK_COMMITTED',
+                schemaVersion: 1,
+                seed: `seed_${i}`,
+                payload: { tick: i },
+                prevEventHash: prevHash,
+                stateHash: '0'.repeat(64),
+                timestampMs: 1000 + i,
+            }
+            const hash = computeChainedEventHash(prevHash, raw)
+            envelopes.push({ ...raw, eventHash: hash })
+            prevHash = hash
+        }
+
+        await verifyChainEnvelopeAction(
+            model,
+            { lst: envelopes, src: GENESIS_HASH_64 },
+            consoleMock as any,
+        )
+
+        await hashStateEnvelopeAction(
+            model,
+            { dat: { rawObject: { tick: 1, sequenceId: 105 } } },
+            consoleMock as any,
+        )
+        process.exit(0)
+    } catch (err: any) {
+        console.error(
+            `:: [ENVELOPE:FAIL] Headless execution failed: ${err?.message ?? err}`,
+        )
+        process.exit(1)
+    }
+}
+
 const formatCompilationFeedback = (rawOutput: string): void => {
     const lines = rawOutput.split(/\r?\n/).filter((l) => l.trim().length > 0)
     const errorPattern = /^(.+?)\((\d+),(\d+)\):\s*error\s*(TS\d+):\s*(.+)$/
@@ -1313,6 +1402,15 @@ const main = async () => {
         options.inspectContinuity
     ) {
         await continuityAuditHeadless()
+        return
+    }
+    if (
+        options.envelopeAudit ||
+        options.auditEnvelope ||
+        options.sealEvent ||
+        options.verifyChain
+    ) {
+        await envelopeAuditHeadless()
         return
     }
     if (options.gauntlet || options.runGauntlet) {

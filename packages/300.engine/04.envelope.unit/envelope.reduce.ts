@@ -20,19 +20,39 @@ export function reducer(
             return Buzz.updateEnvelope(clone(model), act.bale, state)
 
         case Act.CANONICALIZE_ENVELOPE:
-            return Buzz.canonicalizeEnvelopeAction(clone(model), act.bale as any, state)
+            return Buzz.canonicalizeEnvelopeAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         case Act.SEAL_EVENT_ENVELOPE:
-            return Buzz.sealEventEnvelopeAction(clone(model), act.bale as any, state)
+            return Buzz.sealEventEnvelopeAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         case Act.HASH_STATE_ENVELOPE:
-            return Buzz.hashStateEnvelopeAction(clone(model), act.bale as any, state)
+            return Buzz.hashStateEnvelopeAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         case Act.VERIFY_CHAIN_ENVELOPE:
-            return Buzz.verifyChainEnvelopeAction(clone(model), act.bale as any, state)
+            return Buzz.verifyChainEnvelopeAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         case Act.VALIDATE_SPATIAL_PROOF:
-            return Buzz.validateSpatialProofAction(clone(model), act.bale as any, state)
+            return Buzz.validateSpatialProofAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         default:
             return model

@@ -58,12 +58,18 @@ describe('04.envelope.unit - RFC 8785 Canonical JCS & Hash Chain Sealer Battery'
     })
 
     it('rejects non-finite IEEE 754 numbers with TypeError', () => {
-        expect(() => canonicalizeJson({ val: NaN })).toThrow(/NON_FINITE_NUMBER_FORBIDDEN/)
-        expect(() => canonicalizeJson({ val: Infinity })).toThrow(/NON_FINITE_NUMBER_FORBIDDEN/)
+        expect(() => canonicalizeJson({ val: NaN })).toThrow(
+            /NON_FINITE_NUMBER_FORBIDDEN/,
+        )
+        expect(() => canonicalizeJson({ val: Infinity })).toThrow(
+            /NON_FINITE_NUMBER_FORBIDDEN/,
+        )
     })
 
     it('rejects floating-point numbers with FLOAT_PROHIBITED', () => {
-        expect(() => canonicalizeJson({ val: 12.34 })).toThrow(/FLOAT_PROHIBITED/)
+        expect(() => canonicalizeJson({ val: 12.34 })).toThrow(
+            /FLOAT_PROHIBITED/,
+        )
     })
 
     it('validates Spatial Audit Quadruple structure', () => {
@@ -191,8 +197,14 @@ describe('04.envelope.unit - RFC 8785 Canonical JCS & Hash Chain Sealer Battery'
     })
 
     it('computes composite state hash deterministically across inverted keys', () => {
-        const stateA = { entities: { bog: { hp: 10 } }, clocks: { paranoia: 500 } }
-        const stateB = { clocks: { paranoia: 500 }, entities: { bog: { hp: 10 } } }
+        const stateA = {
+            entities: { bog: { hp: 10 } },
+            clocks: { paranoia: 500 },
+        }
+        const stateB = {
+            clocks: { paranoia: 500 },
+            entities: { bog: { hp: 10 } },
+        }
 
         const hashA = computeStateHash(stateA)
         const hashB = computeStateHash(stateB)
