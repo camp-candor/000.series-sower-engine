@@ -11,7 +11,7 @@ import type {
     SpatialNodeDescriptor,
     PortalRecord,
     PortalStatus,
-    TraversalRequest,
+
     TraversalReceipt,
     TopologyValidationReport,
 } from '../fce/location.interface.js'

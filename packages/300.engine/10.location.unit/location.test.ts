@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
-import { LocationModel, BASELINE_TOPOLOGY_LOCATIONS } from './location.model.js'
+import { LocationModel,  } from './location.model.js'
 import {
     initLocation,
     setPortalLockAction,
     checkPortalCrossingAction,
     traverseLocationAction,
-    auditTopologyAction,
+
     auditTopologySymmetry,
-    validateLocationAdjacency,
+
 } from './buz/location.buzz.js'
 import { TRAVERSE_LOCATION } from './location.action.js'
 import { reducer } from './location.reduce.js'
