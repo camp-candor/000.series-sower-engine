@@ -44,7 +44,8 @@ describe('09.leverage.unit - Anti-Reflexive Directional Social Debt Battery', ()
             model,
             {
                 idx: 'test-self',
-                dat: { // @ts-ignore
+                dat: {
+                    // @ts-ignore
 
                     holder_id: 'char_bog',
                     debtor_id: 'char_bog',
@@ -70,7 +71,8 @@ describe('09.leverage.unit - Anti-Reflexive Directional Social Debt Battery', ()
             model,
             {
                 idx: 'test-mutate',
-                dat: { // @ts-ignore
+                dat: {
+                    // @ts-ignore
 
                     holder_id: 'char_bog',
                     debtor_id: 'char_wart',
@@ -101,7 +103,8 @@ describe('09.leverage.unit - Anti-Reflexive Directional Social Debt Battery', ()
             model,
             {
                 idx: 'test-float',
-                dat: { // @ts-ignore
+                dat: {
+                    // @ts-ignore
 
                     holder_id: 'char_bog',
                     debtor_id: 'char_wart',
@@ -135,7 +138,8 @@ describe('09.leverage.unit - Anti-Reflexive Directional Social Debt Battery', ()
             model,
             {
                 idx: 'test-overdraft',
-                dat: { // @ts-ignore
+                dat: {
+                    // @ts-ignore
 
                     holder_id: 'char_bog',
                     debtor_id: 'char_wart',
@@ -169,7 +173,8 @@ describe('09.leverage.unit - Anti-Reflexive Directional Social Debt Battery', ()
             model,
             {
                 idx: 'test-spend',
-                dat: { // @ts-ignore
+                dat: {
+                    // @ts-ignore
 
                     holder_id: 'char_bog',
                     debtor_id: 'char_wart',
@@ -200,7 +205,11 @@ describe('09.leverage.unit - Anti-Reflexive Directional Social Debt Battery', ()
         })
 
         const slv = vi.fn()
-        await Buzz.auditLeverageSolvencyAction(model, { idx: 'audit', slv }, mockState)
+        await Buzz.auditLeverageSolvencyAction(
+            model,
+            { idx: 'audit', slv },
+            mockState,
+        )
 
         expect(slv).toHaveBeenCalled()
         const report = slv.mock.calls[0][0].auditReport
@@ -216,7 +225,8 @@ describe('09.leverage.unit - Anti-Reflexive Directional Social Debt Battery', ()
                 type: MUTATE_LEVERAGE_STRINGS,
                 bale: {
                     idx: 'reducer-mutate',
-                    dat: { // @ts-ignore
+                    dat: {
+                        // @ts-ignore
 
                         holder_id: 'char_bog',
                         debtor_id: 'char_wart',

@@ -6,7 +6,7 @@ import { LeverageModel } from '../leverage.model.js'
 import type LeverageBit from '../fce/leverage.bit.js'
 import type {
     StringsLedgerRecord,
-        LeverageSpendReceipt,
+    LeverageSpendReceipt,
     LeverageAuditReport,
 } from '../fce/leverage.interface.js'
 import * as ActDbs from '../../02.database.unit/database.action.js'
@@ -72,7 +72,8 @@ export const initLeverage = async (
             dat: { table: 'strings_ledger' },
         })
         if (queryRes?.databaseBit?.dat?.records) {
-            for (const r of queryRes.databaseBit.dat.records as StringsLedgerRecord[]) {
+            for (const r of queryRes.databaseBit.dat
+                .records as StringsLedgerRecord[]) {
                 cpy.records.set(r.relation_id, r)
             }
         }
@@ -240,7 +241,10 @@ export const mutateStringLeverage = async (
         const errorMsg = err.message || String(err)
         const isFloat = errorMsg.includes('FLOAT_PROHIBITED')
         const tag = isFloat ? '[FLOAT_PROHIBITED]' : '[MUTATION_FAILED]'
-        await emitConsole(ste, `:: [FAIL] Leverage mutation rejected: ${errorMsg}`)
+        await emitConsole(
+            ste,
+            `:: [FAIL] Leverage mutation rejected: ${errorMsg}`,
+        )
         if (bal.slv) {
             bal.slv({
                 levBit: {
@@ -293,7 +297,10 @@ export const spendStringLeverage = async (
         const queryRes: any = await ste.hunt(ActDbs.QUERY_DATABASE, {
             dat: { table: 'strings_ledger', key: relation_id },
         })
-        if (queryRes?.databaseBit?.val === 1 && queryRes?.databaseBit?.dat?.record) {
+        if (
+            queryRes?.databaseBit?.val === 1 &&
+            queryRes?.databaseBit?.dat?.record
+        ) {
             record = queryRes.databaseBit.dat.record as StringsLedgerRecord
             cpy.records.set(relation_id, record)
         }

@@ -20,19 +20,39 @@ export function reducer(
             return Buzz.updateEntity(clone(model), act.bale, state)
 
         case Act.ASSEMBLE_ENTITY:
-            return Buzz.assembleEntityAction(clone(model), act.bale as any, state)
+            return Buzz.assembleEntityAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         case Act.UPSERT_ENTITY_LIVE:
-            return Buzz.upsertEntityLiveAction(clone(model), act.bale as any, state)
+            return Buzz.upsertEntityLiveAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         case Act.GET_ENTITY_LIVE:
-            return Buzz.getEntityLiveAction(clone(model), act.bale as any, state)
+            return Buzz.getEntityLiveAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         case Act.LIST_ENTITIES_BY_LOCATION:
-            return Buzz.listEntitiesByLocationAction(clone(model), act.bale as any, state)
+            return Buzz.listEntitiesByLocationAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         case Act.HYDRATE_ALL_ENTITIES:
-            return Buzz.hydrateAllEntitiesAction(clone(model), act.bale as any, state)
+            return Buzz.hydrateAllEntitiesAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         default:
             return model

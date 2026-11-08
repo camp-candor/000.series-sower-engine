@@ -29,7 +29,9 @@ async function emitConsole(ste: State | undefined, src: string): Promise<void> {
     }
 }
 
-export function serializeEntityToDbRow(state: CompositeEntityState): EntityLiveDbRow {
+export function serializeEntityToDbRow(
+    state: CompositeEntityState,
+): EntityLiveDbRow {
     return {
         entity_id: state.entityId,
         location_id: state.locationId,
@@ -52,7 +54,9 @@ export function serializeEntityToDbRow(state: CompositeEntityState): EntityLiveD
     }
 }
 
-export function deserializeDbRowToEntity(row: EntityLiveDbRow): CompositeEntityState {
+export function deserializeDbRowToEntity(
+    row: EntityLiveDbRow,
+): CompositeEntityState {
     let openWounds: string[] = []
     let bannedKineticVerbs: string[] = []
     let heldItems: string[] = []
@@ -125,22 +129,34 @@ export function assembleCompositeEntity(
     const ts = params.timestampMs || existing?.updatedAtMs || 1700000000000
     return {
         entityId: params.entityId,
-        locationId: params.locationId ?? existing?.locationId ?? 'loc_the_warm_pipe',
+        locationId:
+            params.locationId ?? existing?.locationId ?? 'loc_the_warm_pipe',
         q: params.q ?? existing?.q ?? 0,
         r: params.r ?? existing?.r ?? 0,
         armsAvailable: params.armsAvailable ?? existing?.armsAvailable ?? 2,
         legsAvailable: params.legsAvailable ?? existing?.legsAvailable ?? 2,
-        locomotionTier: params.locomotionTier ?? existing?.locomotionTier ?? 'UNRESTRICTED',
-        concussionLevel: params.concussionLevel ?? existing?.concussionLevel ?? 0,
+        locomotionTier:
+            params.locomotionTier ?? existing?.locomotionTier ?? 'UNRESTRICTED',
+        concussionLevel:
+            params.concussionLevel ?? existing?.concussionLevel ?? 0,
         fatigueBps: params.fatigueBps ?? existing?.fatigueBps ?? 0,
         painBps: params.painBps ?? existing?.painBps ?? 0,
-        refusalStrainBps: params.refusalStrainBps ?? existing?.refusalStrainBps ?? 0,
-        openWounds: Object.freeze(params.openWounds ?? existing?.openWounds ?? []),
-        bannedKineticVerbs: Object.freeze(params.bannedKineticVerbs ?? existing?.bannedKineticVerbs ?? []),
+        refusalStrainBps:
+            params.refusalStrainBps ?? existing?.refusalStrainBps ?? 0,
+        openWounds: Object.freeze(
+            params.openWounds ?? existing?.openWounds ?? [],
+        ),
+        bannedKineticVerbs: Object.freeze(
+            params.bannedKineticVerbs ?? existing?.bannedKineticVerbs ?? [],
+        ),
         heldItems: Object.freeze(params.heldItems ?? existing?.heldItems ?? []),
         wornGear: Object.freeze(params.wornGear ?? existing?.wornGear ?? {}),
-        slungItems: Object.freeze(params.slungItems ?? existing?.slungItems ?? []),
-        cachedItems: Object.freeze(params.cachedItems ?? existing?.cachedItems ?? []),
+        slungItems: Object.freeze(
+            params.slungItems ?? existing?.slungItems ?? [],
+        ),
+        cachedItems: Object.freeze(
+            params.cachedItems ?? existing?.cachedItems ?? [],
+        ),
         updatedAtMs: ts,
     }
 }
@@ -272,7 +288,8 @@ export const upsertEntityLiveAction = async (
         })
 
         if (dbRes?.databaseBit?.val === 0) {
-            const err = dbRes?.databaseBit?.dat?.error || 'Database upsert rejected'
+            const err =
+                dbRes?.databaseBit?.dat?.error || 'Database upsert rejected'
             throw new Error(`[ENTITY_DB_UPSERT_FAILURE] ${err}`)
         }
     }
@@ -325,7 +342,10 @@ export const getEntityLiveAction = async (
             dat: { table: 'entities_live', key: entityId },
         })
 
-        if (queryRes?.databaseBit?.val === 1 && queryRes?.databaseBit?.dat?.record) {
+        if (
+            queryRes?.databaseBit?.val === 1 &&
+            queryRes?.databaseBit?.dat?.record
+        ) {
             found = deserializeDbRowToEntity(queryRes.databaseBit.dat.record)
             cpy.entities.set(entityId, found)
         }
@@ -433,4 +453,3 @@ export const hydrateAllEntitiesAction = async (
 
     return cpy
 }
-

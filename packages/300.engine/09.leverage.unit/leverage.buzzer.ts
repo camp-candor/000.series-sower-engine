@@ -20,6 +20,4 @@ export type {
     LeverageSpendReceipt,
     LeverageAuditReport,
 } from './fce/leverage.interface.js'
-export type {
-    LeveragePayload,
-} from './fce/leverage.bit.js'
+export type { LeveragePayload } from './fce/leverage.bit.js'

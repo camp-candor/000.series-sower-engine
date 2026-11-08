@@ -23,8 +23,7 @@ export class MutateLeverageStrings implements Action {
     constructor(public bale?: LeverageBit) {}
 }
 
-export const SPEND_LEVERAGE_STRINGS =
-    '[Leverage action] Spend Leverage Strings'
+export const SPEND_LEVERAGE_STRINGS = '[Leverage action] Spend Leverage Strings'
 export class SpendLeverageStrings implements Action {
     readonly type = SPEND_LEVERAGE_STRINGS
     constructor(public bale?: LeverageBit) {}
