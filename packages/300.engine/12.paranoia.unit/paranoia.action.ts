@@ -22,6 +22,25 @@ export class TickClock implements Action {
     constructor(public bale?: ParanoiaBit) {}
 }
 
+export const APPLY_THERMODYNAMIC_IMPULSE =
+    '[Paranoia action] Apply Thermodynamic Impulse'
+export class ApplyThermodynamicImpulse implements Action {
+    readonly type = APPLY_THERMODYNAMIC_IMPULSE
+    constructor(public bale?: ParanoiaBit) {}
+}
+
+export const SWEEP_THERMODYNAMICS = '[Paranoia action] Sweep Thermodynamics'
+export class SweepThermodynamics implements Action {
+    readonly type = SWEEP_THERMODYNAMICS
+    constructor(public bale?: ParanoiaBit) {}
+}
+
+export const AUDIT_THERMODYNAMICS = '[Paranoia action] Audit Thermodynamics'
+export class AuditThermodynamics implements Action {
+    readonly type = AUDIT_THERMODYNAMICS
+    constructor(public bale?: ParanoiaBit) {}
+}
+
 export const DISPATCH_CLOCK = '[Paranoia action] Dispatch Clock'
 export class DispatchClock implements Action {
     readonly type = DISPATCH_CLOCK
@@ -44,6 +63,9 @@ export type Actions =
     | InitParanoia
     | UpdateParanoia
     | TickClock
+    | ApplyThermodynamicImpulse
+    | SweepThermodynamics
+    | AuditThermodynamics
     | DispatchClock
     | DecayClocks
     | QueryClockState
