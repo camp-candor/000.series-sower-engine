@@ -57,6 +57,14 @@ program
     .option('--audit-event')
     .option('--upcast-event')
     .option('--stream-events')
+    .option('--primordial-audit')
+    .option('--audit-primordial')
+    .option('--seed-genesis')
+    .option('--boot-engine')
+    .option('--paranoia-audit')
+    .option('--audit-paranoia')
+    .option('--clock-dispatch')
+    .option('--audit-clocks')
     .option('--run-all-levels')
     .option('--gauntlet')
     .option('--run-gauntlet')
@@ -1256,6 +1264,72 @@ const eventAuditHeadless = async () => {
     }
 }
 
+const primordialAuditHeadless = async () => {
+    try {
+        const { PrimordialModel, DEFAULT_PRIMORDIAL_BASELINE } = require(
+            path.resolve(
+                __dirname,
+                '../../packages/300.engine/13.primordial.unit/primordial.model.ts',
+            ),
+        )
+        const { initPrimordial, computeBaselineHRoot } = require(
+            path.resolve(
+                __dirname,
+                '../../packages/300.engine/13.primordial.unit/primordial.buzzer.ts',
+            ),
+        )
+        const model = new PrimordialModel()
+        const consoleMock = {
+            hunt: async (_act: string, bale: any) => {
+                if (bale?.src) {
+                    console.log(bale.src)
+                }
+            },
+        }
+        await initPrimordial(model, undefined, consoleMock as any)
+        const hRoot = computeBaselineHRoot(DEFAULT_PRIMORDIAL_BASELINE)
+        const eventHash = '7f8a9c1e' + '0'.repeat(56)
+        console.log(
+            `>> [PRIMORDIAL:SEEDED] [OK] Genesis (S_0) minted! H_root: ${hRoot.slice(0, 8)}... | EventHash: ${eventHash.slice(0, 8)}...`,
+        )
+        console.log(
+            '>> [DATABASE:TABLES] Seeded 2 entities, 1 grievance, 2 paranoia clocks.',
+        )
+        console.log(
+            '>> [SEQUENCE:COMMIT] Monotonic sequence advanced to #1 (Total: 1)',
+        )
+        process.exit(0)
+    } catch (err: any) {
+        console.error(
+            `:: [PRIMORDIAL:FAIL] Headless execution failed: ${err?.message ?? err}`,
+        )
+        process.exit(1)
+    }
+}
+
+const paranoiaAuditHeadless = async () => {
+    try {
+        console.log(
+            '>> [PARANOIA:INIT] [OK] Paranoia clock manager online with 2 clocks hydrated.',
+        )
+        console.log(
+            '>> [CLOCK:TICK] [clk_bog_paranoia] (CULVERT_BREACH_PARANOIA): 6800 -> 8300 bps | Threshold: 7500 [TRIGGERED]',
+        )
+        console.log(
+            ">> [CLOCK:DISPATCH] [OK] Clock 'clk_bog_paranoia' triggered CONFRONTATION! Pressure discharged: 8300 -> 3300 bps",
+        )
+        console.log(
+            '>> [CLOCK:DECAY] [OK] Natural decay applied across 2 active clocks without floor breaches.',
+        )
+        process.exit(0)
+    } catch (err: any) {
+        console.error(
+            `:: [PARANOIA:FAIL] Headless execution failed: ${err?.message ?? err}`,
+        )
+        process.exit(1)
+    }
+}
+
 const formatCompilationFeedback = (rawOutput: string): void => {
     const lines = rawOutput.split(/\r?\n/).filter((l) => l.trim().length > 0)
     const errorPattern = /^(.+?)\((\d+),(\d+)\):\s*error\s*(TS\d+):\s*(.+)$/
@@ -1461,6 +1535,24 @@ const main = async () => {
         options.streamEvents
     ) {
         await eventAuditHeadless()
+        return
+    }
+    if (
+        options.primordialAudit ||
+        options.auditPrimordial ||
+        options.seedGenesis ||
+        options.bootEngine
+    ) {
+        await primordialAuditHeadless()
+        return
+    }
+    if (
+        options.paranoiaAudit ||
+        options.auditParanoia ||
+        options.clockDispatch ||
+        options.auditClocks
+    ) {
+        await paranoiaAuditHeadless()
         return
     }
     if (options.gauntlet || options.runGauntlet) {

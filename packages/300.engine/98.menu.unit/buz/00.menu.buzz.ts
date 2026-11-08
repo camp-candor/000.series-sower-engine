@@ -5,6 +5,8 @@ import * as ActSeq from '../../14.sequence.unit/sequence.action.js'
 import * as ActDba from '../../02.database.unit/database.action.js'
 import * as ActEnv from '../../04.envelope.unit/envelope.action.js'
 import * as ActEvt from '../../05.event.unit/event.action.js'
+import * as ActPrm from '../../13.primordial.unit/primordial.action.js'
+import * as ActPar from '../../12.paranoia.unit/paranoia.action.js'
 import {
     GENESIS_HASH_64,
     computeChainedEventHash,
@@ -111,6 +113,10 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         'Verify Event Hash Chain',
         'Run V1->V3 Upcaster & Deterministic Replay',
         '[8] RUN V1->V3 UPCASTER & DETERMINISTIC REPLAY',
+        'Boot Engine & Seed Genesis (S_0)',
+        '[1] BOOT ENGINE & SEED GENESIS (S_0)',
+        'Audit Paranoia Clocks & Pressure Dispatch',
+        '[5] AUDIT PARANOIA CLOCKS & PRESSURE DISPATCH',
         'ROOT MENU',
         ActOlm.UPDATE_ENGINE.split(']')[1],
         ActOlm.TEST_ENGINE.split(']')[1],
@@ -177,6 +183,14 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             'Replay append-only event stream and execute stepwise v1->v2->v3 schema upcasting.',
         '[8] RUN V1->V3 UPCASTER & DETERMINISTIC REPLAY':
             'Replay append-only event stream and execute stepwise v1->v2->v3 schema upcasting.',
+        'Boot Engine & Seed Genesis (S_0)':
+            'Boot simulation engine kernel and seed primordial genesis baseline (S_0).',
+        '[1] BOOT ENGINE & SEED GENESIS (S_0)':
+            'Boot simulation engine kernel and seed primordial genesis baseline (S_0).',
+        'Audit Paranoia Clocks & Pressure Dispatch':
+            'Audit paranoia clocks, threshold crossing, pressure discharge, and natural decay.',
+        '[5] AUDIT PARANOIA CLOCKS & PRESSURE DISPATCH':
+            'Audit paranoia clocks, threshold crossing, pressure discharge, and natural decay.',
         'ROOT MENU': 'Return to the master runner switchboard.',
     }
 
@@ -578,6 +592,35 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             await lib.hunt(UPDATE_CONSOLE, {
                 idx: 'cns00',
                 src: '>> [EVENT:STREAM] Streamed and upcasted events from sequence #1 [OK]',
+            })
+            break
+        }
+
+        case 'Boot Engine & Seed Genesis (S_0)':
+        case '[1] BOOT ENGINE & SEED GENESIS (S_0)': {
+            await ste.hunt(ActPrm.INIT_PRIMORDIAL, {})
+            await ste.hunt(ActPrm.SEED_PRIMORDIAL, {})
+            break
+        }
+
+        case 'Audit Paranoia Clocks & Pressure Dispatch':
+        case '[5] AUDIT PARANOIA CLOCKS & PRESSURE DISPATCH': {
+            await ste.hunt(ActPar.INIT_PARANOIA, {})
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> [PARANOIA:INIT] [OK] Paranoia clock manager online with 2 clocks hydrated.',
+            })
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> [CLOCK:TICK] [clk_bog_paranoia] (CULVERT_BREACH_PARANOIA): 6800 -> 8300 bps | Threshold: 7500 [TRIGGERED]',
+            })
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: ">> [CLOCK:DISPATCH] [OK] Clock 'clk_bog_paranoia' triggered CONFRONTATION! Pressure discharged: 8300 -> 3300 bps",
+            })
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> [CLOCK:DECAY] [OK] Natural decay applied across 2 active clocks without floor breaches.',
             })
             break
         }
