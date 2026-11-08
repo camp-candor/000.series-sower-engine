@@ -20,19 +20,39 @@ export function reducer(
             return Buzz.updateLeverage(clone(model), act.bale, state)
 
         case Act.MUTATE_LEVERAGE_STRINGS:
-            return Buzz.mutateStringLeverage(clone(model), act.bale as any, state)
+            return Buzz.mutateStringLeverage(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         case Act.SPEND_LEVERAGE_STRINGS:
-            return Buzz.spendStringLeverage(clone(model), act.bale as any, state)
+            return Buzz.spendStringLeverage(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         case Act.GET_LEVERAGE_RECORD:
-            return Buzz.getLeverageRecordAction(clone(model), act.bale as any, state)
+            return Buzz.getLeverageRecordAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         case Act.LIST_LEVERAGE_BY_HOLDER:
-            return Buzz.listLeverageByHolderAction(clone(model), act.bale as any, state)
+            return Buzz.listLeverageByHolderAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         case Act.AUDIT_LEVERAGE_SOLVENCY:
-            return Buzz.auditLeverageSolvencyAction(clone(model), act.bale as any, state)
+            return Buzz.auditLeverageSolvencyAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         default:
             return model

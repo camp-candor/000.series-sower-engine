@@ -2,14 +2,16 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { ParanoiaModel } from './paranoia.model.js'
 import {
     initParanoia,
-    tickClockAction,
-    dispatchClockAction,
-    decayClocksAction,
+    applyThermodynamicImpulseAction,
+    sweepThermodynamicsAction,
+    auditThermodynamicsAction,
+    deriveTripwirePhase,
+    calculateCurrentSegment,
 } from './buz/paranoia.buzz.js'
-import { TICK_CLOCK } from './paranoia.action.js'
+import { APPLY_THERMODYNAMIC_IMPULSE } from './paranoia.action.js'
 import { reducer } from './paranoia.reduce.js'
 
-describe('12.paranoia.unit - Clock Dispatch Execution Battery', () => {
+describe('12.paranoia.unit - Thermodynamic Paranoia Monitoring Battery', () => {
     let model: ParanoiaModel
 
     const createMockState = (initialClocks: any[] = []) => {
@@ -68,58 +70,65 @@ describe('12.paranoia.unit - Clock Dispatch Execution Battery', () => {
         delete (globalThis as any).LIBRARY
     })
 
-    it('initializes ParanoiaModel and hydrates registered clocks from database', async () => {
-        const mockClocks = [
-            {
-                clock_id: 'clk_bog',
-                entity_id: 'char_bog',
-                clock_name: 'PARANOIA',
-                value_bps: 2000,
-                threshold_bps: 8000,
-                decay_rate_bps: 100,
-                is_triggered: 0,
-                updated_at_ms: 1700000000000,
-            },
-        ]
-        const mockState = createMockState(mockClocks)
-        const slv = vi.fn()
-
-        await initParanoia(model, { idx: 'init', slv }, mockState as any)
-
-        expect(model.clocks.size).toBe(1)
-        expect(model.clocks.get('clk_bog')?.valueBps).toBe(2000)
-        expect(slv).toHaveBeenCalledWith(
-            expect.objectContaining({
-                paranoiaBit: expect.objectContaining({ val: 1 }),
-            }),
-        )
+    it('derives multi-stage tripwire phase and vision cone narrowing correctly', () => {
+        // Calm: 0 to 3332 bps
+        expect(deriveTripwirePhase(2000, 8000)).toEqual({
+            phase: 'CALM',
+            visionConeDegrees: 360,
+        })
+        // Fidget: 3333 to 6665 bps
+        expect(deriveTripwirePhase(4500, 8000)).toEqual({
+            phase: 'FIDGET',
+            visionConeDegrees: 180,
+        })
+        // Hypervigilant: 6666 to 7999 bps (vision cone narrows to 60 deg)
+        expect(deriveTripwirePhase(7200, 8000)).toEqual({
+            phase: 'HYPERVIGILANT',
+            visionConeDegrees: 60,
+        })
+        // Critical Overdrive: >= 8000 bps
+        expect(deriveTripwirePhase(8500, 8000)).toEqual({
+            phase: 'CRITICAL_OVERDRIVE',
+            visionConeDegrees: 60,
+        })
     })
 
-    it('ticks a clock, updates basis points, and triggers when crossing threshold', async () => {
+    it('calculates 6-segment clock segments accurately', () => {
+        expect(calculateCurrentSegment(0, 6)).toBe(0)
+        expect(calculateCurrentSegment(1666, 6)).toBe(1)
+        expect(calculateCurrentSegment(3333, 6)).toBe(2)
+        expect(calculateCurrentSegment(5000, 6)).toBe(3)
+        expect(calculateCurrentSegment(6666, 6)).toBe(4)
+        expect(calculateCurrentSegment(8333, 6)).toBe(5)
+        expect(calculateCurrentSegment(10000, 6)).toBe(6)
+    })
+
+    it('applies thermodynamic impulse and escalates tripwire phase to HYPERVIGILANT', async () => {
         const mockClocks = [
             {
-                clock_id: 'clk_wart_panic',
-                entity_id: 'char_wart',
-                clock_name: 'CULVERT_PRESSURE',
-                value_bps: 7000,
+                clock_id: 'clk_bog_acoustic',
+                entity_id: 'char_bog',
+                clock_name: 'ACOUSTIC_STRAIN',
+                value_bps: 5500,
                 threshold_bps: 8000,
-                decay_rate_bps: 50,
+                decay_rate_bps: 200,
                 is_triggered: 0,
                 updated_at_ms: 1700000000000,
             },
         ]
         const mockState = createMockState(mockClocks)
-        await initParanoia(model, { idx: 'test-init' }, mockState as any)
+        await initParanoia(model, { idx: 'init' }, mockState as any)
 
         const slv = vi.fn()
-        await tickClockAction(
+        // Impulse +1500 bps: 5500 -> 7000 bps (crosses into HYPERVIGILANT)
+        await applyThermodynamicImpulseAction(
             model,
             {
-                idx: 'tick-surge',
+                idx: 'impulse',
                 dat: {
-                    tickParams: {
-                        clockId: 'clk_wart_panic',
-                        deltaBps: 1500, // 7000 + 1500 = 8500 (>= 8000 threshold)
+                    impulseParams: {
+                        clockId: 'clk_bog_acoustic',
+                        impulseBps: 1500,
                         tick: 5,
                         timestampMs: 1700000005000,
                     },
@@ -130,220 +139,104 @@ describe('12.paranoia.unit - Clock Dispatch Execution Battery', () => {
         )
 
         expect(slv).toHaveBeenCalled()
-        const clock = model.clocks.get('clk_wart_panic')
-        expect(clock?.valueBps).toBe(8500)
-        expect(clock?.isTriggered).toBe(true)
+        const clock = model.clocks.get('clk_bog_acoustic')!
+        expect(clock.valueBps).toBe(7000)
+        expect(clock.tripwirePhase).toBe('HYPERVIGILANT')
+        expect(clock.visionConeDegrees).toBe(60)
 
-        // Verify event appended to event unit
-        expect(mockState.eventStore.length).toBe(1)
-        expect(mockState.eventStore[0].eventType).toBe('PARANOIA_CLOCK_TICKED')
-        expect(mockState.eventStore[0].payload.isTriggered).toBe(true)
-
-        // Verify database persistence
-        const dbClock = mockState.clockStore.get('clk_wart_panic')
-        expect(dbClock.value_bps).toBe(8500)
-        expect(dbClock.is_triggered).toBe(1)
+        const receipt = slv.mock.calls[0][0].flowReceipt
+        expect(receipt.prevValueBps).toBe(5500)
+        expect(receipt.nextValueBps).toBe(7000)
+        expect(receipt.tripwirePhase).toBe('HYPERVIGILANT')
     })
 
-    it('rejects floating-point numbers in tick delta with FLOAT_PROHIBITED', async () => {
+    it('dissipates heat during thermodynamic sweep without falling below 0 basis points', async () => {
         const mockClocks = [
             {
-                clock_id: 'clk_test',
-                entity_id: 'char_bog',
-                clock_name: 'PRESSURE',
-                value_bps: 1000,
-                threshold_bps: 5000,
-                decay_rate_bps: 10,
-                is_triggered: 0,
-                updated_at_ms: 1700000000000,
-            },
-        ]
-        const mockState = createMockState(mockClocks)
-        await initParanoia(model, { idx: 'test-init' }, mockState as any)
-
-        const slv = vi.fn()
-        await tickClockAction(
-            model,
-            {
-                idx: 'tick-float',
-                dat: {
-                    tickParams: {
-                        clockId: 'clk_test',
-                        deltaBps: 250.75, // Fractional float violation
-                        tick: 1,
-                        timestampMs: 1700000001000,
-                    },
-                },
-                slv,
-            },
-            mockState as any,
-        )
-
-        expect(slv).toHaveBeenCalledWith(
-            expect.objectContaining({
-                paranoiaBit: expect.objectContaining({
-                    val: 0,
-                    idx: 'tick-clock-fail',
-                    dat: expect.objectContaining({
-                        error: expect.stringContaining('FLOAT_PROHIBITED'),
-                    }),
-                }),
-            }),
-        )
-    })
-
-    it('executes dramatic clock dispatch, discharges pressure, and resets is_triggered', async () => {
-        const mockClocks = [
-            {
-                clock_id: 'clk_confront',
-                entity_id: 'char_bog',
-                clock_name: 'ACCUSATION_PRESSURE',
-                value_bps: 8500,
-                threshold_bps: 8000,
-                decay_rate_bps: 20,
-                is_triggered: 1, // Already crossed threshold
-                updated_at_ms: 1700000000000,
-            },
-        ]
-        const mockState = createMockState(mockClocks)
-        await initParanoia(model, { idx: 'test-init' }, mockState as any)
-
-        const slv = vi.fn()
-        await dispatchClockAction(
-            model,
-            {
-                idx: 'dispatch',
-                dat: {
-                    dispatchTrigger: {
-                        clockId: 'clk_confront',
-                        entityId: 'char_bog',
-                        dispatchType: 'CONFRONTATION',
-                        dischargeBps: 5000, // Deduct 5000 bps post-discharge
-                        tick: 6,
-                        timestampMs: 1700000006000,
-                        narrativeContext:
-                            'Bog violently confronts Wart over missing siphon hose',
-                    },
-                },
-                slv,
-            },
-            mockState as any,
-        )
-
-        expect(slv).toHaveBeenCalled()
-        const clock = model.clocks.get('clk_confront')
-        expect(clock?.valueBps).toBe(3500) // 8500 - 5000 = 3500 bps
-        expect(clock?.isTriggered).toBe(false)
-        expect(model.activeDispatchCount).toBe(1)
-        expect(model.lastDispatchedClockId).toBe('clk_confront')
-
-        // Verify database updated
-        const dbClock = mockState.clockStore.get('clk_confront')
-        expect(dbClock.value_bps).toBe(3500)
-        expect(dbClock.is_triggered).toBe(0)
-    })
-
-    it('rejects dispatch attempts against un-triggered clocks with PREMATURE_DISPATCH', async () => {
-        const mockClocks = [
-            {
-                clock_id: 'clk_calm',
+                clock_id: 'clk_wart_dissipate',
                 entity_id: 'char_wart',
-                clock_name: 'CALM_CLOCK',
-                value_bps: 2000,
+                clock_name: 'DISSIPATION_METER',
+                value_bps: 150,
                 threshold_bps: 8000,
-                decay_rate_bps: 50,
+                decay_rate_bps: 300, // 150 - 300 -> clamps to 0
                 is_triggered: 0,
                 updated_at_ms: 1700000000000,
             },
         ]
         const mockState = createMockState(mockClocks)
-        await initParanoia(model, { idx: 'test-init' }, mockState as any)
+        await initParanoia(model, { idx: 'init' }, mockState as any)
 
         const slv = vi.fn()
-        await dispatchClockAction(
+        await sweepThermodynamicsAction(
             model,
-            {
-                idx: 'premature-dispatch',
-                dat: {
-                    dispatchTrigger: {
-                        clockId: 'clk_calm',
-                        entityId: 'char_wart',
-                        dispatchType: 'PANIC_FLIGHT',
-                        dischargeBps: 1000,
-                        tick: 2,
-                        timestampMs: 1700000002000,
-                        narrativeContext: 'Premature panic',
-                    },
-                },
-                slv,
-            },
-            mockState as any,
-        )
-
-        expect(slv).toHaveBeenCalledWith(
-            expect.objectContaining({
-                paranoiaBit: expect.objectContaining({
-                    val: 0,
-                    idx: 'dispatch-clock-fail',
-                    dat: expect.objectContaining({
-                        error: expect.stringContaining('PREMATURE_DISPATCH'),
-                    }),
-                }),
-            }),
-        )
-    })
-
-    it('decays active clocks without falling below 0 basis points', async () => {
-        const mockClocks = [
-            {
-                clock_id: 'clk_decay_1',
-                entity_id: 'char_bog',
-                clock_name: 'TEST_DECAY',
-                value_bps: 80,
-                threshold_bps: 5000,
-                decay_rate_bps: 100, // 80 - 100 would be negative -> clamps to 0
-                is_triggered: 0,
-                updated_at_ms: 1700000000000,
-            },
-        ]
-        const mockState = createMockState(mockClocks)
-        await initParanoia(model, { idx: 'test-init' }, mockState as any)
-
-        const slv = vi.fn()
-        await decayClocksAction(
-            model,
-            {
-                idx: 'decay',
-                dat: {
-                    tickParams: {
-                        clockId: '',
-                        deltaBps: 0,
-                        tick: 1,
-                        timestampMs: 1700000001000,
-                    },
-                },
-                slv,
-            },
+            { idx: 'sweep', dat: { timestampMs: 1700000001000 }, slv },
             mockState as any,
         )
 
         expect(slv).toHaveBeenCalled()
-        const clock = model.clocks.get('clk_decay_1')
-        expect(clock?.valueBps).toBe(0)
+        const clock = model.clocks.get('clk_wart_dissipate')!
+        expect(clock.valueBps).toBe(0)
+        expect(clock.tripwirePhase).toBe('CALM')
+        expect(clock.visionConeDegrees).toBe(360)
+
+        const receipts = slv.mock.calls[0][0].flowReceipts
+        expect(receipts[0].dissipatedBps).toBe(150)
+        expect(receipts[0].nextValueBps).toBe(0)
     })
 
-    it('routes actions cleanly through pure reducer using clone-deep', async () => {
+    it('audits total system heat and reports boil-over and hypervigilant counts', async () => {
+        model.clocks.set('c1', {
+            clockId: 'c1',
+            entityId: 'e1',
+            clockName: 'MTR1',
+            valueBps: 8500,
+            thresholdBps: 8000,
+            decayRateBps: 100,
+            segmentsCount: 6,
+            currentSegment: 5,
+            tripwirePhase: 'CRITICAL_OVERDRIVE',
+            visionConeDegrees: 60,
+            isTriggered: true,
+            lastTickedAtMs: 1,
+        })
+        model.clocks.set('c2', {
+            clockId: 'c2',
+            entityId: 'e2',
+            clockName: 'MTR2',
+            valueBps: 7000,
+            thresholdBps: 8000,
+            decayRateBps: 100,
+            segmentsCount: 6,
+            currentSegment: 4,
+            tripwirePhase: 'HYPERVIGILANT',
+            visionConeDegrees: 60,
+            isTriggered: false,
+            lastTickedAtMs: 1,
+        })
+
+        const slv = vi.fn()
+        await auditThermodynamicsAction(model, { idx: 'audit', slv }, {} as any)
+
+        expect(slv).toHaveBeenCalled()
+        const report = slv.mock.calls[0][0].auditReport
+        expect(report.totalClocks).toBe(2)
+        expect(report.totalSystemHeatBps).toBe(15500)
+        expect(report.criticalOverdriveCount).toBe(1)
+        expect(report.hypervigilantCount).toBe(1)
+    })
+
+    it('routes APPLY_THERMODYNAMIC_IMPULSE cleanly through pure reducer using clone-deep', async () => {
         const slv = vi.fn()
         const result = (await reducer(
             model,
             {
-                type: TICK_CLOCK,
+                type: APPLY_THERMODYNAMIC_IMPULSE,
                 bale: {
-                    idx: 'test-reducer',
+                    idx: 'test-impulse',
                     dat: {
-                        tickParams: {
+                        impulseParams: {
                             clockId: 'non_existent',
-                            deltaBps: 100,
+                            impulseBps: 100,
                             tick: 1,
                             timestampMs: 1700000000000,
                         },

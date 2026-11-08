@@ -19,6 +19,4 @@ export type {
     AssembleEntityParams,
     EntityQueryFilter,
 } from './fce/entity.interface.js'
-export type {
-    EntityPayload,
-} from './fce/entity.bit.js'
+export type { EntityPayload } from './fce/entity.bit.js'

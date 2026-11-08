@@ -83,7 +83,9 @@ describe('03.entity.unit - Live Entity State Aggregation & Projection Battery', 
         const dbRow = serializeEntityToDbRow(original)
         expect(typeof dbRow.open_wounds_json).toBe('string')
         expect(dbRow.open_wounds_json).toBe('["wnd_crushed_left_forearm"]')
-        expect(dbRow.banned_kinetic_verbs_json).toBe('["BIMANUAL_LIFT","CLIMB"]')
+        expect(dbRow.banned_kinetic_verbs_json).toBe(
+            '["BIMANUAL_LIFT","CLIMB"]',
+        )
 
         const deserialized = deserializeDbRowToEntity(dbRow)
         expect(deserialized.entityId).toBe(original.entityId)
@@ -92,7 +94,9 @@ describe('03.entity.unit - Live Entity State Aggregation & Projection Battery', 
         expect(deserialized.locomotionTier).toBe(original.locomotionTier)
         expect(deserialized.painBps).toBe(original.painBps)
         expect(deserialized.openWounds).toEqual(original.openWounds)
-        expect(deserialized.bannedKineticVerbs).toEqual(original.bannedKineticVerbs)
+        expect(deserialized.bannedKineticVerbs).toEqual(
+            original.bannedKineticVerbs,
+        )
         expect(deserialized.wornGear).toEqual(original.wornGear)
     })
 
@@ -161,12 +165,17 @@ describe('03.entity.unit - Live Entity State Aggregation & Projection Battery', 
         const slvLocation = vi.fn()
         await listEntitiesByLocationAction(
             model,
-            { idx: 'list-pipe', dat: { locationId: 'loc_the_warm_pipe' }, slv: slvLocation },
+            {
+                idx: 'list-pipe',
+                dat: { locationId: 'loc_the_warm_pipe' },
+                slv: slvLocation,
+            },
             {} as any,
         )
 
         expect(slvLocation).toHaveBeenCalled()
-        const pipeEntities = slvLocation.mock.calls[0][0].entities as CompositeEntityState[]
+        const pipeEntities = slvLocation.mock.calls[0][0]
+            .entities as CompositeEntityState[]
         expect(pipeEntities).toHaveLength(1)
         expect(pipeEntities[0].entityId).toBe('char_bog')
 
@@ -186,28 +195,43 @@ describe('03.entity.unit - Live Entity State Aggregation & Projection Battery', 
     it('hydrates all entities from 02.database.unit into memory cache', async () => {
         const storedRows = [
             serializeEntityToDbRow(
-                assembleCompositeEntity({ entityId: 'char_bog', locationId: 'loc_the_warm_pipe' }),
+                assembleCompositeEntity({
+                    entityId: 'char_bog',
+                    locationId: 'loc_the_warm_pipe',
+                }),
             ),
             serializeEntityToDbRow(
-                assembleCompositeEntity({ entityId: 'char_wart', locationId: 'loc_the_warm_pipe' }),
+                assembleCompositeEntity({
+                    entityId: 'char_wart',
+                    locationId: 'loc_the_warm_pipe',
+                }),
             ),
         ]
 
         const mockState: any = {
             hunt: vi.fn(async (actionType: string) => {
                 if (actionType === '[Database action] Query Database') {
-                    return { databaseBit: { val: 2, dat: { records: storedRows } } }
+                    return {
+                        databaseBit: { val: 2, dat: { records: storedRows } },
+                    }
                 }
                 return {}
             }),
         }
 
         const slv = vi.fn()
-        await hydrateAllEntitiesAction(model, { idx: 'hydrate', slv }, mockState)
+        await hydrateAllEntitiesAction(
+            model,
+            { idx: 'hydrate', slv },
+            mockState,
+        )
 
         expect(slv).toHaveBeenCalledWith(
             expect.objectContaining({
-                entBit: expect.objectContaining({ val: 2, idx: 'hydrate-all-entities-pass' }),
+                entBit: expect.objectContaining({
+                    val: 2,
+                    idx: 'hydrate-all-entities-pass',
+                }),
             }),
         )
         expect(model.entities.size).toBe(2)

@@ -22,6 +22,27 @@ export function reducer(
         case Act.TICK_CLOCK:
             return Buzz.tickClockAction(clone(model), act.bale as any, state)
 
+        case Act.APPLY_THERMODYNAMIC_IMPULSE:
+            return Buzz.applyThermodynamicImpulseAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
+
+        case Act.SWEEP_THERMODYNAMICS:
+            return Buzz.sweepThermodynamicsAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
+
+        case Act.AUDIT_THERMODYNAMICS:
+            return Buzz.auditThermodynamicsAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
+
         case Act.DISPATCH_CLOCK:
             return Buzz.dispatchClockAction(
                 clone(model),
