@@ -20,22 +20,46 @@ export function reducer(
             return Buzz.updateGrievance(clone(model), act.bale, state)
 
         case Act.UPSERT_GRIEVANCE:
-            return Buzz.upsertGrievanceAction(clone(model), act.bale as any, state)
+            return Buzz.upsertGrievanceAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         case Act.ESCALATE_GRIEVANCE:
-            return Buzz.escalateGrievanceAction(clone(model), act.bale as any, state)
+            return Buzz.escalateGrievanceAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         case Act.TICK_COOLDOWN_GRIEVANCE:
-            return Buzz.tickCooldownGrievanceAction(clone(model), act.bale as any, state)
+            return Buzz.tickCooldownGrievanceAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         case Act.QUERY_ELIGIBLE_GRIEVANCES:
-            return Buzz.queryEligibleGrievancesAction(clone(model), act.bale as any, state)
+            return Buzz.queryEligibleGrievancesAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         case Act.SELECT_STAGE3_ENCOUNTER:
-            return Buzz.selectStage3EncounterAction(clone(model), act.bale as any, state)
+            return Buzz.selectStage3EncounterAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         case Act.AUDIT_GRIEVANCE_RECORDS:
-            return Buzz.auditGrievanceRecordsAction(clone(model), act.bale as any, state)
+            return Buzz.auditGrievanceRecordsAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         default:
             return model
