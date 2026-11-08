@@ -20,19 +20,46 @@ export function reducer(
             return Buzz.updateLedger(clone(model), act.bale, state)
 
         case Act.STAGE_MUTATION_LEDGER:
-            return Buzz.stageMutationAction(clone(model), act.bale as any, state)
+            return Buzz.stageMutationAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         case Act.COMMIT_STAGING_LEDGER:
-            return Buzz.commitStagingAction(clone(model), act.bale as any, state)
+            return Buzz.commitStagingAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         case Act.ROLLBACK_STAGING_LEDGER:
-            return Buzz.rollbackStagingAction(clone(model), act.bale as any, state)
+            return Buzz.rollbackStagingAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         case Act.VALIDATE_STAGING_LEDGER:
-            return Buzz.validateStagingLedgerAction(clone(model), act.bale as any, state)
+            return Buzz.validateStagingLedgerAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         case Act.QUERY_STAGING_STATE:
-            return Buzz.queryStagingStateAction(clone(model), act.bale as any, state)
+            return Buzz.queryStagingStateAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
+
+        case Act.RESOLVE_DUAL_2D6_LEDGER:
+            return Buzz.resolveDual2d6Action(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         default:
             return model
