@@ -31,6 +31,4 @@ export type {
     RatifyDetailParams,
     DiscardDetailParams,
 } from './fce/actor.interface.js'
-export type {
-    ActorPayload,
-} from './fce/actor.bit.js'
+export type { ActorPayload } from './fce/actor.bit.js'
