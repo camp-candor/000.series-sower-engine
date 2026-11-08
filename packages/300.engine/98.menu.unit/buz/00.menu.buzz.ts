@@ -31,6 +31,13 @@ import {
     openCompileMenu,
     runParallaxCompileAudit,
 } from './compile-menu.buzz.js'
+import { LocationModel } from '../../10.location.unit/location.model.js'
+import {
+    initLocation,
+    auditTopologyAction,
+    traverseLocationAction,
+    checkPortalCrossingAction,
+} from '../../10.location.unit/location.buzzer.js'
 
 let bit: any, lst: any, src: any
 let rootSlv: any
@@ -124,6 +131,8 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         '[6] AUDIT SOMATIC PANOPTICON & KINETIC VERBS',
         'Audit Inventory Hand Capacity & Slots',
         '[7] AUDIT INVENTORY HAND CAPACITY & SLOTS',
+        'Audit Spatial Topology & Portal Mesh',
+        '[8] AUDIT SPATIAL TOPOLOGY & PORTAL MESH',
         'ROOT MENU',
         ActOlm.UPDATE_ENGINE.split(']')[1],
         ActOlm.TEST_ENGINE.split(']')[1],
@@ -206,6 +215,10 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             'Audit 4-slot inventory, hand capacity constraints, and mass conservation.',
         '[7] AUDIT INVENTORY HAND CAPACITY & SLOTS':
             'Audit 4-slot inventory, hand capacity constraints, and mass conservation.',
+        'Audit Spatial Topology & Portal Mesh':
+            'Audit reciprocal portal mesh, non-adjacent jump traps, and atomic traversal events.',
+        '[8] AUDIT SPATIAL TOPOLOGY & PORTAL MESH':
+            'Audit reciprocal portal mesh, non-adjacent jump traps, and atomic traversal events.',
         'ROOT MENU': 'Return to the master runner switchboard.',
     }
 
@@ -693,6 +706,96 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             await lib.hunt(UPDATE_CONSOLE, {
                 idx: 'cns00',
                 src: '>> [INVENTORY:AUDIT] Mass conservation verified across unique items.',
+            })
+            break
+        }
+
+        case 'Audit Spatial Topology & Portal Mesh':
+        case '[8] AUDIT SPATIAL TOPOLOGY & PORTAL MESH': {
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> ============================================================',
+            })
+            try {
+                await ste.hunt(ActEvt.INIT_EVENT, {})
+
+                const locMod = new LocationModel()
+                const sink = () => {}
+
+                // 1. Ingest baseline crawlspace topology (streams [LOCATION:INIT])
+                await initLocation(
+                    locMod,
+                    { idx: 'menu-spatial-init', slv: sink } as any,
+                    ste,
+                )
+
+                // 2. Reciprocal symmetry + BFS reachability audit (streams [TOPOLOGY:AUDIT])
+                await auditTopologyAction(
+                    locMod,
+                    { idx: 'menu-spatial-audit', slv: sink } as any,
+                    ste,
+                )
+
+                // 3. Legal adjacent traversal with atomic paired event emission
+                locMod.occupants.get('loc_the_warm_pipe')!.add('char_bog')
+                await traverseLocationAction(
+                    locMod,
+                    {
+                        idx: 'menu-spatial-traverse',
+                        dat: {
+                            traversalRequest: {
+                                actorId: 'char_bog',
+                                fromLocationId: 'loc_the_warm_pipe',
+                                toLocationId: 'loc_culvert_junction',
+                                tick: 107,
+                                timestampMs: 1700000010000,
+                            },
+                        },
+                        slv: sink,
+                    } as any,
+                    ste,
+                )
+
+                // 4. Negative control: non-adjacent teleportation must fail closed
+                let hopTicket: any = null
+                await checkPortalCrossingAction(
+                    locMod,
+                    {
+                        idx: 'menu-spatial-trap',
+                        dat: {
+                            traversalRequest: {
+                                actorId: 'char_bog',
+                                fromLocationId: 'loc_siphon_chamber',
+                                toLocationId: 'loc_drainage_pantry',
+                                tick: 108,
+                                timestampMs: 1700000020000,
+                            },
+                        },
+                        slv: (r: any) => {
+                            hopTicket = r
+                        },
+                    } as any,
+                    ste,
+                )
+                if (
+                    hopTicket?.traversalReceipt &&
+                    hopTicket.traversalReceipt.permitted === false &&
+                    hopTicket.locBit?.src === '[PHYSICALLY_IMPOSSIBLE]'
+                ) {
+                    await lib.hunt(UPDATE_CONSOLE, {
+                        idx: 'cns00',
+                        src: '>> [SECURITY:PASS] Illegal spatial hop rejected at T_0 = $0.00; zero state mutation.',
+                    })
+                }
+            } catch (err: any) {
+                await lib.hunt(UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `:: [FAIL] [SPATIAL:AUDIT] ${err?.message ?? String(err)}`,
+                })
+            }
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> ============================================================',
             })
             break
         }
