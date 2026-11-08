@@ -6,8 +6,6 @@ import { GrievanceModel } from '../grievance.model.js'
 import type GrievanceBit from '../fce/grievance.bit.js'
 import type {
     GrievanceRecord,
-
-
     Stage3SelectionParams,
     Stage3SelectionReceipt,
 } from '../fce/grievance.interface.js'
@@ -86,7 +84,10 @@ export function evaluateMachineRailFilter(
         const hasPrimary = record.primary_actors.some((p) => castSet.has(p))
         if (!hasPrimary) return false
     } else {
-        if (!castSet.has(record.instigator_id) || !castSet.has(record.victim_id)) {
+        if (
+            !castSet.has(record.instigator_id) ||
+            !castSet.has(record.victim_id)
+        ) {
             return false
         }
     }
@@ -119,7 +120,9 @@ export const initGrievance = async (
                     min_intensity_bps: r.min_intensity_bps || 0,
                     max_intensity_bps: r.max_intensity_bps || 10000,
                     status: r.status || 'DORMANT',
-                    primary_actors: Object.freeze(r.primary_actors || [r.instigator_id, r.victim_id]),
+                    primary_actors: Object.freeze(
+                        r.primary_actors || [r.instigator_id, r.victim_id],
+                    ),
                     excluded_actors: Object.freeze(r.excluded_actors || []),
                     required_props: Object.freeze(r.required_props || []),
                     location_tags: Object.freeze(r.location_tags || []),
@@ -191,7 +194,8 @@ export const upsertGrievanceAction = async (
     }
 
     if (!grievance_id || !instigator_id || !victim_id) {
-        const err = '[INVALID_GRIEVANCE_PARAMS] Missing grievance_id, instigator_id, or victim_id'
+        const err =
+            '[INVALID_GRIEVANCE_PARAMS] Missing grievance_id, instigator_id, or victim_id'
         if (bal.slv) {
             bal.slv({
                 grvBit: {
@@ -233,7 +237,9 @@ export const upsertGrievanceAction = async (
             min_intensity_bps,
             max_intensity_bps,
             status,
-            primary_actors: Object.freeze(raw.primary_actors || [instigator_id, victim_id]),
+            primary_actors: Object.freeze(
+                raw.primary_actors || [instigator_id, victim_id],
+            ),
             excluded_actors: Object.freeze(raw.excluded_actors || []),
             required_props: Object.freeze(raw.required_props || []),
             location_tags: Object.freeze(raw.location_tags || []),
@@ -278,7 +284,10 @@ export const upsertGrievanceAction = async (
         const errorMsg = err.message || String(err)
         const isFloat = errorMsg.includes('FLOAT_PROHIBITED')
         const tag = isFloat ? '[FLOAT_PROHIBITED]' : '[UPSERT_FAILED]'
-        await emitConsole(ste, `:: [FAIL] Grievance upsert rejected: ${errorMsg}`)
+        await emitConsole(
+            ste,
+            `:: [FAIL] Grievance upsert rejected: ${errorMsg}`,
+        )
         if (bal.slv) {
             bal.slv({
                 grvBit: {
@@ -329,7 +338,10 @@ export const escalateGrievanceAction = async (
             )
         }
 
-        const newIntensity = Math.max(0, Math.min(10000, existing.intensity_bps + delta_bps))
+        const newIntensity = Math.max(
+            0,
+            Math.min(10000, existing.intensity_bps + delta_bps),
+        )
         const newDepth = existing.escalation_depth + 1
         const newCooldown = existing.cooldown_cycles + add_cooldown
 
@@ -513,13 +525,16 @@ export const selectStage3EncounterAction = async (
         return cpy
     }
 
-    const { sceneCast, currentTensionBps, tick, timestamp_ms, forceBoilOver } = params
+    const { sceneCast, currentTensionBps, tick, timestamp_ms, forceBoilOver } =
+        params
 
     // 1. Hard Override Check: Boil Over
     let boilOverCandidate: GrievanceRecord | undefined
     for (const rec of cpy.records.values()) {
         if (
-            (rec.status === 'SIMMERING' || rec.intensity_bps >= 8000 || forceBoilOver) &&
+            (rec.status === 'SIMMERING' ||
+                rec.intensity_bps >= 8000 ||
+                forceBoilOver) &&
             evaluateMachineRailFilter(rec, sceneCast, 0)
         ) {
             boilOverCandidate = rec
@@ -574,7 +589,8 @@ export const selectStage3EncounterAction = async (
     }
 
     if (eligible.length === 0) {
-        const err = '[NO_ELIGIBLE_GRIEVANCE] No grievance met Machine Rail criteria for sceneCast'
+        const err =
+            '[NO_ELIGIBLE_GRIEVANCE] No grievance met Machine Rail criteria for sceneCast'
         await emitConsole(ste, `:: [FAIL] ${err}`)
         if (bal.slv) {
             bal.slv({
@@ -717,4 +733,3 @@ export const auditGrievanceRecordsAction = (
     }
     return cpy
 }
-

@@ -24,6 +24,4 @@ export type {
     Stage3SelectionReceipt,
     JaccardAuditReport,
 } from './fce/grievance.interface.js'
-export type {
-    GrievancePayload,
-} from './fce/grievance.bit.js'
+export type { GrievancePayload } from './fce/grievance.bit.js'

@@ -28,15 +28,13 @@ export class CommitStagingLedger implements Action {
     constructor(public bale?: LedgerBit) {}
 }
 
-export const ROLLBACK_STAGING_LEDGER =
-    '[Ledger action] Rollback Staging Ledger'
+export const ROLLBACK_STAGING_LEDGER = '[Ledger action] Rollback Staging Ledger'
 export class RollbackStagingLedger implements Action {
     readonly type = ROLLBACK_STAGING_LEDGER
     constructor(public bale?: LedgerBit) {}
 }
 
-export const VALIDATE_STAGING_LEDGER =
-    '[Ledger action] Validate Staging Ledger'
+export const VALIDATE_STAGING_LEDGER = '[Ledger action] Validate Staging Ledger'
 export class ValidateStagingLedger implements Action {
     readonly type = VALIDATE_STAGING_LEDGER
     constructor(public bale?: LedgerBit) {}
@@ -48,6 +46,12 @@ export class QueryStagingState implements Action {
     constructor(public bale?: LedgerBit) {}
 }
 
+export const RESOLVE_DUAL_2D6_LEDGER = '[Ledger action] Resolve Dual 2d6 Ledger'
+export class ResolveDual2d6Ledger implements Action {
+    readonly type = RESOLVE_DUAL_2D6_LEDGER
+    constructor(public bale?: LedgerBit) {}
+}
+
 export type Actions =
     | InitLedger
     | UpdateLedger
@@ -56,3 +60,4 @@ export type Actions =
     | RollbackStagingLedger
     | ValidateStagingLedger
     | QueryStagingState
+    | ResolveDual2d6Ledger

@@ -75,16 +75,32 @@ describe('06.grievance.unit - Stage 3 Conflict & Grievance Selection Battery', (
         }
 
         // Cast with Bog and Wart -> Eligible
-        expect(evaluateMachineRailFilter(record, ['char_bog', 'char_wart'], 3000)).toBe(true)
+        expect(
+            evaluateMachineRailFilter(record, ['char_bog', 'char_wart'], 3000),
+        ).toBe(true)
 
         // Cast includes excluded actor Spleen -> Ineligible
-        expect(evaluateMachineRailFilter(record, ['char_bog', 'char_wart', 'char_spleen'], 3000)).toBe(false)
+        expect(
+            evaluateMachineRailFilter(
+                record,
+                ['char_bog', 'char_wart', 'char_spleen'],
+                3000,
+            ),
+        ).toBe(false)
 
         // Tension outside envelope -> Ineligible
-        expect(evaluateMachineRailFilter(record, ['char_bog', 'char_wart'], 7000)).toBe(false)
+        expect(
+            evaluateMachineRailFilter(record, ['char_bog', 'char_wart'], 7000),
+        ).toBe(false)
 
         // Cooldown active -> Ineligible
-        expect(evaluateMachineRailFilter({ ...record, cooldown_cycles: 2 }, ['char_bog', 'char_wart'], 3000)).toBe(false)
+        expect(
+            evaluateMachineRailFilter(
+                { ...record, cooldown_cycles: 2 },
+                ['char_bog', 'char_wart'],
+                3000,
+            ),
+        ).toBe(false)
     })
 
     it('forces hard override (Boil Over) when a simmering grievance is active', async () => {
@@ -226,7 +242,11 @@ describe('06.grievance.unit - Stage 3 Conflict & Grievance Selection Battery', (
         })
 
         const slv = vi.fn()
-        await tickCooldownGrievanceAction(model, { idx: 'tick', slv }, {} as any)
+        await tickCooldownGrievanceAction(
+            model,
+            { idx: 'tick', slv },
+            {} as any,
+        )
 
         expect(slv).toHaveBeenCalledWith(
             expect.objectContaining({
