@@ -1,13 +1,11 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
-import { LocationModel, BASELINE_TOPOLOGY_LOCATIONS } from './location.model.js'
+import { LocationModel } from './location.model.js'
 import {
     initLocation,
     setPortalLockAction,
     checkPortalCrossingAction,
     traverseLocationAction,
-    auditTopologyAction,
     auditTopologySymmetry,
-    validateLocationAdjacency,
 } from './buz/location.buzz.js'
 import { TRAVERSE_LOCATION } from './location.action.js'
 import { reducer } from './location.reduce.js'
@@ -70,7 +68,9 @@ describe('10.location.unit - Spatial Topology Routing & Portal Mesh Battery', ()
         expect(report.valid).toBe(false)
         expect(report.isReciprocal).toBe(false)
         expect(report.asymmetricTraps.length).toBeGreaterThan(0)
-        expect(report.asymmetricTraps[0]).toContain('Missing return room_b -> room_a')
+        expect(report.asymmetricTraps[0]).toContain(
+            'Missing return room_b -> room_a',
+        )
     })
 
     it('flags [ORPHAN_ISLAND_DETECTED] when disconnected subgraphs exist', () => {
@@ -101,7 +101,10 @@ describe('10.location.unit - Spatial Topology Routing & Portal Mesh Battery', ()
             ],
         ])
 
-        const report = auditTopologySymmetry(disconnectedNodes, 'loc_the_warm_pipe')
+        const report = auditTopologySymmetry(
+            disconnectedNodes,
+            'loc_the_warm_pipe',
+        )
         expect(report.valid).toBe(false)
         expect(report.isReachable).toBe(false)
         expect(report.orphanIslands).toContain('island_bunker')
@@ -149,7 +152,10 @@ describe('10.location.unit - Spatial Topology Routing & Portal Mesh Battery', ()
             model,
             {
                 idx: 'lock-portal',
-                dat: { portalId: 'loc_culvert_junction#loc_the_warm_pipe', portalStatus: 'LOCKED' },
+                dat: {
+                    portalId: 'loc_culvert_junction#loc_the_warm_pipe',
+                    portalStatus: 'LOCKED',
+                },
             },
             {} as any,
         )
@@ -255,15 +261,22 @@ describe('10.location.unit - Spatial Topology Routing & Portal Mesh Battery', ()
 
         expect(slv).toHaveBeenCalledWith(
             expect.objectContaining({
-                locBit: expect.objectContaining({ val: 1, idx: 'traverse-location-pass' }),
+                locBit: expect.objectContaining({
+                    val: 1,
+                    idx: 'traverse-location-pass',
+                }),
                 traversalReceipt: expect.objectContaining({ permitted: true }),
             }),
         )
 
         expect(eventsAppended).toContain('ACTOR_LEFT_LOCATION')
         expect(eventsAppended).toContain('ACTOR_ENTERED_LOCATION')
-        expect(model.occupants.get('loc_the_warm_pipe')!.has('char_bog')).toBe(false)
-        expect(model.occupants.get('loc_culvert_junction')!.has('char_bog')).toBe(true)
+        expect(model.occupants.get('loc_the_warm_pipe')!.has('char_bog')).toBe(
+            false,
+        )
+        expect(
+            model.occupants.get('loc_culvert_junction')!.has('char_bog'),
+        ).toBe(true)
     })
 
     it('routes TRAVERSE_LOCATION cleanly through pure reducer using clone-deep', async () => {

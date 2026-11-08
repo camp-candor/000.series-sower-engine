@@ -11,7 +11,6 @@ import type {
     SpatialNodeDescriptor,
     PortalRecord,
     PortalStatus,
-    TraversalRequest,
     TraversalReceipt,
     TopologyValidationReport,
 } from '../fce/location.interface.js'
@@ -66,7 +65,9 @@ export function auditTopologySymmetry(
             }
             const vNode = locations.get(vId)
             if (!vNode || !vNode.adjacentLocations.includes(uId)) {
-                asymmetricTraps.push(`${uId} -> ${vId} (Missing return ${vId} -> ${uId})`)
+                asymmetricTraps.push(
+                    `${uId} -> ${vId} (Missing return ${vId} -> ${uId})`,
+                )
             }
             const pKey = portalKey(uId, vId)
             if (!countedPortals.has(pKey)) {
@@ -105,7 +106,8 @@ export function auditTopologySymmetry(
         }
     }
 
-    const isReciprocal = asymmetricTraps.length === 0 && selfAdjacencies.length === 0
+    const isReciprocal =
+        asymmetricTraps.length === 0 && selfAdjacencies.length === 0
     const isReachable = orphanIslands.length === 0
     const valid = isReciprocal && isReachable
 
@@ -201,7 +203,9 @@ export const registerLocation = async (
                 locBit: {
                     idx: 'register-location-fail',
                     val: 0,
-                    dat: { error: '[INVALID_LOCATION_NODE] Missing node or locationId' },
+                    dat: {
+                        error: '[INVALID_LOCATION_NODE] Missing node or locationId',
+                    },
                 },
             })
         }
@@ -298,7 +302,9 @@ export const validateAdjacencyAction = (
     if (bal.slv) {
         bal.slv({
             locBit: {
-                idx: isAdjacent ? 'validate-adjacency-pass' : 'validate-adjacency-fail',
+                idx: isAdjacent
+                    ? 'validate-adjacency-pass'
+                    : 'validate-adjacency-fail',
                 val: isAdjacent ? 1 : 0,
                 dat: { locationId: toId },
             },
@@ -314,7 +320,8 @@ export const checkPortalCrossingAction = async (
 ): Promise<LocationModel> => {
     const req = bal.dat?.traversalRequest
     if (!req || !req.fromLocationId || !req.toLocationId) {
-        const err = '[INVALID_TRAVERSAL_REQUEST] Missing fromLocationId or toLocationId'
+        const err =
+            '[INVALID_TRAVERSAL_REQUEST] Missing fromLocationId or toLocationId'
         if (bal.slv) {
             bal.slv({
                 locBit: {
@@ -330,7 +337,9 @@ export const checkPortalCrossingAction = async (
     const { actorId, fromLocationId, toLocationId, timestampMs } = req
 
     // 1. Adjacency Invariant Check
-    if (!validateLocationAdjacency(cpy.locations, fromLocationId, toLocationId)) {
+    if (
+        !validateLocationAdjacency(cpy.locations, fromLocationId, toLocationId)
+    ) {
         const err = `[PHYSICALLY_IMPOSSIBLE] Location '${toLocationId}' is not adjacent to '${fromLocationId}'`
         await emitConsole(ste, `:: [FAIL] ${err}`)
         if (bal.slv) {
@@ -527,7 +536,10 @@ export const traverseLocationAction = async (
                         table: 'entities_live',
                         action: 'UPDATE',
                         key: actorId,
-                        record: { location_id: toLocationId, updated_at_ms: timestampMs },
+                        record: {
+                            location_id: toLocationId,
+                            updated_at_ms: timestampMs,
+                        },
                     },
                 ],
             },
@@ -587,7 +599,9 @@ export const auditTopologyAction = async (
         bal.slv({
             topologyReport: report,
             locBit: {
-                idx: report.valid ? 'audit-topology-pass' : 'audit-topology-fail',
+                idx: report.valid
+                    ? 'audit-topology-pass'
+                    : 'audit-topology-fail',
                 val: report.valid ? 1 : 0,
                 dat: { topologyReport: report },
             },
