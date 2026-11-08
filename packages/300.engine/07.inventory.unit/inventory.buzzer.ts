@@ -20,6 +20,4 @@ export type {
     HandCapacityAuditReceipt,
     MassConservationAuditReceipt,
 } from './fce/inventory.interface.js'
-export type {
-    InventoryPayload,
-} from './fce/inventory.bit.js'
+export type { InventoryPayload } from './fce/inventory.bit.js'

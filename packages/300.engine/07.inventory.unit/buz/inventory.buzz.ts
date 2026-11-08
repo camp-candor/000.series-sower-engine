@@ -5,7 +5,6 @@
 import { InventoryModel } from '../inventory.model.js'
 import type InventoryBit from '../fce/inventory.bit.js'
 import type {
-
     EntityInventoryState,
     ItemTransferPayload,
     DropExcessPayload,
@@ -31,7 +30,10 @@ async function emitConsole(ste: State | undefined, src: string): Promise<void> {
     }
 }
 
-export function validateHandCapacity(armsAvailable: number, heldCount: number): boolean {
+export function validateHandCapacity(
+    armsAvailable: number,
+    heldCount: number,
+): boolean {
     return heldCount <= armsAvailable
 }
 
@@ -131,18 +133,29 @@ export const transferInventory = async (
         timestampMs: bal.dat?.timestampMs || 1700000000000,
     }
 
-    const { sourceEntityId, targetEntityId, itemId, targetSlot, wornSlotName } = payload
+    const { sourceEntityId, targetEntityId, itemId, targetSlot, wornSlotName } =
+        payload
     const nowMs = payload.timestampMs || 1700000000000
 
     if (!targetEntityId || !itemId || !targetSlot) {
-        const errorMsg = '[INVALID_TRANSFER_PARAMS] Missing targetEntityId, itemId, or targetSlot'
+        const errorMsg =
+            '[INVALID_TRANSFER_PARAMS] Missing targetEntityId, itemId, or targetSlot'
         await emitConsole(ste, `:: [FAIL] ${errorMsg}`)
         if (bal.slv) {
             bal.slv({
                 invBit: {
                     idx: 'transfer-inventory-fail',
                     val: 0,
-                    dat: { error: errorMsg, transferReceipt: { success: false, itemId, targetEntityId, targetSlot, error: errorMsg } },
+                    dat: {
+                        error: errorMsg,
+                        transferReceipt: {
+                            success: false,
+                            itemId,
+                            targetEntityId,
+                            targetSlot,
+                            error: errorMsg,
+                        },
+                    },
                 },
             })
         }
@@ -158,7 +171,9 @@ export const transferInventory = async (
             ? targetInv.heldItems.length
             : targetInv.heldItems.length + 1
 
-        if (!validateHandCapacity(targetInv.armsAvailable, projectedHeldCount)) {
+        if (
+            !validateHandCapacity(targetInv.armsAvailable, projectedHeldCount)
+        ) {
             const errorMsg = `[HAND_CAPACITY_BREACH] Entity '${targetEntityId}' has ${targetInv.armsAvailable} arm(s), cannot hold ${projectedHeldCount} item(s)`
             await emitConsole(ste, `:: [FAIL] ${errorMsg}`)
             if (bal.slv) {
@@ -260,7 +275,10 @@ export const transferInventory = async (
             invBit: {
                 idx: 'transfer-inventory-pass',
                 val: 1,
-                dat: { transferReceipt: receipt, inventory: cpy.inventories[targetEntityId] },
+                dat: {
+                    transferReceipt: receipt,
+                    inventory: cpy.inventories[targetEntityId],
+                },
             },
         })
     }
@@ -288,7 +306,9 @@ export const dropExcessHeldInventoryAction = async (
                 invBit: {
                     idx: 'drop-excess-fail',
                     val: 0,
-                    dat: { error: `Entity '${entityId}' not found in inventory registry` },
+                    dat: {
+                        error: `Entity '${entityId}' not found in inventory registry`,
+                    },
                 },
             })
         }
@@ -330,7 +350,10 @@ export const dropExcessHeldInventoryAction = async (
             invBit: {
                 idx: 'drop-excess-pass',
                 val: dropped.length,
-                dat: { droppedItems: dropped, inventory: cpy.inventories[entityId] },
+                dat: {
+                    droppedItems: dropped,
+                    inventory: cpy.inventories[entityId],
+                },
             },
         })
     }
@@ -385,7 +408,9 @@ export const assertHandCapacityInventoryAction = async (
         bal.slv({
             capacityAudit: receipt,
             invBit: {
-                idx: valid ? 'assert-hand-capacity-pass' : 'hand-capacity-breach',
+                idx: valid
+                    ? 'assert-hand-capacity-pass'
+                    : 'hand-capacity-breach',
                 val: valid ? 1 : -1,
                 dat: { capacityAudit: receipt },
             },
@@ -407,7 +432,9 @@ export const assertMassConservationInventoryAction = (
         for (const item of inv.heldItems) {
             const loc = `${entityId}.held`
             if (seenItems.has(item)) {
-                duplicates.push(`[DUPLICATE_ITEM_BREACH] Item '${item}' duplicated in ${loc} and ${seenItems.get(item)}`)
+                duplicates.push(
+                    `[DUPLICATE_ITEM_BREACH] Item '${item}' duplicated in ${loc} and ${seenItems.get(item)}`,
+                )
             } else {
                 seenItems.set(item, loc)
             }
@@ -416,7 +443,9 @@ export const assertMassConservationInventoryAction = (
         for (const [slot, item] of Object.entries(inv.wornGear)) {
             const loc = `${entityId}.worn.${slot}`
             if (seenItems.has(item)) {
-                duplicates.push(`[DUPLICATE_ITEM_BREACH] Item '${item}' duplicated in ${loc} and ${seenItems.get(item)}`)
+                duplicates.push(
+                    `[DUPLICATE_ITEM_BREACH] Item '${item}' duplicated in ${loc} and ${seenItems.get(item)}`,
+                )
             } else {
                 seenItems.set(item, loc)
             }
@@ -425,7 +454,9 @@ export const assertMassConservationInventoryAction = (
         for (const item of inv.slungItems) {
             const loc = `${entityId}.slung`
             if (seenItems.has(item)) {
-                duplicates.push(`[DUPLICATE_ITEM_BREACH] Item '${item}' duplicated in ${loc} and ${seenItems.get(item)}`)
+                duplicates.push(
+                    `[DUPLICATE_ITEM_BREACH] Item '${item}' duplicated in ${loc} and ${seenItems.get(item)}`,
+                )
             } else {
                 seenItems.set(item, loc)
             }
@@ -434,7 +465,9 @@ export const assertMassConservationInventoryAction = (
         for (const item of inv.cachedItems) {
             const loc = `${entityId}.cached`
             if (seenItems.has(item)) {
-                duplicates.push(`[DUPLICATE_ITEM_BREACH] Item '${item}' duplicated in ${loc} and ${seenItems.get(item)}`)
+                duplicates.push(
+                    `[DUPLICATE_ITEM_BREACH] Item '${item}' duplicated in ${loc} and ${seenItems.get(item)}`,
+                )
             } else {
                 seenItems.set(item, loc)
             }

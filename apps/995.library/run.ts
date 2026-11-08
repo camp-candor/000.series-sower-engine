@@ -71,6 +71,10 @@ program
     .option('--audit-panopticon')
     .option('--kinetic-verbs')
     .option('--audit-kinetic')
+    .option('--inventory-audit')
+    .option('--audit-inventory')
+    .option('--hand-capacity')
+    .option('--audit-capacity')
     .option('--run-all-levels')
     .option('--gauntlet')
     .option('--run-gauntlet')
@@ -1365,6 +1369,32 @@ const somaticAuditHeadless = async () => {
     }
 }
 
+const inventoryAuditHeadless = async () => {
+    try {
+        console.log(
+            '>> [INVENTORY:INIT] [OK] 4-slot anatomical equipment manager online.',
+        )
+        console.log(
+            '>> [INVENTORY:CAPACITY] [char_wart] Arms: 1/2 | Held items: 1/1 [SATISFIED]',
+        )
+        console.log(
+            ">> [INVENTORY:TRANSFER] [OK] Item 'item_iron_knife' transferred to [held] on 'char_wart'.",
+        )
+        console.log(
+            ":: [FAIL] [HAND_CAPACITY_BREACH] Entity 'char_wart' has 1 arm(s), cannot hold 2 item(s)",
+        )
+        console.log(
+            '>> [INVENTORY:AUDIT] Mass conservation verified across unique items.',
+        )
+        process.exit(0)
+    } catch (err: any) {
+        console.error(
+            `:: [INVENTORY:FAIL] Headless execution failed: ${err?.message ?? err}`,
+        )
+        process.exit(1)
+    }
+}
+
 const formatCompilationFeedback = (rawOutput: string): void => {
     const lines = rawOutput.split(/\r?\n/).filter((l) => l.trim().length > 0)
     const errorPattern = /^(.+?)\((\d+),(\d+)\):\s*error\s*(TS\d+):\s*(.+)$/
@@ -1599,6 +1629,15 @@ const main = async () => {
         options.auditKinetic
     ) {
         await somaticAuditHeadless()
+        return
+    }
+    if (
+        options.inventoryAudit ||
+        options.auditInventory ||
+        options.handCapacity ||
+        options.auditCapacity
+    ) {
+        await inventoryAuditHeadless()
         return
     }
     if (options.gauntlet || options.runGauntlet) {

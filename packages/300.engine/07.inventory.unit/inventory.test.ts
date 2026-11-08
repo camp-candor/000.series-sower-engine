@@ -5,7 +5,6 @@ import {
     setArmsCapacity,
     transferInventory,
     dropExcessHeldInventoryAction,
-
     assertMassConservationInventoryAction,
     validateHandCapacity,
 } from './buz/inventory.buzz.js'
@@ -37,7 +36,10 @@ describe('07.inventory.unit - Hand Capacity Invariant & Logistical Conservation'
     })
 
     it('permits item transfer when hand capacity is available', async () => {
-        setArmsCapacity(model, { idx: 'set-arms', dat: { entityId: 'char_bog', armsAvailable: 2 } })
+        setArmsCapacity(model, {
+            idx: 'set-arms',
+            dat: { entityId: 'char_bog', armsAvailable: 2 },
+        })
 
         const slv = vi.fn()
         await transferInventory(
@@ -57,19 +59,28 @@ describe('07.inventory.unit - Hand Capacity Invariant & Logistical Conservation'
         expect(slv).toHaveBeenCalled()
         const receipt = slv.mock.calls[0][0].transferReceipt
         expect(receipt.success).toBe(true)
-        expect(model.inventories['char_bog'].heldItems).toContain('item_iron_knife')
+        expect(model.inventories['char_bog'].heldItems).toContain(
+            'item_iron_knife',
+        )
     })
 
     it('aborts at T0 ($0.00) with [HAND_CAPACITY_BREACH] when one-armed actor over-allocates', async () => {
         // Wart has 1 available arm (severed left arm)
-        setArmsCapacity(model, { idx: 'set-arms', dat: { entityId: 'char_wart', armsAvailable: 1 } })
+        setArmsCapacity(model, {
+            idx: 'set-arms',
+            dat: { entityId: 'char_wart', armsAvailable: 1 },
+        })
 
         // Equip item 1: Knife -> OK
         await transferInventory(
             model,
             {
                 idx: 'equip-1',
-                dat: { targetEntityId: 'char_wart', itemId: 'item_iron_knife', targetSlot: 'held' },
+                dat: {
+                    targetEntityId: 'char_wart',
+                    itemId: 'item_iron_knife',
+                    targetSlot: 'held',
+                },
             },
             {} as any,
         )
@@ -80,7 +91,11 @@ describe('07.inventory.unit - Hand Capacity Invariant & Logistical Conservation'
             model,
             {
                 idx: 'equip-2',
-                dat: { targetEntityId: 'char_wart', itemId: 'item_torch', targetSlot: 'held' },
+                dat: {
+                    targetEntityId: 'char_wart',
+                    itemId: 'item_torch',
+                    targetSlot: 'held',
+                },
                 slv,
             },
             {} as any,
@@ -93,27 +108,48 @@ describe('07.inventory.unit - Hand Capacity Invariant & Logistical Conservation'
                     idx: 'hand-capacity-breach',
                     src: '[HAND_CAPACITY_BREACH]',
                     dat: expect.objectContaining({
-                        error: expect.stringContaining('[HAND_CAPACITY_BREACH]'),
+                        error: expect.stringContaining(
+                            '[HAND_CAPACITY_BREACH]',
+                        ),
                     }),
                 }),
             }),
         )
 
-        expect(model.inventories['char_wart'].heldItems).toEqual(['item_iron_knife'])
+        expect(model.inventories['char_wart'].heldItems).toEqual([
+            'item_iron_knife',
+        ])
     })
 
     it('automatically ejects excess held items to cache when amputation occurs', async () => {
-        setArmsCapacity(model, { idx: 'set-arms', dat: { entityId: 'char_bog', armsAvailable: 2 } })
+        setArmsCapacity(model, {
+            idx: 'set-arms',
+            dat: { entityId: 'char_bog', armsAvailable: 2 },
+        })
 
         // Equip 2 items
         await transferInventory(
             model,
-            { idx: 'eq1', dat: { targetEntityId: 'char_bog', itemId: 'item_knife', targetSlot: 'held' } },
+            {
+                idx: 'eq1',
+                dat: {
+                    targetEntityId: 'char_bog',
+                    itemId: 'item_knife',
+                    targetSlot: 'held',
+                },
+            },
             {} as any,
         )
         await transferInventory(
             model,
-            { idx: 'eq2', dat: { targetEntityId: 'char_bog', itemId: 'item_torch', targetSlot: 'held' } },
+            {
+                idx: 'eq2',
+                dat: {
+                    targetEntityId: 'char_bog',
+                    itemId: 'item_torch',
+                    targetSlot: 'held',
+                },
+            },
             {} as any,
         )
 
@@ -135,7 +171,9 @@ describe('07.inventory.unit - Hand Capacity Invariant & Logistical Conservation'
         const dropped = slv.mock.calls[0][0].droppedItems
         expect(dropped).toEqual(['item_torch'])
         expect(model.inventories['char_bog'].heldItems).toEqual(['item_knife'])
-        expect(model.inventories['char_bog'].cachedItems).toContain('item_torch')
+        expect(model.inventories['char_bog'].cachedItems).toContain(
+            'item_torch',
+        )
     })
 
     it('detects duplicate items across entities or slots (Mass Conservation)', () => {

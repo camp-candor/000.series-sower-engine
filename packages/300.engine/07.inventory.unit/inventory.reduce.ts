@@ -26,13 +26,25 @@ export function reducer(
             return Buzz.transferInventory(clone(model), act.bale as any, state)
 
         case Act.DROP_EXCESS_HELD_INVENTORY:
-            return Buzz.dropExcessHeldInventoryAction(clone(model), act.bale as any, state)
+            return Buzz.dropExcessHeldInventoryAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         case Act.ASSERT_HAND_CAPACITY:
-            return Buzz.assertHandCapacityInventoryAction(clone(model), act.bale as any, state)
+            return Buzz.assertHandCapacityInventoryAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         case Act.ASSERT_MASS_CONSERVATION:
-            return Buzz.assertMassConservationInventoryAction(clone(model), act.bale as any, state)
+            return Buzz.assertMassConservationInventoryAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         default:
             return model

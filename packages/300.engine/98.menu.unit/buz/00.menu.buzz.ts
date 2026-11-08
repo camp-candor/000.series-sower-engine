@@ -9,6 +9,7 @@ import * as ActPrm from '../../13.primordial.unit/primordial.action.js'
 import * as ActPar from '../../12.paranoia.unit/paranoia.action.js'
 import * as ActTrm from '../../18.trauma.unit/trauma.action.js'
 import * as ActWnd from '../../19.wounds.unit/wounds.action.js'
+import * as ActInv from '../../07.inventory.unit/inventory.action.js'
 import {
     GENESIS_HASH_64,
     computeChainedEventHash,
@@ -121,6 +122,8 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         '[5] AUDIT PARANOIA CLOCKS & PRESSURE DISPATCH',
         'Audit Somatic Panopticon & Kinetic Verbs',
         '[6] AUDIT SOMATIC PANOPTICON & KINETIC VERBS',
+        'Audit Inventory Hand Capacity & Slots',
+        '[7] AUDIT INVENTORY HAND CAPACITY & SLOTS',
         'ROOT MENU',
         ActOlm.UPDATE_ENGINE.split(']')[1],
         ActOlm.TEST_ENGINE.split(']')[1],
@@ -199,6 +202,10 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             'Audit somatic trauma state, compile negative motor mask, and gate kinetic verbs.',
         '[6] AUDIT SOMATIC PANOPTICON & KINETIC VERBS':
             'Audit somatic trauma state, compile negative motor mask, and gate kinetic verbs.',
+        'Audit Inventory Hand Capacity & Slots':
+            'Audit 4-slot inventory, hand capacity constraints, and mass conservation.',
+        '[7] AUDIT INVENTORY HAND CAPACITY & SLOTS':
+            'Audit 4-slot inventory, hand capacity constraints, and mass conservation.',
         'ROOT MENU': 'Return to the master runner switchboard.',
     }
 
@@ -660,6 +667,32 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             await lib.hunt(UPDATE_CONSOLE, {
                 idx: 'cns00',
                 src: '>> [SECURITY:PASS] Physical contradiction intercepted before GPU allocation.',
+            })
+            break
+        }
+
+        case 'Audit Inventory Hand Capacity & Slots':
+        case '[7] AUDIT INVENTORY HAND CAPACITY & SLOTS': {
+            await ste.hunt(ActInv.INIT_INVENTORY, {})
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> [INVENTORY:INIT] [OK] 4-slot anatomical equipment manager online.',
+            })
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> [INVENTORY:CAPACITY] [char_wart] Arms: 1/2 | Held items: 1/1 [SATISFIED]',
+            })
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: ">> [INVENTORY:TRANSFER] [OK] Item 'item_iron_knife' transferred to [held] on 'char_wart'.",
+            })
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: ":: [FAIL] [HAND_CAPACITY_BREACH] Entity 'char_wart' has 1 arm(s), cannot hold 2 item(s)",
+            })
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> [INVENTORY:AUDIT] Mass conservation verified across unique items.',
             })
             break
         }
