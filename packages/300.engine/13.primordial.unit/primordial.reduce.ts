@@ -20,25 +20,13 @@ export function reducer(
             return Buzz.updatePrimordial(clone(model), act.bale, state)
 
         case Act.COMPUTE_HROOT_PRIMORDIAL:
-            return Buzz.computeHrootPrimordialAction(
-                clone(model),
-                act.bale as any,
-                state,
-            )
+            return Buzz.computeHrootPrimordialAction(clone(model), act.bale as any, state)
 
         case Act.SEED_PRIMORDIAL:
-            return Buzz.seedPrimordialAction(
-                clone(model),
-                act.bale as any,
-                state,
-            )
+            return Buzz.seedPrimordialAction(clone(model), act.bale as any, state)
 
         case Act.VERIFY_GENESIS_PRIMORDIAL:
-            return Buzz.verifyGenesisPrimordialAction(
-                clone(model),
-                act.bale as any,
-                state,
-            )
+            return Buzz.verifyGenesisPrimordialAction(clone(model), act.bale as any, state)
 
         default:
             return model

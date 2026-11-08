@@ -1,8 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
-import {
-    PrimordialModel,
-    DEFAULT_PRIMORDIAL_BASELINE,
-} from './primordial.model.js'
+import { PrimordialModel, DEFAULT_PRIMORDIAL_BASELINE } from './primordial.model.js'
 import {
     initPrimordial,
     computeBaselineHRoot,
@@ -18,25 +15,17 @@ describe('13.primordial.unit - Primordial Genesis Seeding Battery', () => {
 
     const createMockState = () => ({
         hunt: vi.fn(async (actionType: string, payload: any) => {
-            if (
-                actionType === '[Database action] QUERY_DATABASE' ||
-                actionType === '[Database action] Query Database'
-            ) {
+            if (actionType === '[Database action] QUERY_DATABASE' || actionType === '[Database action] Query Database') {
                 const table = payload?.dat?.table
                 const key = payload?.dat?.key
                 if (key && memoryDatabase[table]) {
                     const record = memoryDatabase[table].get(key)
-                    return {
-                        databaseBit: { val: record ? 1 : 0, dat: { record } },
-                    }
+                    return { databaseBit: { val: record ? 1 : 0, dat: { record } } }
                 }
                 const count = memoryDatabase[table]?.size || 0
                 return { databaseBit: { val: count } }
             }
-            if (
-                actionType === '[Database action] EXEC_BATCH_DATABASE' ||
-                actionType === '[Database action] Exec Batch Database'
-            ) {
+            if (actionType === '[Database action] EXEC_BATCH_DATABASE' || actionType === '[Database action] Exec Batch Database') {
                 for (const op of payload.dat.operations) {
                     if (!memoryDatabase[op.table]) {
                         memoryDatabase[op.table] = new Map()
@@ -98,10 +87,7 @@ describe('13.primordial.unit - Primordial Genesis Seeding Battery', () => {
             model,
             {
                 idx: 'seed',
-                dat: {
-                    baseline: DEFAULT_PRIMORDIAL_BASELINE,
-                    seededAtMs: 1700000000000,
-                },
+                dat: { baseline: DEFAULT_PRIMORDIAL_BASELINE, seededAtMs: 1700000000000 },
                 slv,
             },
             mockState as any,
@@ -125,9 +111,7 @@ describe('13.primordial.unit - Primordial Genesis Seeding Battery', () => {
 
         // Verify grievance_status table populated
         expect(memoryDatabase.grievance_status.size).toBe(1)
-        const grv = memoryDatabase.grievance_status.get(
-            'grv_territorial_impasse',
-        )
+        const grv = memoryDatabase.grievance_status.get('grv_territorial_impasse')
         expect(grv.instigator_id).toBe('char_wart')
         expect(grv.victim_id).toBe('char_bog')
 
@@ -155,11 +139,7 @@ describe('13.primordial.unit - Primordial Genesis Seeding Battery', () => {
 
         // Second seed (Idempotency assertion)
         const slv = vi.fn()
-        await seedPrimordialAction(
-            model,
-            { idx: 'seed-2', slv },
-            mockState as any,
-        )
+        await seedPrimordialAction(model, { idx: 'seed-2', slv }, mockState as any)
 
         expect(slv).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -180,11 +160,7 @@ describe('13.primordial.unit - Primordial Genesis Seeding Battery', () => {
         await seedPrimordialAction(model, { idx: 'seed' }, mockState as any)
 
         const slv = vi.fn()
-        await verifyGenesisPrimordialAction(
-            model,
-            { idx: 'verify', slv },
-            mockState as any,
-        )
+        await verifyGenesisPrimordialAction(model, { idx: 'verify', slv }, mockState as any)
 
         expect(slv).toHaveBeenCalledWith(
             expect.objectContaining({
