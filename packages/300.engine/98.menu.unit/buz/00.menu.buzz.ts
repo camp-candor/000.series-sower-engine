@@ -7,6 +7,8 @@ import * as ActEnv from '../../04.envelope.unit/envelope.action.js'
 import * as ActEvt from '../../05.event.unit/event.action.js'
 import * as ActPrm from '../../13.primordial.unit/primordial.action.js'
 import * as ActPar from '../../12.paranoia.unit/paranoia.action.js'
+import * as ActTrm from '../../18.trauma.unit/trauma.action.js'
+import * as ActWnd from '../../19.wounds.unit/wounds.action.js'
 import {
     GENESIS_HASH_64,
     computeChainedEventHash,
@@ -117,6 +119,8 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         '[1] BOOT ENGINE & SEED GENESIS (S_0)',
         'Audit Paranoia Clocks & Pressure Dispatch',
         '[5] AUDIT PARANOIA CLOCKS & PRESSURE DISPATCH',
+        'Audit Somatic Panopticon & Kinetic Verbs',
+        '[6] AUDIT SOMATIC PANOPTICON & KINETIC VERBS',
         'ROOT MENU',
         ActOlm.UPDATE_ENGINE.split(']')[1],
         ActOlm.TEST_ENGINE.split(']')[1],
@@ -191,6 +195,10 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             'Audit paranoia clocks, threshold crossing, pressure discharge, and natural decay.',
         '[5] AUDIT PARANOIA CLOCKS & PRESSURE DISPATCH':
             'Audit paranoia clocks, threshold crossing, pressure discharge, and natural decay.',
+        'Audit Somatic Panopticon & Kinetic Verbs':
+            'Audit somatic trauma state, compile negative motor mask, and gate kinetic verbs.',
+        '[6] AUDIT SOMATIC PANOPTICON & KINETIC VERBS':
+            'Audit somatic trauma state, compile negative motor mask, and gate kinetic verbs.',
         'ROOT MENU': 'Return to the master runner switchboard.',
     }
 
@@ -621,6 +629,37 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             await lib.hunt(UPDATE_CONSOLE, {
                 idx: 'cns00',
                 src: '>> [CLOCK:DECAY] [OK] Natural decay applied across 2 active clocks without floor breaches.',
+            })
+            break
+        }
+
+        case 'Audit Somatic Panopticon & Kinetic Verbs':
+        case '[6] AUDIT SOMATIC PANOPTICON & KINETIC VERBS': {
+            await ste.hunt(ActTrm.INIT_TRAUMA, {})
+            await ste.hunt(ActWnd.INIT_WOUNDS, {})
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> [TRAUMA:APPLY] [char_wart] Arms: 1/2 | Legs: 2/2 | Pain: 8200 bps | Locomotion: [LIMPING]',
+            })
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: ">> [WOUNDS:ADD] [char_wart] Incurred wound 'wnd_crushed_forearm': [SEVERED_LEFT_ARM] (8200 bps)",
+            })
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> [PANOPTICON:MASK] [char_wart] Compiled negative motor mask: 25 banned verbs across 1 open wounds.',
+            })
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: ">> [PANOPTICON:GATE] Auditing candidate motor verbs: ['INSPECT', 'SPRINT', 'BIMANUAL_LIFT']",
+            })
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: ':: [SOMATIC_CAPABILITY_BREACH] [char_wart] Blocked motor verbs at T_0 = $0.00: [SPRINT, BIMANUAL_LIFT]',
+            })
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> [SECURITY:PASS] Physical contradiction intercepted before GPU allocation.',
             })
             break
         }

@@ -23,10 +23,18 @@ export function reducer(
             return Buzz.addWoundAction(clone(model), act.bale as any, state)
 
         case Act.COMPILE_SOMATIC_MASK_WOUNDS:
-            return Buzz.compileSomaticMaskWoundsAction(clone(model), act.bale as any, state)
+            return Buzz.compileSomaticMaskWoundsAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         case Act.ASSERT_KINETIC_VERBS_WOUNDS:
-            return Buzz.assertKineticVerbsWoundsAction(clone(model), act.bale as any, state)
+            return Buzz.assertKineticVerbsWoundsAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         default:
             return model

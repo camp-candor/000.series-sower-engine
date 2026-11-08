@@ -270,7 +270,9 @@ export const compileSomaticMaskWoundsAction = async (
                 wndBit: {
                     idx: 'compile-mask-fail',
                     val: 0,
-                    dat: { error: '[MISSING_ENTITY_ID] entityId required to compile mask' },
+                    dat: {
+                        error: '[MISSING_ENTITY_ID] entityId required to compile mask',
+                    },
                 },
             })
         }
@@ -283,7 +285,14 @@ export const compileSomaticMaskWoundsAction = async (
     const tier = bal.dat?.locomotionTier || 'UNRESTRICTED'
     const timestampMs = bal.dat?.timestampMs || 1700000000000
 
-    const mask = compileSomaticMask(entityId, wounds, arms, legs, tier, timestampMs)
+    const mask = compileSomaticMask(
+        entityId,
+        wounds,
+        arms,
+        legs,
+        tier,
+        timestampMs,
+    )
     cpy.masksByEntity[entityId] = mask
 
     await emitConsole(
@@ -311,7 +320,8 @@ export const assertKineticVerbsWoundsAction = async (
 ): Promise<WoundsModel> => {
     const query: KineticAuditQuery | undefined = bal.dat?.auditQuery
     if (!query || !query.entityId || !query.proposedVerbs) {
-        const errorMsg = '[INVALID_AUDIT_QUERY] Missing entityId or proposedVerbs'
+        const errorMsg =
+            '[INVALID_AUDIT_QUERY] Missing entityId or proposedVerbs'
         await emitConsole(ste, `:: [FAIL] ${errorMsg}`)
         if (bal.slv) {
             bal.slv({
@@ -371,7 +381,9 @@ export const assertKineticVerbsWoundsAction = async (
         bal.slv({
             auditReceipt: receipt,
             wndBit: {
-                idx: permitted ? 'assert-kinetic-verbs-pass' : 'somatic-capability-breach',
+                idx: permitted
+                    ? 'assert-kinetic-verbs-pass'
+                    : 'somatic-capability-breach',
                 val: permitted ? 1 : -1,
                 src: permitted ? '[OK]' : '[SOMATIC_CAPABILITY_BREACH]',
                 dat: { auditReceipt: receipt },

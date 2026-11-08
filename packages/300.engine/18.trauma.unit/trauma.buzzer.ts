@@ -17,6 +17,4 @@ export type {
     TraumaDeltaPayload,
     RefusalStrainReport,
 } from './fce/trauma.interface.js'
-export type {
-    TraumaPayload,
-} from './fce/trauma.bit.js'
+export type { TraumaPayload } from './fce/trauma.bit.js'

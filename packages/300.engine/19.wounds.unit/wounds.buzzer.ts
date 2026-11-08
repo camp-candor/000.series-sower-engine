@@ -18,6 +18,4 @@ export type {
     KineticAuditQuery,
     KineticAuditReceipt,
 } from './fce/wounds.interface.js'
-export type {
-    WoundsPayload,
-} from './fce/wounds.bit.js'
+export type { WoundsPayload } from './fce/wounds.bit.js'

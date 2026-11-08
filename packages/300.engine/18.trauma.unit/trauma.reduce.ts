@@ -23,13 +23,25 @@ export function reducer(
             return Buzz.applyTraumaAction(clone(model), act.bale as any, state)
 
         case Act.DECAY_FATIGUE_TRAUMA:
-            return Buzz.decayFatigueTraumaAction(clone(model), act.bale as any, state)
+            return Buzz.decayFatigueTraumaAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         case Act.CLAMP_BASIS_POINTS_TRAUMA:
-            return Buzz.clampBasisPointsTraumaAction(clone(model), act.bale as any, state)
+            return Buzz.clampBasisPointsTraumaAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         case Act.GET_SOMATIC_STATE:
-            return Buzz.getSomaticStateAction(clone(model), act.bale as any, state)
+            return Buzz.getSomaticStateAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         default:
             return model

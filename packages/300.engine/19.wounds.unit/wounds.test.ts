@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { WoundsModel } from './wounds.model.js'
 import {
     initWounds,
-
     compileSomaticMaskWoundsAction,
     assertKineticVerbsWoundsAction,
     compileSomaticMask,
@@ -47,7 +46,11 @@ describe('19.wounds.unit - Somatic Panopticon & Kinetic Verb Gating Battery', ()
             model,
             {
                 idx: 'mask',
-                dat: { entityId: 'char_wart', armsAvailable: 1, legsAvailable: 2 },
+                dat: {
+                    entityId: 'char_wart',
+                    armsAvailable: 1,
+                    legsAvailable: 2,
+                },
             },
             {} as any,
         )
@@ -88,7 +91,12 @@ describe('19.wounds.unit - Somatic Panopticon & Kinetic Verb Gating Battery', ()
             model,
             {
                 idx: 'mask',
-                dat: { entityId: 'char_bog', armsAvailable: 2, legsAvailable: 2, locomotionTier: 'UNRESTRICTED' },
+                dat: {
+                    entityId: 'char_bog',
+                    armsAvailable: 2,
+                    legsAvailable: 2,
+                    locomotionTier: 'UNRESTRICTED',
+                },
             },
             {} as any,
         )
@@ -132,7 +140,12 @@ describe('19.wounds.unit - Somatic Panopticon & Kinetic Verb Gating Battery', ()
                 type: ASSERT_KINETIC_VERBS_WOUNDS,
                 bale: {
                     idx: 'assert',
-                    dat: { auditQuery: { entityId: 'char_bog', proposedVerbs: ['WALK'] } },
+                    dat: {
+                        auditQuery: {
+                            entityId: 'char_bog',
+                            proposedVerbs: ['WALK'],
+                        },
+                    },
                     slv,
                 } as any,
             },

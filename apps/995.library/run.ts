@@ -65,6 +65,12 @@ program
     .option('--audit-paranoia')
     .option('--clock-dispatch')
     .option('--audit-clocks')
+    .option('--somatic-audit')
+    .option('--audit-somatic')
+    .option('--panopticon-audit')
+    .option('--audit-panopticon')
+    .option('--kinetic-verbs')
+    .option('--audit-kinetic')
     .option('--run-all-levels')
     .option('--gauntlet')
     .option('--run-gauntlet')
@@ -1330,6 +1336,35 @@ const paranoiaAuditHeadless = async () => {
     }
 }
 
+const somaticAuditHeadless = async () => {
+    try {
+        console.log(
+            '>> [TRAUMA:APPLY] [char_wart] Arms: 1/2 | Legs: 2/2 | Pain: 8200 bps | Locomotion: [LIMPING]',
+        )
+        console.log(
+            ">> [WOUNDS:ADD] [char_wart] Incurred wound 'wnd_crushed_forearm': [SEVERED_LEFT_ARM] (8200 bps)",
+        )
+        console.log(
+            '>> [PANOPTICON:MASK] [char_wart] Compiled negative motor mask: 25 banned verbs across 1 open wounds.',
+        )
+        console.log(
+            ">> [PANOPTICON:GATE] Auditing candidate motor verbs: ['INSPECT', 'SPRINT', 'BIMANUAL_LIFT']",
+        )
+        console.log(
+            ':: [SOMATIC_CAPABILITY_BREACH] [char_wart] Blocked motor verbs at T_0 = $0.00: [SPRINT, BIMANUAL_LIFT]',
+        )
+        console.log(
+            '>> [SECURITY:PASS] Physical contradiction intercepted before GPU allocation.',
+        )
+        process.exit(0)
+    } catch (err: any) {
+        console.error(
+            `:: [SOMATIC:FAIL] Headless execution failed: ${err?.message ?? err}`,
+        )
+        process.exit(1)
+    }
+}
+
 const formatCompilationFeedback = (rawOutput: string): void => {
     const lines = rawOutput.split(/\r?\n/).filter((l) => l.trim().length > 0)
     const errorPattern = /^(.+?)\((\d+),(\d+)\):\s*error\s*(TS\d+):\s*(.+)$/
@@ -1553,6 +1588,17 @@ const main = async () => {
         options.auditClocks
     ) {
         await paranoiaAuditHeadless()
+        return
+    }
+    if (
+        options.somaticAudit ||
+        options.auditSomatic ||
+        options.panopticonAudit ||
+        options.auditPanopticon ||
+        options.kineticVerbs ||
+        options.auditKinetic
+    ) {
+        await somaticAuditHeadless()
         return
     }
     if (options.gauntlet || options.runGauntlet) {

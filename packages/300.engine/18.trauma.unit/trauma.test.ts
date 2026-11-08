@@ -4,7 +4,6 @@ import {
     initTrauma,
     applyTraumaAction,
     decayFatigueTraumaAction,
-
     assertBasisPoint,
 } from './buz/trauma.buzz.js'
 import { APPLY_TRAUMA } from './trauma.action.js'
@@ -25,7 +24,9 @@ describe('18.trauma.unit - Somatic Vector & Trauma Invariance Battery', () => {
     })
 
     it('rejects floating-point basis points with FLOAT_PROHIBITED', () => {
-        expect(() => assertBasisPoint(4500.5, 'painBps')).toThrow(/FLOAT_PROHIBITED/)
+        expect(() => assertBasisPoint(4500.5, 'painBps')).toThrow(
+            /FLOAT_PROHIBITED/,
+        )
     })
 
     it('applies trauma and clamps basis points strictly between 0 and 10,000', async () => {
@@ -114,7 +115,9 @@ describe('18.trauma.unit - Somatic Vector & Trauma Invariance Battery', () => {
                 type: APPLY_TRAUMA,
                 bale: {
                     idx: 'apply',
-                    dat: { delta: { entityId: 'char_bog', deltaPainBps: 1000 } },
+                    dat: {
+                        delta: { entityId: 'char_bog', deltaPainBps: 1000 },
+                    },
                     slv,
                 } as any,
             },

@@ -121,13 +121,23 @@ export const applyTraumaAction = async (
             updatedAtMs: delta.timestampMs || 1700000000000,
         }
 
-        const newArms = Math.max(0, Math.min(2, current.armsAvailable + (delta.deltaArms || 0)))
-        const newLegs = Math.max(0, Math.min(2, current.legsAvailable + (delta.deltaLegs || 0)))
-        const newConcussion = Math.max(0, Math.min(3, current.concussionLevel + (delta.deltaConcussion || 0)))
+        const newArms = Math.max(
+            0,
+            Math.min(2, current.armsAvailable + (delta.deltaArms || 0)),
+        )
+        const newLegs = Math.max(
+            0,
+            Math.min(2, current.legsAvailable + (delta.deltaLegs || 0)),
+        )
+        const newConcussion = Math.max(
+            0,
+            Math.min(3, current.concussionLevel + (delta.deltaConcussion || 0)),
+        )
 
         const rawFatigue = current.fatigueBps + (delta.deltaFatigueBps || 0)
         const rawPain = current.painBps + (delta.deltaPainBps || 0)
-        const rawRefusal = current.refusalStrainBps + (delta.deltaRefusalStrainBps || 0)
+        const rawRefusal =
+            current.refusalStrainBps + (delta.deltaRefusalStrainBps || 0)
 
         const clampedFatigue = Math.max(0, Math.min(10000, rawFatigue))
         const clampedPain = Math.max(0, Math.min(10000, rawPain))
@@ -137,7 +147,11 @@ export const applyTraumaAction = async (
         assertBasisPoint(clampedPain, 'painBps')
         assertBasisPoint(clampedRefusal, 'refusalStrainBps')
 
-        const newTier = deriveLocomotionTier(newLegs, clampedPain, clampedFatigue)
+        const newTier = deriveLocomotionTier(
+            newLegs,
+            clampedPain,
+            clampedFatigue,
+        )
 
         const updatedState: SomaticTraumaState = {
             entityId: delta.entityId,
@@ -169,7 +183,10 @@ export const applyTraumaAction = async (
         }
     } catch (err: any) {
         const errorMsg = err.message || String(err)
-        await emitConsole(ste, `:: [FAIL] Trauma application aborted: ${errorMsg}`)
+        await emitConsole(
+            ste,
+            `:: [FAIL] Trauma application aborted: ${errorMsg}`,
+        )
         if (bal.slv) {
             bal.slv({
                 trmBit: {
@@ -199,7 +216,9 @@ export const decayFatigueTraumaAction = async (
                 trmBit: {
                     idx: 'decay-fatigue-fail',
                     val: 0,
-                    dat: { error: `Entity '${entityId}' not found in trauma registry` },
+                    dat: {
+                        error: `Entity '${entityId}' not found in trauma registry`,
+                    },
                 },
             })
         }
@@ -210,7 +229,11 @@ export const decayFatigueTraumaAction = async (
         assertBasisPoint(decayBps, 'decayBps')
         const current = cpy.entities[entityId]
         const newFatigue = Math.max(0, current.fatigueBps - decayBps)
-        const newTier = deriveLocomotionTier(current.legsAvailable, current.painBps, newFatigue)
+        const newTier = deriveLocomotionTier(
+            current.legsAvailable,
+            current.painBps,
+            newFatigue,
+        )
 
         const updated: SomaticTraumaState = {
             ...current,
