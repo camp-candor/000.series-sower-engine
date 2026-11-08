@@ -14,9 +14,7 @@ export {
     auditTopologySymmetry,
     portalKey,
 } from './buz/location.buzz.js'
-export {
-    BASELINE_TOPOLOGY_LOCATIONS,
-} from './location.model.js'
+export { BASELINE_TOPOLOGY_LOCATIONS } from './location.model.js'
 export type {
     LightingLevel,
     PortalStatus,
@@ -26,6 +24,4 @@ export type {
     TraversalReceipt,
     TopologyValidationReport,
 } from './fce/location.interface.js'
-export type {
-    LocationPayload,
-} from './fce/location.bit.js'
+export type { LocationPayload } from './fce/location.bit.js'

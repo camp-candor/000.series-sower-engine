@@ -1,8 +1,13 @@
-import Movement from './fce/movement.interface.js'
-// import MovementBit from "./fce/movement.interface.js";
+/**
+ * 11.movement.unit - Movement State Model Container
+ */
+import type Movement from './fce/movement.interface.js'
+import type { ActorMovementState } from './fce/movement.interface.js'
 
 export class MovementModel implements Movement {
-    //idx:string;
-    //movementBitList: MovementBit[] = [];
-    //movementBits: any = {};
+    idx: string = '11.movement'
+    actorPositions: Map<string, ActorMovementState> = new Map()
+    occupiedCells: Map<string, string> = new Map()
 }
+
+export default MovementModel

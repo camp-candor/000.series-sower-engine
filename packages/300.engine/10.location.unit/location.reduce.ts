@@ -23,19 +23,39 @@ export function reducer(
             return Buzz.registerLocation(clone(model), act.bale as any, state)
 
         case Act.SET_PORTAL_LOCK:
-            return Buzz.setPortalLockAction(clone(model), act.bale as any, state)
+            return Buzz.setPortalLockAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         case Act.VALIDATE_ADJACENCY:
-            return Buzz.validateAdjacencyAction(clone(model), act.bale as any, state)
+            return Buzz.validateAdjacencyAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         case Act.CHECK_PORTAL_CROSSING:
-            return Buzz.checkPortalCrossingAction(clone(model), act.bale as any, state)
+            return Buzz.checkPortalCrossingAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         case Act.TRAVERSE_LOCATION:
-            return Buzz.traverseLocationAction(clone(model), act.bale as any, state)
+            return Buzz.traverseLocationAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         case Act.AUDIT_TOPOLOGY:
-            return Buzz.auditTopologyAction(clone(model), act.bale as any, state)
+            return Buzz.auditTopologyAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         default:
             return model
