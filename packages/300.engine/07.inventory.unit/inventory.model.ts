@@ -1,8 +1,12 @@
-import Inventory from './fce/inventory.interface.js'
-// import InventoryBit from "./fce/inventory.interface.js";
+/**
+ * 07.inventory.unit - Inventory State Model Container
+ */
+import type Inventory from './fce/inventory.interface.js'
+import type { EntityInventoryState } from './fce/inventory.interface.js'
 
 export class InventoryModel implements Inventory {
-    //idx:string;
-    //inventoryBitList: InventoryBit[] = [];
-    //inventoryBits: any = {};
+    idx: string = '07.inventory'
+    inventories: Record<string, EntityInventoryState> = {}
 }
+
+export default InventoryModel
