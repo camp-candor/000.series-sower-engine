@@ -1,8 +1,13 @@
-import Grievance from './fce/grievance.interface.js'
-// import GrievanceBit from "./fce/grievance.interface.js";
+/**
+ * 06.grievance.unit - Grievance State Model Container
+ */
+import type Grievance from './fce/grievance.interface.js'
+import type { GrievanceRecord } from './fce/grievance.interface.js'
 
 export class GrievanceModel implements Grievance {
-    //idx:string;
-    //grievanceBitList: GrievanceBit[] = [];
-    //grievanceBits: any = {};
+    idx: string = '06.grievance'
+    records: Map<string, GrievanceRecord> = new Map()
+    recentEncounterHistory: string[] = [] // Sliding window of last K encounter IDs
 }
+
+export default GrievanceModel
