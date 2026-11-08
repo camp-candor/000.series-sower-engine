@@ -6,6 +6,8 @@ import type {
     StageMutationParams,
     StagingCommitResult,
     StagingAccumulatorState,
+    ResolutionReceipt,
+    ResolveDual2d6Params,
 } from './ledger.interface.js'
 
 export interface LedgerPayload {
@@ -14,6 +16,8 @@ export interface LedgerPayload {
     readonly stagedMutations?: readonly StagedMutationRecord[]
     readonly commitResult?: StagingCommitResult
     readonly accumulatorState?: StagingAccumulatorState
+    readonly resolveParams?: ResolveDual2d6Params
+    readonly resolutionReceipt?: ResolutionReceipt
     readonly sequenceNumber?: number
     readonly rowCount?: number
     readonly timestampMs?: number
