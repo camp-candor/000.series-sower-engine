@@ -1,8 +1,12 @@
-import State from './fce/state.interface.js'
-// import StateBit from "./fce/state.interface.js";
+/**
+ * 16.state.unit - State Snapshot Model Container
+ */
+import type StateSnapshot from './fce/state.interface.js'
+import type { LedgerWorkingState } from './fce/state.interface.js'
 
-export class StateModel implements State {
-    //idx:string;
-    //stateBitList: StateBit[] = [];
-    //stateBits: any = {};
+export class StateModel implements StateSnapshot {
+    idx: string = '16.state'
+    activeSnapshot: LedgerWorkingState | null = null
 }
+
+export default StateModel

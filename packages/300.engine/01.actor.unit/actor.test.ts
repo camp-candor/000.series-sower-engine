@@ -14,7 +14,6 @@ import { STAGE_DETAIL_ACTOR } from './actor.action.js'
 import { reducer } from './actor.reduce.js'
 import type { ActorBeliefRecord } from './fce/actor.interface.js'
 
-
 describe('01.actor.unit - Epistemic Horizon & Unratified Detail Salience Battery', () => {
     let model: ActorModel
     let mockState: any
@@ -29,7 +28,9 @@ describe('01.actor.unit - Epistemic Horizon & Unratified Detail Salience Battery
             hunt: vi.fn(async (actionType: string, payload: any) => {
                 if (actionType.includes('Exec Batch Database')) {
                     dbOperations.push(...payload.dat.operations)
-                    return { databaseBit: { val: payload.dat.operations.length } }
+                    return {
+                        databaseBit: { val: payload.dat.operations.length },
+                    }
                 }
                 if (actionType.includes('Append Event')) {
                     eventAppends.push(payload.dat.appendParams)
@@ -95,7 +96,8 @@ describe('01.actor.unit - Epistemic Horizon & Unratified Detail Salience Battery
                         category: 'SPATIAL_SET',
                         recurrence_count: 1,
                         dramatic_turn: 'BACKGROUND',
-                        claim_proposal: 'Incidental gravel on culvert pipe floor',
+                        claim_proposal:
+                            'Incidental gravel on culvert pipe floor',
                     },
                 },
                 slv,
@@ -131,7 +133,8 @@ describe('01.actor.unit - Epistemic Horizon & Unratified Detail Salience Battery
                         category: 'PROP',
                         recurrence_count: 3,
                         dramatic_turn: 'GAZE_PROXIMITY',
-                        claim_proposal: 'A chipped green enamel cup Bog keeps in his pocket',
+                        claim_proposal:
+                            'A chipped green enamel cup Bog keeps in his pocket',
                     },
                 },
                 slv,
@@ -212,7 +215,11 @@ describe('01.actor.unit - Epistemic Horizon & Unratified Detail Salience Battery
         )
 
         const slv = vi.fn()
-        queryHorizonActor(model, { idx: 'q', dat: { observerId: 'char_bog' }, slv }, mockState)
+        queryHorizonActor(
+            model,
+            { idx: 'q', dat: { observerId: 'char_bog' }, slv },
+            mockState,
+        )
 
         expect(slv).toHaveBeenCalled()
         const beliefs = slv.mock.calls[0][0].beliefs as ActorBeliefRecord[]
@@ -235,7 +242,8 @@ describe('01.actor.unit - Epistemic Horizon & Unratified Detail Salience Battery
 
         const worldFacts = {
             fact_water_tainted: 'The culvert water contains caustic lye.',
-            fact_secret_cache: 'Wart buried an iron crowbar under the pipe joint.',
+            fact_secret_cache:
+                'Wart buried an iron crowbar under the pipe joint.',
         }
 
         const slv = vi.fn()
@@ -262,7 +270,9 @@ describe('01.actor.unit - Epistemic Horizon & Unratified Detail Salience Battery
     })
 
     it('rejects floating-point basis points with FLOAT_PROHIBITED', () => {
-        expect(() => assertBasisPoints(7500.5, 'salience_bps')).toThrow(/FLOAT_PROHIBITED/)
+        expect(() => assertBasisPoints(7500.5, 'salience_bps')).toThrow(
+            /FLOAT_PROHIBITED/,
+        )
     })
 
     it('routes STAGE_DETAIL_ACTOR cleanly through pure reducer using clone-deep', async () => {

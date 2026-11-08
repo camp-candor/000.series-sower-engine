@@ -26,10 +26,18 @@ export function reducer(
             return Buzz.queryHorizonActor(clone(model), act.bale as any, state)
 
         case Act.SCRUB_EPISTEMIC_CONTEXT_ACTOR:
-            return Buzz.scrubEpistemicContextActor(clone(model), act.bale as any, state)
+            return Buzz.scrubEpistemicContextActor(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         case Act.CALCULATE_SALIENCE_ACTOR:
-            return Buzz.calculateSalienceActor(clone(model), act.bale as any, state)
+            return Buzz.calculateSalienceActor(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         case Act.STAGE_DETAIL_ACTOR:
             return Buzz.stageDetailActor(clone(model), act.bale as any, state)
@@ -41,7 +49,11 @@ export function reducer(
             return Buzz.discardDetailActor(clone(model), act.bale as any, state)
 
         case Act.LIST_UNRATIFIED_DETAILS_ACTOR:
-            return Buzz.listUnratifiedDetailsActor(clone(model), act.bale as any, state)
+            return Buzz.listUnratifiedDetailsActor(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         default:
             return model

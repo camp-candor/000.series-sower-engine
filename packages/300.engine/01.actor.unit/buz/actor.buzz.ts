@@ -151,7 +151,7 @@ export const recordBeliefActor = async (
     bal: ActorBit,
     ste?: State,
 ): Promise<ActorModel> => {
-    const raw = bal.dat?.beliefParams || bal.dat || {} as any
+    const raw = bal.dat?.beliefParams || bal.dat || ({} as any)
     const observer_id: string = raw.observer_id || bal.src || ''
     const fact_id: string = raw.fact_id || ''
     const prob: number = raw.subjective_probability_bps ?? 10000
@@ -206,7 +206,10 @@ export const recordBeliefActor = async (
         }
     } catch (err: any) {
         const errorMsg = err.message || String(err)
-        await emitConsole(ste, `:: [FAIL] Belief registration failed: ${errorMsg}`)
+        await emitConsole(
+            ste,
+            `:: [FAIL] Belief registration failed: ${errorMsg}`,
+        )
         if (bal.slv) {
             bal.slv({
                 actBit: {
@@ -256,7 +259,7 @@ export const scrubEpistemicContextActor = (
     bal: ActorBit,
     _ste?: State,
 ): ActorModel => {
-    const raw = bal.dat?.scrubParams || bal.dat || {} as any
+    const raw = bal.dat?.scrubParams || bal.dat || ({} as any)
     const observerId: string = raw.observer_id || bal.src || ''
     const facts: Record<string, string> = raw.world_facts || {}
 
@@ -288,7 +291,7 @@ export const calculateSalienceActor = (
     bal: ActorBit,
     _ste?: State,
 ): ActorModel => {
-    const raw = bal.dat?.salienceParams || bal.dat || {} as any
+    const raw = bal.dat?.salienceParams || bal.dat || ({} as any)
     const recCount = raw.recurrence_count ?? 1
     const turn: DramaticTurnLevel = raw.dramatic_turn || 'BACKGROUND'
 
@@ -304,7 +307,9 @@ export const calculateSalienceActor = (
                 actBit: {
                     idx: 'calculate-salience-pass',
                     val: receipt.salience_bps,
-                    src: receipt.isHarvestEligible ? 'HARVEST_ELIGIBLE' : 'EPHEMERAL_NOISE',
+                    src: receipt.isHarvestEligible
+                        ? 'HARVEST_ELIGIBLE'
+                        : 'EPHEMERAL_NOISE',
                     dat: { salienceReceipt: receipt },
                 },
             })
@@ -329,7 +334,7 @@ export const stageDetailActor = async (
     bal: ActorBit,
     ste?: State,
 ): Promise<ActorModel> => {
-    const raw = bal.dat?.stageDetailParams || bal.dat || {} as any
+    const raw = bal.dat?.stageDetailParams || bal.dat || ({} as any)
     const detail_id: string = raw.detail_id || bal.src || ''
     const scene_id: string = raw.scene_id || 'sc01'
     const label_candidate: string = raw.label_candidate || 'unnamed_detail'
@@ -340,7 +345,8 @@ export const stageDetailActor = async (
     const nowMs: number = raw.timestamp_ms || 1700000000000
 
     if (!detail_id || !claim_proposal) {
-        const err = '[INVALID_DETAIL_PARAMS] Missing detail_id or claim_proposal'
+        const err =
+            '[INVALID_DETAIL_PARAMS] Missing detail_id or claim_proposal'
         await emitConsole(ste, `:: [FAIL] ${err}`)
         if (bal.slv) {
             bal.slv({
@@ -467,7 +473,7 @@ export const ratifyDetailActor = async (
     bal: ActorBit,
     ste?: State,
 ): Promise<ActorModel> => {
-    const raw = bal.dat?.ratifyDetailParams || bal.dat || {} as any
+    const raw = bal.dat?.ratifyDetailParams || bal.dat || ({} as any)
     const detail_id = raw.detail_id || bal.src
     const ratified_id = raw.ratified_entity_id
     const nowMs = raw.timestamp_ms || 1700000000000
@@ -489,7 +495,8 @@ export const ratifyDetailActor = async (
     }
 
     if (!ratified_id) {
-        const err = '[MISSING_CANON_ID] ratified_entity_id required for promotion'
+        const err =
+            '[MISSING_CANON_ID] ratified_entity_id required for promotion'
         if (bal.slv) {
             bal.slv({
                 actBit: {
@@ -569,7 +576,7 @@ export const discardDetailActor = async (
     bal: ActorBit,
     ste?: State,
 ): Promise<ActorModel> => {
-    const raw = bal.dat?.discardDetailParams || bal.dat || {} as any
+    const raw = bal.dat?.discardDetailParams || bal.dat || ({} as any)
     const detail_id = raw.detail_id || bal.src
     const nowMs = raw.timestamp_ms || 1700000000000
 
