@@ -1,20 +1,47 @@
+/**
+ * 01.actor.unit - Actor Reducer Router
+ */
 import clone from 'clone-deep'
 import * as Act from './actor.action.js'
 import { ActorModel } from './actor.model.js'
 import * as Buzz from './actor.buzzer.js'
-import State from '../99.core/state.js'
+import type State from '../99.core/state.js'
 
 export function reducer(
     model: ActorModel = new ActorModel(),
     act: Act.Actions,
     state?: State,
-) {
+): ActorModel | Promise<ActorModel> {
     switch (act.type) {
-        case Act.UPDATE_ACTOR:
-            return Buzz.updateActor(clone(model), act.bale, state as State)
-
         case Act.INIT_ACTOR:
-            return Buzz.initActor(clone(model), act.bale, state as State)
+            return Buzz.initActor(clone(model), act.bale, state)
+
+        case Act.UPDATE_ACTOR:
+            return Buzz.updateActor(clone(model), act.bale, state)
+
+        case Act.RECORD_BELIEF_ACTOR:
+            return Buzz.recordBeliefActor(clone(model), act.bale as any, state)
+
+        case Act.QUERY_HORIZON_ACTOR:
+            return Buzz.queryHorizonActor(clone(model), act.bale as any, state)
+
+        case Act.SCRUB_EPISTEMIC_CONTEXT_ACTOR:
+            return Buzz.scrubEpistemicContextActor(clone(model), act.bale as any, state)
+
+        case Act.CALCULATE_SALIENCE_ACTOR:
+            return Buzz.calculateSalienceActor(clone(model), act.bale as any, state)
+
+        case Act.STAGE_DETAIL_ACTOR:
+            return Buzz.stageDetailActor(clone(model), act.bale as any, state)
+
+        case Act.RATIFY_DETAIL_ACTOR:
+            return Buzz.ratifyDetailActor(clone(model), act.bale as any, state)
+
+        case Act.DISCARD_DETAIL_ACTOR:
+            return Buzz.discardDetailActor(clone(model), act.bale as any, state)
+
+        case Act.LIST_UNRATIFIED_DETAILS_ACTOR:
+            return Buzz.listUnratifiedDetailsActor(clone(model), act.bale as any, state)
 
         default:
             return model
