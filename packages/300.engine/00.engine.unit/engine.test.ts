@@ -25,7 +25,11 @@ describe('00.engine.unit - Engine Master Lifecycle Orchestrator Battery', () => 
                     return { stateHash: 'a'.repeat(64) }
                 }
                 if (actionType.includes('Query Database')) {
-                    return { databaseBit: { dat: { records: [{ id: 1 }, { id: 2 }] } } }
+                    return {
+                        databaseBit: {
+                            dat: { records: [{ id: 1 }, { id: 2 }] },
+                        },
+                    }
                 }
                 return {}
             }),
@@ -69,9 +73,15 @@ describe('00.engine.unit - Engine Master Lifecycle Orchestrator Battery', () => 
         expect(model.lastBootMs).toBe(1000)
 
         // Verify the 3-phase boot dispatches occurred
-        expect(dispatchedActions.some((a) => a.includes('Init Database'))).toBe(true)
-        expect(dispatchedActions.some((a) => a.includes('Seed Genesis'))).toBe(true)
-        expect(dispatchedActions.some((a) => a.includes('Hydrate State'))).toBe(true)
+        expect(dispatchedActions.some((a) => a.includes('Init Database'))).toBe(
+            true,
+        )
+        expect(dispatchedActions.some((a) => a.includes('Seed Genesis'))).toBe(
+            true,
+        )
+        expect(dispatchedActions.some((a) => a.includes('Hydrate State'))).toBe(
+            true,
+        )
     })
 
     it('aggregates table inventory and compiles status report', async () => {

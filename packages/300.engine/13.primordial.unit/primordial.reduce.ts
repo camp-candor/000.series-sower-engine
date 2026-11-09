@@ -27,6 +27,7 @@ export function reducer(
             )
 
         case Act.SEED_PRIMORDIAL:
+        case Act.SEED_GENESIS:
             return Buzz.seedPrimordialAction(
                 clone(model),
                 act.bale as any,

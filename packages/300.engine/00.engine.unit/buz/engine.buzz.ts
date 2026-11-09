@@ -1,9 +1,16 @@
-
 import * as ActDbs from '../../02.database.unit/database.action.js'
 import * as ActSte from '../../16.state.unit/state.action.js'
+import * as ActPrm from '../../13.primordial.unit/primordial.action.js'
 import { sha256Hex } from '../../04.envelope.unit/envelope.buzzer.js'
 import { EngineModel } from '../engine.model.js'
 import EngineBit from '../fce/engine.bit.js'
+import type {
+    EngineStatusReport,
+    EngineAuditReceipt,
+    EngineBootReceipt,
+    TableStatusReport,
+    BootEngineParams,
+} from '../fce/engine.interface.js'
 import State from '../../99.core/state.js'
 import {
     reducer as tickReducer,
@@ -1066,13 +1073,13 @@ export const listEngine = async (
     return cpy
 }
 
-
 export const bootEngine = async (
     cpy: EngineModel,
     bal: EngineBit,
     ste?: State,
 ): Promise<EngineModel> => {
-    const params: BootEngineParams | undefined = bal.dat?.bootParams || bal.dat as any
+    const params: BootEngineParams | undefined =
+        bal.dat?.bootParams || (bal.dat as any)
     const seriesSlug = params?.seriesSlug || cpy.seriesSlug
     const nowMs = params?.timestampMs || 1700000000000
 
@@ -1092,17 +1099,24 @@ export const bootEngine = async (
             await ste.hunt(ActDbs.INIT_DATABASE, {
                 dat: { seriesSlug },
             })
+            await ste.hunt(ActDbs.ENSURE_SCHEMA_DATABASE, {
+                dat: { seriesSlug },
+            })
 
             // Phase 2: Primordial seeding (if requested or needed)
             if (params?.seedGenesis) {
-                await ste.hunt('[Primordial action] Seed Genesis', {
-                    dat: { seriesSlug, timestampMs: nowMs },
-                }).catch(() => {})
+                await ste
+                    .hunt(ActPrm.SEED_GENESIS, {
+                        dat: { seriesSlug, timestampMs: nowMs },
+                    })
+                    .catch(() => {})
             }
 
             // Phase 3: Hydrate master deep-frozen state snapshot in 16.state.unit
             const hydRes: any = await ste.hunt(ActSte.HYDRATE_STATE, {
-                dat: { hydrateParams: { seriesSlug, tick: 0, timestampMs: nowMs } },
+                dat: {
+                    hydrateParams: { seriesSlug, tick: 0, timestampMs: nowMs },
+                },
             })
             if (hydRes?.stateHash) {
                 stateHash = hydRes.stateHash

@@ -22,6 +22,12 @@ export class SeedPrimordial implements Action {
     constructor(public bale?: PrimordialBit) {}
 }
 
+export const SEED_GENESIS = '[Primordial action] Seed Genesis'
+export class SeedGenesis implements Action {
+    readonly type = SEED_GENESIS
+    constructor(public bale?: PrimordialBit) {}
+}
+
 export const COMPUTE_HROOT_PRIMORDIAL =
     '[Primordial action] Compute Hroot Primordial'
 export class ComputeHrootPrimordial implements Action {
@@ -40,5 +46,6 @@ export type Actions =
     | InitPrimordial
     | UpdatePrimordial
     | SeedPrimordial
+    | SeedGenesis
     | ComputeHrootPrimordial
     | VerifyGenesisPrimordial

@@ -132,22 +132,26 @@ export class AntiGamingAudit implements Action {
 export const BOOT_ENGINE = '[Engine action] Boot Engine'
 export class BootEngine implements Action {
     readonly type = BOOT_ENGINE
-    constructor(public bale?: EngineBit) {}}
+    constructor(public bale?: EngineBit) {}
+}
 
 export const STATUS_ENGINE = '[Engine action] Status Engine'
 export class StatusEngine implements Action {
     readonly type = STATUS_ENGINE
-    constructor(public bale?: EngineBit) {}}
+    constructor(public bale?: EngineBit) {}
+}
 
 export const AUDIT_ENGINE = '[Engine action] Audit Engine'
 export class AuditEngine implements Action {
     readonly type = AUDIT_ENGINE
-    constructor(public bale?: EngineBit) {}}
+    constructor(public bale?: EngineBit) {}
+}
 
 export const RESET_ENGINE = '[Engine action] Reset Engine'
 export class ResetEngine implements Action {
     readonly type = RESET_ENGINE
-    constructor(public bale?: EngineBit) {}}
+    constructor(public bale?: EngineBit) {}
+}
 
 export type Actions =
     | InitEngine
@@ -170,7 +174,6 @@ export type Actions =
     | DivisionAudit
     | BigIntAudit
     | AntiGamingAudit
-
     | BootEngine
     | StatusEngine
     | AuditEngine

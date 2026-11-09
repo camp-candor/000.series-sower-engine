@@ -14,7 +14,11 @@ export function reducer(
             return Buzz.updateEngine(clone(model), act.bale, state as State)
 
         case Act.INIT_ENGINE:
-            return Buzz.initEngine(clone(model), act.bale, state as State)
+            return Buzz.initEngine(
+                clone(model),
+                act.bale as any,
+                state as State,
+            )
 
         case Act.TEST_ENGINE:
             return Buzz.testEngine(clone(model), act.bale, state as State)

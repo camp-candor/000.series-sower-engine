@@ -1,6 +1,11 @@
 /* eslint-disable */
 import * as ActMnu from '../menu.action.js'
 import * as ActOlm from '../../00.engine.unit/engine.action.js'
+import * as ActEng from '../../00.engine.unit/engine.action.js'
+import * as ActGrv from '../../06.grievance.unit/grievance.action.js'
+import * as ActLed from '../../08.ledger.unit/ledger.action.js'
+import * as ActAct from '../../01.actor.unit/actor.action.js'
+import * as ActSte from '../../16.state.unit/state.action.js'
 import * as ActSeq from '../../14.sequence.unit/sequence.action.js'
 import * as ActDba from '../../02.database.unit/database.action.js'
 import * as ActEnv from '../../04.envelope.unit/envelope.action.js'
@@ -100,6 +105,8 @@ import {
     foldEventsStateAction,
     whyDirtyStateAction,
 } from '../../16.state.unit/state.buzzer.js'
+import { EngineModel } from '../../00.engine.unit/engine.model.js'
+import { auditEngine } from '../../00.engine.unit/engine.buzzer.js'
 
 let bit: any, lst: any, src: any
 let rootSlv: any
@@ -111,58 +118,348 @@ const OPEN_CHOICE = '[Open action] Open Choice'
 const CLOSE_TERMINAL = '[Close action] Close Terminal'
 const PRINT_MENU = '[Render action] Print Menu'
 
-export const initMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
-    if (bal.slv != null) rootSlv = bal.slv
+export const MENU_CHOICES: readonly string[] = Object.freeze([
+    '[01] BOOT ENGINE & ENSURE SCHEMA',
+    '[02] STATUS ENGINE & TABLE INVENTORY',
+    '[03] AUDIT SIMULATION INVARIANTS',
+    '[04] RESET ENGINE TO OFFLINE',
+    '[10] EXECUTE STAGE 3 GRIEVANCE LOTTERY & ENCOUNTER SELECTION',
+    '[11] AUDIT STAGING ACCUMULATOR & ATOMIC COMMIT',
+    '[12] EXECUTE STAGE 4 DUAL-SET 2D6 CONFLICT RESOLUTION',
+    '[13] AUDIT UNRATIFIED DETAILS & SALIENCE HARVEST QUEUE',
+    '[14] EXECUTE DETERMINISTIC STATE FOLD & AUDIT WHY-DIRTY',
+    '[15] AUDIT EPISTEMIC HORIZONS & SUBTEXT ATTENUATION',
+    '[16] COMPILE DUAL-FIELD DIALOGUE AST & ENFORCE CURTNESS',
+    '[ROOT MENU]',
+])
 
-    const lib = (globalThis as any).LIBRARY || (global as any).LIBRARY
+async function emitConsole(ste: State | undefined, src: string): Promise<void> {
+    if (ste && typeof ste.hunt === 'function') {
+        await ste.hunt(UPDATE_CONSOLE, { idx: 'cns00', src }).catch(() => {})
+    }
+    const lib =
+        (globalThis as any).LIBRARY ||
+        (typeof global !== 'undefined' ? (global as any).LIBRARY : undefined)
     if (lib && typeof lib.hunt === 'function') {
-        bit = await lib.hunt(UPDATE_GRID, {
-            x: 4,
-            y: 0,
-            xSpan: 8,
-            ySpan: 12,
-        })
-        bit = await lib.hunt(WRITE_CONSOLE, {
-            idx: 'cns00',
-            src: '',
-            dat: { net: bit?.grdBit?.dat, src: 'alligaor0' },
-        })
+        await lib.hunt(UPDATE_CONSOLE, { idx: 'cns00', src }).catch(() => {})
+    }
+}
 
-        bit = await lib.hunt(UPDATE_CONSOLE, {
-            idx: 'cns00',
-            src: '-----------',
-        })
-        bit = await lib.hunt(UPDATE_CONSOLE, {
-            idx: 'cns00',
-            src: 'SIMULATION ENGINE',
-        })
-        bit = await lib.hunt(UPDATE_CONSOLE, {
-            idx: 'cns00',
-            src: '>> [BEE:MANIFEST] 25 Sovereign Units Synchronized & Online',
-        })
-        bit = await lib.hunt(UPDATE_CONSOLE, {
-            idx: 'cns00',
-            src: '>> [OK] packages/300.engine active in local isolate (Zero VRAM)',
-        })
-        bit = await lib.hunt(UPDATE_CONSOLE, {
-            idx: 'cns00',
-            src: '-----------',
-        })
+export const handleMenuSelection = async (
+    selection: string,
+    ste?: State,
+): Promise<void> => {
+    if (!ste || typeof ste.hunt !== 'function') {
+        return
     }
 
-    await updateMenu(cpy, bal, ste)
+    switch (selection) {
+        case '[01] BOOT ENGINE & ENSURE SCHEMA': {
+            await emitConsole(
+                ste,
+                '>> [MENU:ACTION] Dispatching BOOT_ENGINE...',
+            )
+            await ste.hunt(ActEng.BOOT_ENGINE, {
+                dat: {
+                    bootParams: {
+                        seriesSlug: 'under-the-floorboards',
+                        seedGenesis: true,
+                    },
+                },
+            })
+            break
+        }
+
+        case '[02] STATUS ENGINE & TABLE INVENTORY': {
+            await emitConsole(
+                ste,
+                '>> [MENU:ACTION] Dispatching STATUS_ENGINE...',
+            )
+            await ste.hunt(ActEng.STATUS_ENGINE, {})
+            break
+        }
+
+        case '[03] AUDIT SIMULATION INVARIANTS': {
+            await emitConsole(
+                ste,
+                '>> [MENU:ACTION] Dispatching AUDIT_ENGINE...',
+            )
+            await ste.hunt(ActEng.AUDIT_ENGINE, {})
+            break
+        }
+
+        case '[04] RESET ENGINE TO OFFLINE': {
+            await emitConsole(
+                ste,
+                '>> [MENU:ACTION] Dispatching RESET_ENGINE...',
+            )
+            await ste.hunt(ActEng.RESET_ENGINE, {})
+            break
+        }
+
+        case '[10] EXECUTE STAGE 3 GRIEVANCE LOTTERY & ENCOUNTER SELECTION': {
+            await emitConsole(
+                ste,
+                '>> [MENU:ACTION] Dispatching SELECT_STAGE3_ENCOUNTER...',
+            )
+            await ste.hunt(ActGrv.SELECT_STAGE3_ENCOUNTER, {
+                dat: {
+                    selectionParams: {
+                        sceneCast: ['char_bog', 'char_wart'],
+                        currentTensionBps: 3000,
+                        tick: 1,
+                        timestamp_ms: 1700000000000,
+                    },
+                },
+            })
+            break
+        }
+
+        case '[11] AUDIT STAGING ACCUMULATOR & ATOMIC COMMIT': {
+            await emitConsole(
+                ste,
+                '>> [MENU:ACTION] Dispatching COMMIT_STAGING_LEDGER...',
+            )
+            await ste.hunt(ActLed.COMMIT_STAGING_LEDGER, {
+                dat: { timestampMs: 1700000000000 },
+            })
+            break
+        }
+
+        case '[12] EXECUTE STAGE 4 DUAL-SET 2D6 CONFLICT RESOLUTION': {
+            await emitConsole(
+                ste,
+                '>> [MENU:ACTION] Dispatching RESOLVE_DUAL_2D6_LEDGER...',
+            )
+            await ste.hunt(ActLed.RESOLVE_DUAL_2D6_LEDGER, {
+                dat: {
+                    resolveParams: {
+                        context: {
+                            initiator: {
+                                id: 'char_bog',
+                                stats: { cunning: 2, poise: 1 },
+                            },
+                            target: {
+                                id: 'char_wart',
+                                stats: { spite: 1, vigor: 2 },
+                            },
+                            tick: 1,
+                            timestampMs: 1700000000000,
+                        },
+                        autoStage: true,
+                    },
+                },
+            })
+            break
+        }
+
+        case '[13] AUDIT UNRATIFIED DETAILS & SALIENCE HARVEST QUEUE': {
+            await emitConsole(
+                ste,
+                '>> [MENU:ACTION] Dispatching STAGE_DETAIL_ACTOR...',
+            )
+            await ste.hunt(ActAct.STAGE_DETAIL_ACTOR, {
+                dat: {
+                    stageDetailParams: {
+                        detail_id: 'det_cockpit_green_cup',
+                        scene_id: 'sc01',
+                        label_candidate: 'green_enamel_cup',
+                        category: 'PROP',
+                        recurrence_count: 3,
+                        dramatic_turn: 'GAZE_PROXIMITY',
+                        claim_proposal: 'Chipped green enamel cup on floor',
+                    },
+                },
+            })
+            break
+        }
+
+        case '[14] EXECUTE DETERMINISTIC STATE FOLD & AUDIT WHY-DIRTY': {
+            await emitConsole(
+                ste,
+                '>> [MENU:ACTION] Dispatching HYDRATE_STATE & WHY_DIRTY_STATE...',
+            )
+            await ste.hunt(ActSte.HYDRATE_STATE, {
+                dat: {
+                    hydrateParams: {
+                        seriesSlug: 'under-the-floorboards',
+                        tick: 1,
+                    },
+                },
+            })
+            await ste.hunt(ActSte.WHY_DIRTY_STATE, {
+                dat: { whyDirtyParams: { entityId: 'char_bog' } },
+            })
+            break
+        }
+
+        case '[15] AUDIT EPISTEMIC HORIZONS & SUBTEXT ATTENUATION': {
+            await emitConsole(
+                ste,
+                '>> [MENU:ACTION] Dispatching BUILD_SUBTEXT_DIRECTIVE_ACTOR...',
+            )
+            await ste.hunt(ActAct.BUILD_SUBTEXT_DIRECTIVE_ACTOR, {
+                dat: {
+                    subtextParams: {
+                        actor_id: 'char_bog',
+                        tension_bps: 8000,
+                        candidate_props: ['item_copper_tea_kettle'],
+                        surface_dispute: 'bent kettle lid',
+                        underlying_conflict: 'fear of seasonal abandonment',
+                    },
+                },
+            })
+            break
+        }
+
+        case '[16] COMPILE DUAL-FIELD DIALOGUE AST & ENFORCE CURTNESS': {
+            await emitConsole(
+                ste,
+                '>> [MENU:ACTION] Dispatching COMPILE_DIALOGUE_BEAT_ACTOR...',
+            )
+            await ste.hunt(ActAct.COMPILE_DIALOGUE_BEAT_ACTOR, {
+                dat: {
+                    compileBeatParams: {
+                        beat_id: 'b_cockpit_01',
+                        speaker: 'char_bog',
+                        dialogue_text: 'Leave the valve.',
+                        camera_parenthetical: 'Camera pushes in on Bog jaw.',
+                        observable_parenthetical: 'Bog stands motionless.',
+                        speech_act: 'IMPLICIT_WARNING',
+                        emotion: 'cold_urgency',
+                        swain_mru_phase: 'SPEECH',
+                        extracted_motor_actions: ['STAND'],
+                        curtness_bps: 10000,
+                    },
+                },
+            })
+            break
+        }
+    }
+}
+
+export const selectMenuOptionAction = async (
+    cpy: MenuModel,
+    bal: MenuBit,
+    ste?: State,
+): Promise<MenuModel> => {
+    const selection = bal.dat?.selection || bal.src || ''
+    cpy.activeSelection = selection
+
+    await handleMenuSelection(selection, ste)
+
+    if (bal.slv) {
+        bal.slv({
+            mnuBit: {
+                idx: 'select-menu-option-pass',
+                val: 1,
+                src: selection,
+            },
+        })
+    }
 
     return cpy
 }
 
-export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
+export const initMenu = async (
+    cpy: MenuModel,
+    bal?: MenuBit,
+    ste?: State,
+): Promise<MenuModel> => {
+    cpy.activeSelection = ''
+    cpy.lastActionTimestamp = bal?.dat?.timestampMs || 1700000000000
+
+    if (bal?.slv != null) rootSlv = bal.slv
+
+    // NOTE: emit without ste; engine hunt for console updates never settles,
+    // so this routes cns00 telemetry via global LIBRARY and never stalls boot.
+    await emitConsole(
+        undefined,
+        '>> [FLIGHT_DECK:READY] 300.ENGINE SIMULATION COCKPIT ONLINE [OK]',
+    )
+
     const lib = (globalThis as any).LIBRARY || (global as any).LIBRARY
     if (!lib || typeof lib.hunt !== 'function') {
-        if (bal?.slv) bal.slv({ mnuBit: { idx: 'update-menu-headless' } })
+        cpy.isHeadless = true
+        if (bal?.slv) {
+            bal.slv({
+                mnuBit: {
+                    idx: 'init-menu-headless-pass',
+                    val: 1,
+                    src: 'HEADLESS',
+                },
+            })
+        }
         return cpy
     }
 
+    cpy.isHeadless = false
+
+    bit = await lib.hunt(UPDATE_GRID, {
+        x: 4,
+        y: 0,
+        xSpan: 8,
+        ySpan: 12,
+    })
+    bit = await lib.hunt(WRITE_CONSOLE, {
+        idx: 'cns00',
+        src: '',
+        dat: { net: bit?.grdBit?.dat, src: 'alligaor0' },
+    })
+
+    bit = await lib.hunt(UPDATE_CONSOLE, {
+        idx: 'cns00',
+        src: '-----------',
+    })
+    bit = await lib.hunt(UPDATE_CONSOLE, {
+        idx: 'cns00',
+        src: 'SIMULATION ENGINE',
+    })
+    bit = await lib.hunt(UPDATE_CONSOLE, {
+        idx: 'cns00',
+        src: '>> [BEE:MANIFEST] 25 Sovereign Units Synchronized & Online',
+    })
+    bit = await lib.hunt(UPDATE_CONSOLE, {
+        idx: 'cns00',
+        src: '>> [OK] packages/300.engine active in local isolate (Zero VRAM)',
+    })
+    bit = await lib.hunt(UPDATE_CONSOLE, {
+        idx: 'cns00',
+        src: '-----------',
+    })
+
+    // First render delegates once to updateMenu without propagating the
+    // init-time resolver, so the runner keeps the engine menu mounted until
+    // an explicit [ROOT MENU] exit; re-arm stays timer-driven (no recursion).
+    return updateMenu(cpy, { ...bal, slv: undefined } as MenuBit, ste).then(
+        () => cpy,
+    )
+}
+
+export const updateMenu = async (
+    cpy: MenuModel,
+    bal?: MenuBit,
+    ste?: State,
+): Promise<MenuModel> => {
+    const lib = (globalThis as any).LIBRARY || (global as any).LIBRARY
+    if (!lib || typeof lib.hunt !== 'function') {
+        cpy.isHeadless = true
+        if (bal?.slv) {
+            bal.slv({
+                mnuBit: {
+                    idx: 'update-menu-headless-pass',
+                    val: 1,
+                    src: 'HEADLESS',
+                },
+            })
+        }
+        return cpy
+    }
+
+    cpy.isHeadless = false
+
     lst = [
+        ...MENU_CHOICES,
         'OPEN GAUNTLET MENU',
         'COMPILE & PREFLIGHT PARALLAX DINNER',
         'AUDIT ZERO-RUNTIME FENCE',
@@ -235,6 +532,15 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
     ]
 
     const descriptions: Record<string, string> = {
+        '[01] BOOT ENGINE & ENSURE SCHEMA':
+            'Boot master engine kernel and ensure relational schema.',
+        '[02] STATUS ENGINE & TABLE INVENTORY':
+            'Aggregate live status across 6 relational tables.',
+        '[03] AUDIT SIMULATION INVARIANTS':
+            'Run non-destructive invariant audit gauntlet with SHA-256 receipt.',
+        '[04] RESET ENGINE TO OFFLINE':
+            'Reset runtime state to OFFLINE baseline.',
+        '[ROOT MENU]': 'Return to the master runner switchboard.',
         'OPEN GAUNTLET MENU':
             'Open the Simulation Engine Cockpit to audit CI gates and tick performance.',
         'COMPILE & PREFLIGHT PARALLAX DINNER':
@@ -348,7 +654,7 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         x: 0,
         y: 4,
         xSpan: 4,
-        ySpan: 12,
+        ySpan: 8,
     })
     bit = await lib.hunt(OPEN_CHOICE, {
         dat: {
@@ -367,8 +673,92 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
     })
 
     src = bit?.chcBit?.src
+    cpy.activeSelection = src || ''
+    cpy.lastActionTimestamp = bal?.dat?.timestampMs || 1700000000000
+
+    // NOTE: '[03]' runs through the dedicated TUI case below via direct unit
+    // calls; ste.hunt console telemetry never settles, so routed dispatch
+    // would stall the interactive journey. Headless routing for all 12
+    // choices stays intact inside handleMenuSelection.
+    if (
+        MENU_CHOICES.includes(src) &&
+        src !== '[ROOT MENU]' &&
+        src !== '[03] AUDIT SIMULATION INVARIANTS'
+    ) {
+        await handleMenuSelection(src, ste)
+    }
+
+    if (src === '[ROOT MENU]') {
+        if (bal?.slv) {
+            bal.slv({
+                mnuBit: {
+                    idx: 'root-menu-exit',
+                    val: 1,
+                    src: '[ROOT MENU]',
+                },
+            })
+        }
+        if (rootSlv != null && rootSlv !== bal?.slv) {
+            rootSlv({ mnuBit: { idx: 'root-menu' } })
+        }
+        return cpy
+    }
+
+    if (!ste || typeof ste.hunt !== 'function') {
+        if (bal?.slv) {
+            bal.slv({
+                mnuBit: {
+                    idx: 'update-menu-no-state',
+                    val: -1,
+                    src: cpy.activeSelection,
+                },
+            })
+        }
+        return cpy
+    }
 
     switch (src) {
+        case '[01] BOOT ENGINE & ENSURE SCHEMA':
+        case '[02] STATUS ENGINE & TABLE INVENTORY':
+        case '[04] RESET ENGINE TO OFFLINE':
+            break
+
+        case '[03] AUDIT SIMULATION INVARIANTS': {
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> ============================================================',
+            })
+            try {
+                const engMod = new EngineModel()
+                const sink = () => {}
+                // NOTE: pass undefined ste; engine hunt for console updates never
+                // settles, so the audit buzzer routes cns00 telemetry via global LIBRARY.
+                await lib.hunt(UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: '>> [MENU:ACTION] Dispatching AUDIT_ENGINE...',
+                })
+                await auditEngine(
+                    engMod,
+                    {
+                        idx: 'menu-03-audit',
+                        dat: { timestampMs: 1700000000000 },
+                        slv: sink,
+                    } as any,
+                    undefined,
+                )
+            } catch (err: any) {
+                await lib.hunt(UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `:: [FAIL] [MENU:ACTION] ${err?.message ?? String(err)}`,
+                })
+            }
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> ============================================================',
+            })
+            break
+        }
+
         case 'OPEN GAUNTLET MENU': {
             await openGauntletMenu(cpy, bal, ste)
             break
@@ -2449,6 +2839,7 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
 
         case 'ROOT MENU':
             if (rootSlv != null) rootSlv({ mnuBit: { idx: 'root-menu' } })
+            else if (bal?.slv) bal.slv({ mnuBit: { idx: 'root-menu' } })
             return cpy
 
         default:
@@ -2456,9 +2847,21 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             break
     }
 
-    setTimeout(async () => {
-        bit = await ste.hunt(ActMnu.UPDATE_MENU, {})
-    }, 333)
+    if (ste && typeof ste.hunt === 'function') {
+        setTimeout(async () => {
+            bit = await ste.hunt(ActMnu.UPDATE_MENU, {}).catch(() => {})
+        }, 333)
+    }
+
+    if (bal?.slv) {
+        bal.slv({
+            mnuBit: {
+                idx: 'update-menu-pass',
+                val: 1,
+                src: cpy.activeSelection,
+            },
+        })
+    }
 
     return cpy
 }

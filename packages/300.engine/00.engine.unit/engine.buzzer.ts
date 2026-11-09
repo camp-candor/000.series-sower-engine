@@ -28,6 +28,4 @@ export type {
     EngineBootReceipt,
     BootEngineParams,
 } from './fce/engine.interface.js'
-export type {
-    EnginePayload,
-} from './fce/engine.bit.js'
+export type { EnginePayload } from './fce/engine.bit.js'
