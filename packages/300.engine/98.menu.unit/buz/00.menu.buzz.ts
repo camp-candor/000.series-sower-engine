@@ -649,7 +649,7 @@ export const updateMenu = async (
 
     const descriptions: Record<string, string> = {
         '[01] BOOT ENGINE & ENSURE SCHEMA':
-            'Boot master engine kernel and ensure relational schema.',
+            'Boot master engine kernel and ensure relational schema. Runs Canon Airlock scan of compiled/ universe manifests.',
         '[02] STATUS ENGINE & TABLE INVENTORY':
             'Aggregate live status across 6 relational tables.',
         '[03] AUDIT SIMULATION INVARIANTS':
@@ -834,7 +834,82 @@ export const updateMenu = async (
     }
 
     switch (src) {
-        case '[01] BOOT ENGINE & ENSURE SCHEMA':
+        case '[01] BOOT ENGINE & ENSURE SCHEMA': {
+            // Canon Airlock: sweep compiled/ manifests, then present the
+            // operator universe switchboard in the left choice deck.
+            await emitConsole(
+                ste,
+                '>> [AIRLOCK::SCAN] Sweeping compiled/ universe manifests from host volume...',
+            )
+            let discovered: CompiledUniverseDescriptor[] = []
+            try {
+                discovered = scanCompiledUniverses()
+            } catch {
+                discovered = []
+            }
+            cpy.discoveredUniverses = discovered
+            await emitConsole(
+                ste,
+                `>> [AIRLOCK::FOUND] ${discovered.length} sealed world artifacts detected:`,
+            )
+            for (const universe of discovered) {
+                await emitConsole(
+                    ste,
+                    `:: - ${universe.seriesSlug} (${universe.byteSize} bytes, ${universe.merkleRootHex.slice(0, 12)}...)`,
+                )
+            }
+            await emitConsole(
+                ste,
+                '>> [AIRLOCK::PROMPT] Presenting operator selection switchboard in left deck...',
+            )
+            const airlockGrid = await lib.hunt(UPDATE_GRID, {
+                x: 0,
+                y: 4,
+                xSpan: 4,
+                ySpan: 8,
+            })
+            const airlockChoices = [
+                ...discovered.map((u) => u.seriesSlug),
+                '[ABORT AIRLOCK SEQUENCE]',
+            ]
+            const airlockBit = await lib.hunt(OPEN_CHOICE, {
+                dat: {
+                    clr0: Color.BLACK,
+                    clr1: Color.YELLOW,
+                    cb: (choice: string) => {
+                        const text =
+                            choice === '[ABORT AIRLOCK SEQUENCE]'
+                                ? 'Abort airlock sequence and return to flight deck.'
+                                : `Seal compiled universe: ${choice}`
+                        lib.hunt(UPDATE_CONSOLE, {
+                            idx: 'cns00',
+                            src: text,
+                        })
+                    },
+                },
+                src: Align.VERTICAL,
+                lst: airlockChoices,
+                net: airlockGrid?.grdBit?.dat,
+            })
+            const picked = airlockBit?.chcBit?.src || ''
+            if (
+                picked &&
+                picked !== '[ABORT AIRLOCK SEQUENCE]' &&
+                discovered.some((u) => u.seriesSlug === picked)
+            ) {
+                cpy.activeUniverseSlug = picked
+                await emitConsole(
+                    ste,
+                    `>> [AIRLOCK::SEALED] Operator sealed universe: ${picked}`,
+                )
+            } else {
+                await emitConsole(
+                    ste,
+                    '>> [AIRLOCK::ABORTED] Airlock sequence aborted, returning to flight deck.',
+                )
+            }
+            break
+        }
         case '[02] STATUS ENGINE & TABLE INVENTORY':
         case '[04] RESET ENGINE TO OFFLINE':
             break

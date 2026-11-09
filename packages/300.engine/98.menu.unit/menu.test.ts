@@ -325,3 +325,121 @@ describe('98.menu.unit :: Local Compiled Universe Discovery (Phase 1)', () => {
         expect(discovered[0].byteSize).toBeGreaterThan(0)
     })
 })
+
+describe('98.menu.unit :: Canon Airlock interactive switchboard (Check 12)', () => {
+    let model: MenuModel
+    let mockState: any
+    let tempDir: string
+
+    beforeEach(() => {
+        model = new MenuModel()
+        mockState = { hunt: vi.fn(async () => ({})) }
+        tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sower-test-airlock-'))
+        const slugDir = path.join(tempDir, 'compiled', 'wiregrass-basin')
+        fs.mkdirSync(slugDir, { recursive: true })
+        fs.writeFileSync(
+            path.join(slugDir, 'bible-state.json'),
+            JSON.stringify({
+                seriesSlug: 'wiregrass-basin',
+                schemaVersion: '1.0.0',
+                merkleRootHex: 'd'.repeat(64),
+                entities: {
+                    characters: {},
+                    locations: {},
+                    possessions: {},
+                    grievances: {},
+                },
+            }),
+            'utf8',
+        )
+        vi.spyOn(process, 'cwd').mockReturnValue(tempDir)
+    })
+
+    afterEach(() => {
+        vi.unstubAllGlobals()
+        vi.restoreAllMocks()
+        delete (global as any).LIBRARY
+        delete (globalThis as any).LIBRARY
+        fs.rmSync(tempDir, { recursive: true, force: true })
+    })
+
+    const mountAirlockLibrary = (
+        libraryLines: string[],
+        choiceLists: any[],
+        airlockPick: string,
+    ) => {
+        let openChoiceCalls = 0
+        ;(globalThis as any).LIBRARY = {
+            hunt: vi.fn(async (actionType: string, payload: any) => {
+                if (actionType.includes('Update Grid')) {
+                    return { grdBit: { dat: { grid: true } } }
+                }
+                if (actionType.includes('Open Choice')) {
+                    openChoiceCalls += 1
+                    choiceLists.push(payload?.lst)
+                    if (openChoiceCalls === 1) {
+                        return {
+                            chcBit: {
+                                src: '[01] BOOT ENGINE & ENSURE SCHEMA',
+                            },
+                        }
+                    }
+                    return { chcBit: { src: airlockPick } }
+                }
+                if (actionType.includes('Update Console')) {
+                    libraryLines.push(payload?.src)
+                }
+                return {}
+            }),
+        }
+    }
+
+    it('streams AIRLOCK tokens and seals the operator universe pick', async () => {
+        const libraryLines: string[] = []
+        const choiceLists: any[] = []
+        mountAirlockLibrary(libraryLines, choiceLists, 'wiregrass-basin')
+
+        const slv = vi.fn()
+        await updateMenu(model, { idx: 'update-airlock-seal', slv }, mockState)
+
+        expect(libraryLines.some((l) => l.includes('[AIRLOCK::SCAN]'))).toBe(
+            true,
+        )
+        expect(
+            libraryLines.some((l) =>
+                l.includes(
+                    '[AIRLOCK::FOUND] 1 sealed world artifacts detected:',
+                ),
+            ),
+        ).toBe(true)
+        expect(libraryLines.some((l) => l.includes('[AIRLOCK::PROMPT]'))).toBe(
+            true,
+        )
+        expect(choiceLists[1]).toContain('wiregrass-basin')
+        expect(choiceLists[1]).toContain('[ABORT AIRLOCK SEQUENCE]')
+        expect(model.activeUniverseSlug).toBe('wiregrass-basin')
+        expect(libraryLines.some((l) => l.includes('[AIRLOCK::SEALED]'))).toBe(
+            true,
+        )
+        expect(slv).toHaveBeenCalled()
+    })
+
+    it('aborts the airlock sequence and returns cleanly', async () => {
+        const libraryLines: string[] = []
+        const choiceLists: any[] = []
+        mountAirlockLibrary(
+            libraryLines,
+            choiceLists,
+            '[ABORT AIRLOCK SEQUENCE]',
+        )
+
+        const slv = vi.fn()
+        await updateMenu(model, { idx: 'update-airlock-abort', slv }, mockState)
+
+        expect(libraryLines.some((l) => l.includes('[AIRLOCK::ABORTED]'))).toBe(
+            true,
+        )
+        expect(model.activeUniverseSlug).toBe('')
+        expect(slv).toHaveBeenCalled()
+    })
+})
