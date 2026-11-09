@@ -221,3 +221,107 @@ describe('98.menu.unit - Blessed Terminal Flight Deck Switchboard Battery', () =
         expect(model.activeSelection).toBe('[01] BOOT ENGINE & ENSURE SCHEMA')
     })
 })
+
+import fs from 'node:fs'
+import path from 'node:path'
+import os from 'node:os'
+import {
+    scanCompiledUniverses,
+    validateUniverseManifestShape,
+} from './buz/00.menu.buzz.js'
+
+describe('98.menu.unit :: Local Compiled Universe Discovery (Phase 1)', () => {
+    let tempDir: string
+
+    beforeEach(() => {
+        tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sower-test-engine-'))
+    })
+
+    afterEach(() => {
+        fs.rmSync(tempDir, { recursive: true, force: true })
+    })
+
+    it('validates correct manifest shape against contract', () => {
+        const validManifest = {
+            seriesSlug: 'wiregrass-basin',
+            schemaVersion: '1.0.0',
+            merkleRootHex: 'a'.repeat(64),
+            entities: {
+                characters: { char_bog: {} },
+                locations: { loc_pipe: {} },
+                possessions: { item_scraper: {} },
+                grievances: { grv_impasse: {} },
+            },
+        }
+        expect(validateUniverseManifestShape(validManifest)).toBe(true)
+    })
+
+    it('rejects manifests missing required entity collections or valid hashes', () => {
+        expect(validateUniverseManifestShape(null)).toBe(false)
+        expect(validateUniverseManifestShape({})).toBe(false)
+        expect(
+            validateUniverseManifestShape({
+                seriesSlug: 'bad-hash',
+                merkleRootHex: 'not-a-64-char-hex',
+                entities: {
+                    characters: {},
+                    locations: {},
+                    possessions: {},
+                    grievances: {},
+                },
+            }),
+        ).toBe(false)
+        expect(
+            validateUniverseManifestShape({
+                seriesSlug: 'missing-grievances',
+                merkleRootHex: 'b'.repeat(64),
+                entities: { characters: {}, locations: {}, possessions: {} },
+            }),
+        ).toBe(false)
+    })
+
+    it('scans compiled/ directory and discovers valid universes while ignoring invalid ones', () => {
+        const compiledPath = path.join(tempDir, 'compiled')
+        fs.mkdirSync(compiledPath, { recursive: true })
+
+        // 1. Valid universe
+        const validSlugDir = path.join(compiledPath, 'wiregrass-basin')
+        fs.mkdirSync(validSlugDir, { recursive: true })
+        fs.writeFileSync(
+            path.join(validSlugDir, 'bible-state.json'),
+            JSON.stringify({
+                seriesSlug: 'wiregrass-basin',
+                schemaVersion: '1.0.0',
+                merkleRootHex: 'c'.repeat(64),
+                entities: {
+                    characters: { char_bog: {} },
+                    locations: { loc_pipe: {} },
+                    possessions: { item_scraper: {} },
+                    grievances: { grv_impasse: {} },
+                },
+            }),
+            'utf8',
+        )
+
+        // 2. Directory without bible-state.json
+        fs.mkdirSync(path.join(compiledPath, 'empty-realm'), {
+            recursive: true,
+        })
+
+        // 3. Directory with corrupt JSON
+        const corruptSlugDir = path.join(compiledPath, 'corrupted-realm')
+        fs.mkdirSync(corruptSlugDir, { recursive: true })
+        fs.writeFileSync(
+            path.join(corruptSlugDir, 'bible-state.json'),
+            '{ invalid-json',
+            'utf8',
+        )
+
+        const discovered = scanCompiledUniverses(tempDir)
+        expect(discovered).toHaveLength(1)
+        expect(discovered[0].seriesSlug).toBe('wiregrass-basin')
+        expect(discovered[0].merkleRootHex).toBe('c'.repeat(64))
+        expect(discovered[0].hasBibleState).toBe(true)
+        expect(discovered[0].byteSize).toBeGreaterThan(0)
+    })
+})
