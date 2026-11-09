@@ -1,6 +1,7 @@
 /**
  * 01.actor.unit - Actor Buzz Business Logic
- * Epistemic Belief Horizon, Unratified Detail Harvest Queue, and Composite Salience Gating.
+ * Epistemic Belief Horizon, Unratified Detail Harvest Queue,
+ * Stage 5 Epistemic Context Scrubbing, Subtext Attenuation, and Secret Leak Probing.
  */
 import { ActorModel } from '../actor.model.js'
 import type ActorBit from '../fce/actor.bit.js'
@@ -10,6 +11,10 @@ import type {
     CalculateSalienceParams,
     SalienceCalculationReceipt,
     DramaticTurnLevel,
+    BuildSubtextParams,
+    SubtextAttenuationDirective,
+    DialogueLeakProbeParams,
+    DialogueLeakProbeReceipt,
 } from '../fce/actor.interface.js'
 import * as ActDbs from '../../02.database.unit/database.action.js'
 import * as ActEvt from '../../05.event.unit/event.action.js'
@@ -59,7 +64,6 @@ export function calculateCompositeSalience(
         )
     }
 
-    // Weight Recurrence: 40% (4,000 bps). Fully saturated at >= 3 recurrences.
     const normalizedRecurrenceBps = Math.min(
         10000,
         Math.floor((recurrence_count * 10000) / 3),
@@ -68,14 +72,13 @@ export function calculateCompositeSalience(
         (4000 * normalizedRecurrenceBps) / 10000,
     )
 
-    // Weight Drama: 60% (6,000 bps)
     let dTurnBps = 0
     if (dramatic_turn === 'MECHANICAL_DUEL') {
         dTurnBps = 10000
     } else if (dramatic_turn === 'GAZE_PROXIMITY') {
         dTurnBps = 5000
     } else {
-        dTurnBps = 0 // 'BACKGROUND'
+        dTurnBps = 0
     }
 
     const dramatic_component_bps = Math.floor((6000 * dTurnBps) / 10000)
@@ -94,6 +97,96 @@ export function calculateCompositeSalience(
     }
 }
 
+// ============================================================================
+// STAGE 5 EPISTEMIC CONTEXT SCRUBBING & SUBTEXT ATTENUATION HELPERS
+// ============================================================================
+
+export function buildSubtextAttenuationDirective(
+    params: BuildSubtextParams,
+): SubtextAttenuationDirective {
+    const { tension_bps, candidate_props, surface_dispute, underlying_conflict } = params
+    assertBasisPoints(tension_bps, 'tension_bps')
+
+    const anchor = candidate_props.length > 0 ? candidate_props[0] : 'grease_bucket'
+
+    if (tension_bps >= 7000) {
+        return {
+            directive_type: 'FALSE_INTERPRETATION_ANCHOR',
+            anchor_prop: anchor,
+            overt_topic: surface_dispute,
+            suppressed_emotion: underlying_conflict,
+            tension_bps,
+            guidance_prompt: `Argue violently about '${surface_dispute}' focusing obsessively on '${anchor}'. Suppress any mention of '${underlying_conflict}'.`,
+        }
+    }
+
+    return {
+        directive_type: 'DIRECT_EXPRESSION',
+        anchor_prop: anchor,
+        overt_topic: surface_dispute,
+        suppressed_emotion: '',
+        tension_bps,
+        guidance_prompt: `Discuss '${surface_dispute}' directly. Tension is calm.`,
+    }
+}
+
+export function probeDialogueSubtextLeak(
+    params: DialogueLeakProbeParams,
+): DialogueLeakProbeReceipt {
+    const { dialogue_text, secret_id, secret_lemmas } = params
+    const threshold_bps = params.threshold_bps ?? 3500 // 0.35 similarity ceiling
+    assertBasisPoints(threshold_bps, 'threshold_bps')
+
+    if (secret_lemmas.length === 0) {
+        return {
+            passed: true,
+            secret_id,
+            overlap_count: 0,
+            total_lemmas: 0,
+            similarity_bps: 0,
+            matched_tokens: Object.freeze([]),
+        }
+    }
+
+    const normalizedWords = dialogue_text
+        .toLowerCase()
+        .replace(/[^a-z0-9_\s]/g, ' ')
+        .split(/\s+/)
+        .filter((w) => w.length > 0)
+
+    const dialogueWordSet = new Set(normalizedWords)
+    const matchedTokens: string[] = []
+
+    for (const lemma of secret_lemmas) {
+        const cleanLemma = lemma.toLowerCase().trim()
+        if (dialogueWordSet.has(cleanLemma)) {
+            matchedTokens.push(cleanLemma)
+        }
+    }
+
+    const overlap_count = matchedTokens.length
+    const total_lemmas = secret_lemmas.length
+    const similarity_bps = Math.min(
+        10000,
+        Math.floor((overlap_count * 10000) / total_lemmas),
+    )
+
+    const passed = similarity_bps <= threshold_bps
+    const error = passed
+        ? undefined
+        : `[EPISTEMIC_HORIZON_LEAK] Dialogue leaked secret '${secret_id}' (Similarity: ${similarity_bps} bps > ${threshold_bps} bps)`
+
+    return {
+        passed,
+        secret_id,
+        overlap_count,
+        total_lemmas,
+        similarity_bps,
+        matched_tokens: Object.freeze(matchedTokens),
+        error,
+    }
+}
+
 export const initActor = async (
     cpy: ActorModel,
     bal?: ActorBit,
@@ -102,7 +195,6 @@ export const initActor = async (
     cpy.beliefs.clear()
     cpy.details.clear()
 
-    // Hydrate unratified details from 02.database.unit if available
     if (ste && typeof ste.hunt === 'function') {
         const queryRes: any = await ste.hunt(ActDbs.QUERY_DATABASE, {
             dat: { table: 'unratified_details' },
@@ -151,7 +243,7 @@ export const recordBeliefActor = async (
     bal: ActorBit,
     ste?: State,
 ): Promise<ActorModel> => {
-    const raw = bal.dat?.beliefParams || bal.dat || {} as any
+    const raw = bal.dat?.beliefParams || bal.dat || {}
     const observer_id: string = raw.observer_id || bal.src || ''
     const fact_id: string = raw.fact_id || ''
     const prob: number = raw.subjective_probability_bps ?? 10000
@@ -251,24 +343,32 @@ export const queryHorizonActor = (
     return cpy
 }
 
-export const scrubEpistemicContextActor = (
+export const scrubEpistemicContextActor = async (
     cpy: ActorModel,
     bal: ActorBit,
-    _ste?: State,
-): ActorModel => {
-    const raw = bal.dat?.scrubParams || bal.dat || {} as any
+    ste?: State,
+): Promise<ActorModel> => {
+    const raw = bal.dat?.scrubParams || bal.dat || {}
     const observerId: string = raw.observer_id || bal.src || ''
     const facts: Record<string, string> = raw.world_facts || {}
 
     const scrubbed: Record<string, string> = {}
+    let omittedCount = 0
 
     for (const [factKey, factValue] of Object.entries(facts)) {
         const beliefId = makeBeliefId(observerId, factKey)
         const b = cpy.beliefs.get(beliefId)
         if (b && b.subjective_probability_bps > 0) {
             scrubbed[factKey] = factValue
+        } else {
+            omittedCount++
         }
     }
+
+    await emitConsole(
+        ste,
+        `>> [EPISTEMIC:SCRUB] Scrubbed context for '${observerId}'. Retained: ${Object.keys(scrubbed).length} facts | Omitted: ${omittedCount} unobserved facts [OK]`,
+    )
 
     if (bal.slv) {
         bal.slv({
@@ -283,12 +383,143 @@ export const scrubEpistemicContextActor = (
     return cpy
 }
 
+export const buildSubtextDirectiveAction = async (
+    cpy: ActorModel,
+    bal: ActorBit,
+    ste?: State,
+): Promise<ActorModel> => {
+    const params: BuildSubtextParams | undefined = bal.dat?.subtextParams
+    if (!params || !params.actor_id) {
+        const err = '[INVALID_SUBTEXT_PARAMS] Missing actor_id or subtextParams'
+        if (bal.slv) {
+            bal.slv({
+                actBit: {
+                    idx: 'build-subtext-fail',
+                    val: -1,
+                    dat: { error: err },
+                },
+            })
+        }
+        return cpy
+    }
+
+    try {
+        const directive = buildSubtextAttenuationDirective(params)
+
+        await emitConsole(
+            ste,
+            `>> [SUBTEXT:DIRECTIVE] [${params.actor_id}] Directive: [${directive.directive_type}] | Anchor: '${directive.anchor_prop}' | Tension: ${directive.tension_bps} bps [OK]`,
+        )
+
+        if (bal.slv) {
+            bal.slv({
+                subtextDirective: directive,
+                actBit: {
+                    idx: 'build-subtext-pass',
+                    val: directive.tension_bps,
+                    src: directive.directive_type,
+                    dat: { subtextDirective: directive },
+                },
+            })
+        }
+    } catch (err: any) {
+        const errorMsg = err.message || String(err)
+        await emitConsole(ste, `:: [FAIL] Subtext directive build failed: ${errorMsg}`)
+        if (bal.slv) {
+            bal.slv({
+                actBit: {
+                    idx: 'build-subtext-fail',
+                    val: -1,
+                    dat: { error: errorMsg },
+                },
+            })
+        }
+    }
+
+    return cpy
+}
+
+export const probeDialogueLeakAction = async (
+    cpy: ActorModel,
+    bal: ActorBit,
+    ste?: State,
+): Promise<ActorModel> => {
+    const params: DialogueLeakProbeParams | undefined = bal.dat?.leakProbeParams
+    if (!params || !params.dialogue_text || !params.secret_id) {
+        const err = '[INVALID_PROBE_PARAMS] Missing dialogue_text or secret_id'
+        if (bal.slv) {
+            bal.slv({
+                actBit: {
+                    idx: 'probe-leak-fail',
+                    val: -1,
+                    dat: { error: err },
+                },
+            })
+        }
+        return cpy
+    }
+
+    try {
+        const receipt = probeDialogueSubtextLeak(params)
+
+        if (!receipt.passed) {
+            await emitConsole(
+                ste,
+                `:: [FAIL] [EPISTEMIC_HORIZON_LEAK] Secret '${params.secret_id}' leaked! Sim: ${receipt.similarity_bps} bps > 3500 bps | Tokens: [${receipt.matched_tokens.join(', ')}]`,
+            )
+            if (bal.slv) {
+                bal.slv({
+                    leakProbeReceipt: receipt,
+                    actBit: {
+                        idx: 'probe-leak-breach',
+                        val: -1,
+                        src: '[EPISTEMIC_HORIZON_LEAK]',
+                        dat: { leakProbeReceipt: receipt, error: receipt.error },
+                    },
+                })
+            }
+            return cpy
+        }
+
+        await emitConsole(
+            ste,
+            `>> [SUBTEXT:LEAK_PROBE] Clean. Secret '${params.secret_id}' uncompromised (Sim: ${receipt.similarity_bps} bps <= 3500 bps) [OK]`,
+        )
+
+        if (bal.slv) {
+            bal.slv({
+                leakProbeReceipt: receipt,
+                actBit: {
+                    idx: 'probe-leak-pass',
+                    val: receipt.similarity_bps,
+                    src: '[OK]',
+                    dat: { leakProbeReceipt: receipt },
+                },
+            })
+        }
+    } catch (err: any) {
+        const errorMsg = err.message || String(err)
+        await emitConsole(ste, `:: [FAIL] Subtext leak probe failed: ${errorMsg}`)
+        if (bal.slv) {
+            bal.slv({
+                actBit: {
+                    idx: 'probe-leak-fail',
+                    val: -1,
+                    dat: { error: errorMsg },
+                },
+            })
+        }
+    }
+
+    return cpy
+}
+
 export const calculateSalienceActor = (
     cpy: ActorModel,
     bal: ActorBit,
     _ste?: State,
 ): ActorModel => {
-    const raw = bal.dat?.salienceParams || bal.dat || {} as any
+    const raw = bal.dat?.salienceParams || bal.dat || {}
     const recCount = raw.recurrence_count ?? 1
     const turn: DramaticTurnLevel = raw.dramatic_turn || 'BACKGROUND'
 
@@ -329,7 +560,7 @@ export const stageDetailActor = async (
     bal: ActorBit,
     ste?: State,
 ): Promise<ActorModel> => {
-    const raw = bal.dat?.stageDetailParams || bal.dat || {} as any
+    const raw = bal.dat?.stageDetailParams || bal.dat || {}
     const detail_id: string = raw.detail_id || bal.src || ''
     const scene_id: string = raw.scene_id || 'sc01'
     const label_candidate: string = raw.label_candidate || 'unnamed_detail'
@@ -360,7 +591,6 @@ export const stageDetailActor = async (
             dramatic_turn,
         })
 
-        // Tier 1: Ephemeral Visual Noise (S < 7,000 bps) -> DISCARD
         if (!receipt.isHarvestEligible) {
             await emitConsole(
                 ste,
@@ -396,7 +626,6 @@ export const stageDetailActor = async (
             return cpy
         }
 
-        // Tier 2: The Harvest Queue (S >= 7,000 bps) -> STAGED
         const stagedRec: UnratifiedDetailRecord = {
             detail_id,
             scene_id,
@@ -413,7 +642,6 @@ export const stageDetailActor = async (
 
         cpy.details.set(detail_id, stagedRec)
 
-        // Persist to 02.database.unit table unratified_details
         if (ste && typeof ste.hunt === 'function') {
             await ste.hunt(ActDbs.EXEC_BATCH_DATABASE, {
                 dat: {
@@ -421,7 +649,7 @@ export const stageDetailActor = async (
                         {
                             table: 'unratified_details',
                             action: 'INSERT',
-                            key: detail_id,
+                            key: detail_id as string,
                             record: stagedRec,
                         },
                     ],
@@ -467,13 +695,13 @@ export const ratifyDetailActor = async (
     bal: ActorBit,
     ste?: State,
 ): Promise<ActorModel> => {
-    const raw = bal.dat?.ratifyDetailParams || bal.dat || {} as any
+    const raw = bal.dat?.ratifyDetailParams || bal.dat || {}
     const detail_id = raw.detail_id || bal.src
     const ratified_id = raw.ratified_entity_id
     const nowMs = raw.timestamp_ms || 1700000000000
     const tick = raw.tick || 1
 
-    const existing = cpy.details.get(detail_id)
+    const existing = cpy.details.get(detail_id as string)
     if (!existing) {
         const err = `[DETAIL_NOT_FOUND] Detail '${detail_id}' not found in harvest queue`
         if (bal.slv) {
@@ -509,24 +737,22 @@ export const ratifyDetailActor = async (
         reviewed_at_ms: nowMs,
     }
 
-    cpy.details.set(detail_id, updated)
+    cpy.details.set(detail_id as string, updated)
 
     if (ste && typeof ste.hunt === 'function') {
-        // Update database row
         await ste.hunt(ActDbs.EXEC_BATCH_DATABASE, {
             dat: {
                 operations: [
                     {
                         table: 'unratified_details',
                         action: 'UPDATE',
-                        key: detail_id,
+                        key: detail_id as string,
                         record: updated,
                     },
                 ],
             },
         })
 
-        // Emit ratification event into historical log
         await ste.hunt(ActEvt.APPEND_EVENT, {
             dat: {
                 appendParams: {
@@ -569,11 +795,11 @@ export const discardDetailActor = async (
     bal: ActorBit,
     ste?: State,
 ): Promise<ActorModel> => {
-    const raw = bal.dat?.discardDetailParams || bal.dat || {} as any
+    const raw = bal.dat?.discardDetailParams || bal.dat || {}
     const detail_id = raw.detail_id || bal.src
     const nowMs = raw.timestamp_ms || 1700000000000
 
-    const existing = cpy.details.get(detail_id)
+    const existing = cpy.details.get(detail_id as string)
     if (!existing) {
         const err = `[DETAIL_NOT_FOUND] Detail '${detail_id}' not found`
         if (bal.slv) {
@@ -594,7 +820,7 @@ export const discardDetailActor = async (
         reviewed_at_ms: nowMs,
     }
 
-    cpy.details.set(detail_id, updated)
+    cpy.details.set(detail_id as string, updated)
 
     if (ste && typeof ste.hunt === 'function') {
         await ste.hunt(ActDbs.EXEC_BATCH_DATABASE, {
@@ -603,7 +829,7 @@ export const discardDetailActor = async (
                     {
                         table: 'unratified_details',
                         action: 'UPDATE',
-                        key: detail_id,
+                        key: detail_id as string,
                         record: updated,
                     },
                 ],

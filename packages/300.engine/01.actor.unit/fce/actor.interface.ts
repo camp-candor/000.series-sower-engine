@@ -1,6 +1,7 @@
 /**
  * 01.actor.unit - Actor Interface Contracts
- * Epistemic Belief Horizon, Unratified Detail Quarantine, and Composite Salience Calculation.
+ * Epistemic Belief Horizon, Unratified Detail Quarantine,
+ * Stage 5 Epistemic Context Scrubbing, Subtext Attenuation, and Leak Probing.
  */
 
 export type BeliefSourceType = 'INFERENCE' | 'TESTIMONY' | 'DIRECT_OBSERVATION'
@@ -96,6 +97,44 @@ export interface RatifyDetailParams {
 export interface DiscardDetailParams {
     readonly detail_id: string
     readonly timestamp_ms?: number
+}
+
+// ============================================================================
+// STAGE 5 EPISTEMIC CONTEXT SCRUBBING & SUBTEXT ATTENUATION CONTRACTS
+// ============================================================================
+
+export interface SubtextAttenuationDirective {
+    readonly directive_type: 'FALSE_INTERPRETATION_ANCHOR' | 'DIRECT_EXPRESSION'
+    readonly anchor_prop: string
+    readonly overt_topic: string
+    readonly suppressed_emotion: string
+    readonly tension_bps: number
+    readonly guidance_prompt: string
+}
+
+export interface BuildSubtextParams {
+    readonly actor_id: string
+    readonly tension_bps: number // [0, 10000]
+    readonly candidate_props: readonly string[]
+    readonly surface_dispute: string
+    readonly underlying_conflict: string
+}
+
+export interface DialogueLeakProbeParams {
+    readonly dialogue_text: string
+    readonly secret_id: string
+    readonly secret_lemmas: readonly string[]
+    readonly threshold_bps?: number // Default: 3500 bps (0.35 similarity)
+}
+
+export interface DialogueLeakProbeReceipt {
+    readonly passed: boolean
+    readonly secret_id: string
+    readonly overlap_count: number
+    readonly total_lemmas: number
+    readonly similarity_bps: number // [0, 10000]
+    readonly matched_tokens: readonly string[]
+    readonly error?: string
 }
 
 export default interface Actor {
