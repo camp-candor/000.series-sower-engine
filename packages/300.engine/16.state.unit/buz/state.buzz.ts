@@ -79,7 +79,9 @@ export function reduceLedgerState(
     const entities: Record<string, CompositeEntityLiveRecord> = {
         ...prevState.entities,
     }
-    const strings: Record<string, StringsLedgerRecord> = { ...prevState.strings }
+    const strings: Record<string, StringsLedgerRecord> = {
+        ...prevState.strings,
+    }
     const grievances: Record<string, GrievanceStatusRecord> = {
         ...prevState.grievances,
     }
@@ -102,15 +104,20 @@ export function reduceLedgerState(
                     ...current,
                     fatigue_bps: Math.min(
                         10000,
-                        current.fatigue_bps + (payload.fatigueBpsDelta || payload.fatigueBps || 0),
+                        current.fatigue_bps +
+                            (payload.fatigueBpsDelta ||
+                                payload.fatigueBps ||
+                                0),
                     ),
                     pain_bps: Math.min(
                         10000,
-                        current.pain_bps + (payload.painBpsDelta || payload.painBps || 0),
+                        current.pain_bps +
+                            (payload.painBpsDelta || payload.painBps || 0),
                     ),
                     refusal_strain_bps: Math.min(
                         10000,
-                        current.refusal_strain_bps + (payload.refusalStrainBpsDelta || 0),
+                        current.refusal_strain_bps +
+                            (payload.refusalStrainBpsDelta || 0),
                     ),
                     open_wounds: Object.freeze([
                         ...current.open_wounds,
@@ -130,8 +137,14 @@ export function reduceLedgerState(
                 entities[entId] = {
                     ...current,
                     location_id: payload.locationId || current.location_id,
-                    q: payload.toCoord?.q ?? payload.fromCoord?.[0] ?? current.q,
-                    r: payload.toCoord?.r ?? payload.fromCoord?.[1] ?? current.r,
+                    q:
+                        payload.toCoord?.q ??
+                        payload.fromCoord?.[0] ??
+                        current.q,
+                    r:
+                        payload.toCoord?.r ??
+                        payload.fromCoord?.[1] ??
+                        current.r,
                     updated_at_ms: event.timestampMs || current.updated_at_ms,
                 }
             }
@@ -141,7 +154,8 @@ export function reduceLedgerState(
         case 'SOCIAL_STRING_EXCHANGED':
         case 'STRING_EXCHANGE': {
             const relId =
-                payload.relation_id || `${payload.holderId}->${payload.debtorId}`
+                payload.relation_id ||
+                `${payload.holderId}->${payload.debtorId}`
             const currentCount = strings[relId]?.strings_count || 0
             const delta = payload.stringsCount ?? payload.delta ?? 0
             const newCount =
@@ -153,7 +167,8 @@ export function reduceLedgerState(
                 relation_id: relId,
                 holder_id: payload.holderId,
                 debtor_id: payload.debtorId,
-                weight_bps: payload.weightBps || strings[relId]?.weight_bps || 10000,
+                weight_bps:
+                    payload.weightBps || strings[relId]?.weight_bps || 10000,
                 strings_count: newCount,
                 updated_at_ms: event.timestampMs || 1700000000000,
             }
@@ -167,7 +182,8 @@ export function reduceLedgerState(
                 grievances[grvId] = {
                     ...current,
                     escalation_depth: current.escalation_depth + 1,
-                    intensity_bps: payload.intensity_bps ?? current.intensity_bps,
+                    intensity_bps:
+                        payload.intensity_bps ?? current.intensity_bps,
                     status: payload.status ?? current.status,
                     updated_at_ms: event.timestampMs || current.updated_at_ms,
                 }
@@ -282,7 +298,8 @@ export function whyDirtyEntity(
         isDirty: affectedScenes.length > 0,
         affectedScenes: Object.freeze(Array.from(new Set(affectedScenes))),
         traversalPaths: Object.freeze(paths),
-        traversalDepth: paths.length > 0 ? Math.max(...paths.map((p) => p.depth)) : 0,
+        traversalDepth:
+            paths.length > 0 ? Math.max(...paths.map((p) => p.depth)) : 0,
     }
 }
 
@@ -360,12 +377,24 @@ export const hydrateStateAction = async (
                     fatigue_bps: r.fatigue_bps || 0,
                     pain_bps: r.pain_bps || 0,
                     refusal_strain_bps: r.refusal_strain_bps || 0,
-                    open_wounds: Object.freeze(JSON.parse(r.open_wounds_json || '[]')),
-                    banned_kinetic_verbs: Object.freeze(JSON.parse(r.banned_kinetic_verbs_json || '[]')),
-                    held_items: Object.freeze(JSON.parse(r.held_items_json || '[]')),
-                    worn_gear: Object.freeze(JSON.parse(r.worn_gear_json || '{}')),
-                    slung_items: Object.freeze(JSON.parse(r.slung_items_json || '[]')),
-                    cached_items: Object.freeze(JSON.parse(r.cached_items_json || '[]')),
+                    open_wounds: Object.freeze(
+                        JSON.parse(r.open_wounds_json || '[]'),
+                    ),
+                    banned_kinetic_verbs: Object.freeze(
+                        JSON.parse(r.banned_kinetic_verbs_json || '[]'),
+                    ),
+                    held_items: Object.freeze(
+                        JSON.parse(r.held_items_json || '[]'),
+                    ),
+                    worn_gear: Object.freeze(
+                        JSON.parse(r.worn_gear_json || '{}'),
+                    ),
+                    slung_items: Object.freeze(
+                        JSON.parse(r.slung_items_json || '[]'),
+                    ),
+                    cached_items: Object.freeze(
+                        JSON.parse(r.cached_items_json || '[]'),
+                    ),
                     updated_at_ms: r.updated_at_ms || 1700000000000,
                 }
             }
@@ -466,7 +495,9 @@ export const computeHashStateAction = (
                 steBit: {
                     idx: 'compute-hash-fail',
                     val: 0,
-                    dat: { error: '[NO_ACTIVE_SNAPSHOT] Snapshot not hydrated' },
+                    dat: {
+                        error: '[NO_ACTIVE_SNAPSHOT] Snapshot not hydrated',
+                    },
                 },
             })
         }
@@ -591,4 +622,3 @@ export const whyDirtyStateAction = (
 
     return cpy
 }
-

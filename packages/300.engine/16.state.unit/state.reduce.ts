@@ -23,16 +23,28 @@ export function reducer(
             return Buzz.hydrateStateAction(clone(model), act.bale as any, state)
 
         case Act.COMPUTE_HASH_STATE:
-            return Buzz.computeHashStateAction(clone(model), act.bale as any, state)
+            return Buzz.computeHashStateAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         case Act.FREEZE_STATE:
             return Buzz.freezeStateAction(clone(model), act.bale as any, state)
 
         case Act.FOLD_EVENTS_STATE:
-            return Buzz.foldEventsStateAction(clone(model), act.bale as any, state)
+            return Buzz.foldEventsStateAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         case Act.WHY_DIRTY_STATE:
-            return Buzz.whyDirtyStateAction(clone(model), act.bale as any, state)
+            return Buzz.whyDirtyStateAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
 
         default:
             return model
