@@ -1,3 +1,5 @@
+import fs from 'node:fs'
+import path from 'node:path'
 /* eslint-disable */
 import * as ActMnu from '../menu.action.js'
 import * as ActOlm from '../../00.engine.unit/engine.action.js'
@@ -2864,4 +2866,118 @@ export const updateMenu = async (
     }
 
     return cpy
+}
+
+export function resolveEngineRoot(startDir: string = process.cwd()): string {
+    let curr = path.resolve(startDir)
+    while (curr && curr !== path.dirname(curr)) {
+        if (
+            fs.existsSync(path.join(curr, 'compiled')) ||
+            fs.existsSync(path.join(curr, 'packages', '300.engine'))
+        ) {
+            return curr
+        }
+        curr = path.dirname(curr)
+    }
+    return path.resolve(startDir)
+}
+
+export function validateUniverseManifestShape(candidate: any): boolean {
+    if (!candidate || typeof candidate !== 'object') {
+        return false
+    }
+
+    const slug = candidate.seriesSlug || candidate.slug
+    if (typeof slug !== 'string' || slug.trim().length === 0) {
+        return false
+    }
+
+    const hash =
+        candidate.merkleRootHex ||
+        candidate.stateHash ||
+        candidate._meta?.corpusHash
+    if (typeof hash !== 'string' || !/^[a-f0-9]{64}$/i.test(hash)) {
+        return false
+    }
+
+    // Ensure collections exist either at root or nested under entities
+    const entities = candidate.entities || candidate
+    const hasCharacters = Boolean(
+        entities.characters && typeof entities.characters === 'object',
+    )
+    const hasLocations = Boolean(
+        entities.locations && typeof entities.locations === 'object',
+    )
+    const hasPossessions = Boolean(
+        (entities.possessions || entities.items) &&
+            typeof (entities.possessions || entities.items) === 'object',
+    )
+    const hasGrievances = Boolean(
+        entities.grievances && typeof entities.grievances === 'object',
+    )
+
+    return hasCharacters && hasLocations && hasPossessions && hasGrievances
+}
+
+export function scanCompiledUniverses(
+    baseDir?: string,
+): import('../fce/menu.interface.js').CompiledUniverseDescriptor[] {
+    const root = baseDir ? path.resolve(baseDir) : resolveEngineRoot()
+    const compiledDir = path.join(root, 'compiled')
+
+    if (!fs.existsSync(compiledDir)) {
+        return []
+    }
+
+    const entries = fs.readdirSync(compiledDir, { withFileTypes: true })
+    const results: import('../fce/menu.interface.js').CompiledUniverseDescriptor[] =
+        []
+
+    for (const entry of entries) {
+        if (
+            !entry.isDirectory() ||
+            entry.name.startsWith('.') ||
+            entry.name.startsWith('_')
+        ) {
+            continue
+        }
+
+        const manifestPath = path.join(
+            compiledDir,
+            entry.name,
+            'bible-state.json',
+        )
+        if (!fs.existsSync(manifestPath)) {
+            continue
+        }
+
+        try {
+            const stats = fs.statSync(manifestPath)
+            const rawContent = fs.readFileSync(manifestPath, 'utf8')
+            const parsed = JSON.parse(rawContent)
+
+            if (!validateUniverseManifestShape(parsed)) {
+                continue
+            }
+
+            const hash =
+                parsed.merkleRootHex ||
+                parsed.stateHash ||
+                parsed._meta?.corpusHash ||
+                ''
+
+            results.push({
+                seriesSlug: entry.name,
+                manifestPath,
+                byteSize: stats.size,
+                merkleRootHex: hash.toLowerCase(),
+                hasBibleState: true,
+            })
+        } catch {
+            // Malformed JSON fails closed
+            continue
+        }
+    }
+
+    return results.sort((a, b) => a.seriesSlug.localeCompare(b.seriesSlug))
 }

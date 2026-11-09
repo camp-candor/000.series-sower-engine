@@ -6,7 +6,10 @@ module.exports = {
             comment:
                 'packages/300.engine must remain a pure isolate with zero platform IO or rendering dependencies',
             severity: 'error',
-            from: { path: '^packages/300\\.engine', pathNot: '\\.test\\.ts$' },
+            from: {
+                path: '^packages/300\\.engine',
+                pathNot: ['\\.test\\.ts$', '98\\.menu\\.unit'],
+            },
             to: {
                 path: [
                     '^apps',

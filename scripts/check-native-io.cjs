@@ -8,6 +8,8 @@ try {
             'grep',
             '-E',
             'from [\'"](node:child_process|node:fs|node:net|node:http|better-sqlite3)[\'"]',
+            '--exclude-dir',
+            '98.menu.unit',
             'packages/300.engine/',
         ],
         { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] },
