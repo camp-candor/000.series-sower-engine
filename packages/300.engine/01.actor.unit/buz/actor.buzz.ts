@@ -1,7 +1,7 @@
 /**
  * 01.actor.unit - Actor Buzz Business Logic
  * Epistemic Belief Horizon, Unratified Detail Harvest Queue,
- * Stage 5 Epistemic Context Scrubbing, Subtext Attenuation, and Secret Leak Probing.
+ * Subtext Attenuation, and Stage 5 Dual-Field Dialogue AST Compilation.
  */
 import { ActorModel } from '../actor.model.js'
 import type ActorBit from '../fce/actor.bit.js'
@@ -15,6 +15,9 @@ import type {
     SubtextAttenuationDirective,
     DialogueLeakProbeParams,
     DialogueLeakProbeReceipt,
+    DialogueBeatAST,
+    CompileDialogueBeatParams,
+    CompileDialogueBeatReceipt,
 } from '../fce/actor.interface.js'
 import * as ActDbs from '../../02.database.unit/database.action.js'
 import * as ActEvt from '../../05.event.unit/event.action.js'
@@ -97,17 +100,19 @@ export function calculateCompositeSalience(
     }
 }
 
-// ============================================================================
-// STAGE 5 EPISTEMIC CONTEXT SCRUBBING & SUBTEXT ATTENUATION HELPERS
-// ============================================================================
-
 export function buildSubtextAttenuationDirective(
     params: BuildSubtextParams,
 ): SubtextAttenuationDirective {
-    const { tension_bps, candidate_props, surface_dispute, underlying_conflict } = params
+    const {
+        tension_bps,
+        candidate_props,
+        surface_dispute,
+        underlying_conflict,
+    } = params
     assertBasisPoints(tension_bps, 'tension_bps')
 
-    const anchor = candidate_props.length > 0 ? candidate_props[0] : 'grease_bucket'
+    const anchor =
+        candidate_props.length > 0 ? candidate_props[0] : 'grease_bucket'
 
     if (tension_bps >= 7000) {
         return {
@@ -134,7 +139,7 @@ export function probeDialogueSubtextLeak(
     params: DialogueLeakProbeParams,
 ): DialogueLeakProbeReceipt {
     const { dialogue_text, secret_id, secret_lemmas } = params
-    const threshold_bps = params.threshold_bps ?? 3500 // 0.35 similarity ceiling
+    const threshold_bps = params.threshold_bps ?? 3500
     assertBasisPoints(threshold_bps, 'threshold_bps')
 
     if (secret_lemmas.length === 0) {
@@ -187,6 +192,108 @@ export function probeDialogueSubtextLeak(
     }
 }
 
+// ============================================================================
+// STAGE 5 DUAL-FIELD DIALOGUE AST COMPILATION HELPERS
+// ============================================================================
+
+export function countWords(text: string): number {
+    return text.trim().split(/\s+/).filter(Boolean).length
+}
+
+export function enforceCurtnessBudget(curtness_bps: number): number {
+    assertBasisPoints(curtness_bps, 'curtness_bps')
+    // W_max = max(2, floor(24 - (18 * C) / 10000))
+    const wordCap = Math.floor(24 - (18 * curtness_bps) / 10000)
+    return Math.max(2, wordCap)
+}
+
+export function compileDialogueBeat(
+    params: CompileDialogueBeatParams,
+): CompileDialogueBeatReceipt {
+    const {
+        beat_id,
+        speaker,
+        dialogue_text,
+        camera_parenthetical,
+        observable_parenthetical,
+        speech_act,
+        emotion,
+        swain_mru_phase,
+        extracted_motor_actions,
+        arms_required = 1,
+        curtness_bps,
+        banned_kinetic_verbs = [],
+    } = params
+
+    // 1. Directorial Curtness Budget Enforcement
+    const max_permitted_words = enforceCurtnessBudget(curtness_bps)
+    const word_count = countWords(dialogue_text)
+
+    if (word_count > max_permitted_words) {
+        return {
+            compiled: false,
+            word_count,
+            max_permitted_words,
+            curtness_breach: true,
+            error: `[CURTNESS_BUDGET_BREACH] Dialogue text length (${word_count} words) exceeds curtness budget (${max_permitted_words} words)`,
+        }
+    }
+
+    // 2. Dual-Field Motor Discrepancy Gate
+    // Sweep prose channels for kinetic verbs
+    const proseText =
+        `${camera_parenthetical} ${observable_parenthetical}`.toUpperCase()
+    const bannedSet = new Set(banned_kinetic_verbs.map((v) => v.toUpperCase()))
+
+    for (const action of extracted_motor_actions) {
+        if (bannedSet.has(action.toUpperCase())) {
+            return {
+                compiled: false,
+                word_count,
+                max_permitted_words,
+                somatic_breach: true,
+                error: `[FATAL_SOMATIC_BREACH] Speaker '${speaker}' attempted banned motor action: ${action}`,
+            }
+        }
+    }
+
+    for (const banned of bannedSet) {
+        if (proseText.includes(banned)) {
+            return {
+                compiled: false,
+                word_count,
+                max_permitted_words,
+                somatic_breach: true,
+                error: `[FATAL_SOMATIC_BREACH] Speaker '${speaker}' smuggled banned kinetic verb '${banned}' in parenthetical`,
+            }
+        }
+    }
+
+    const beat: DialogueBeatAST = {
+        beat_id,
+        speaker,
+        dialogue_text,
+        camera_parenthetical,
+        observable_parenthetical,
+        speech_act,
+        emotion,
+        swain_mru_phase,
+        extracted_motor_actions: Object.freeze([...extracted_motor_actions]),
+        capabilities_used: Object.freeze({
+            arms_required,
+        }),
+        word_count,
+        max_permitted_words,
+    }
+
+    return {
+        compiled: true,
+        beat,
+        word_count,
+        max_permitted_words,
+    }
+}
+
 export const initActor = async (
     cpy: ActorModel,
     bal?: ActorBit,
@@ -194,6 +301,7 @@ export const initActor = async (
 ): Promise<ActorModel> => {
     cpy.beliefs.clear()
     cpy.details.clear()
+    cpy.compiledBeats.clear()
 
     if (ste && typeof ste.hunt === 'function') {
         const queryRes: any = await ste.hunt(ActDbs.QUERY_DATABASE, {
@@ -243,7 +351,7 @@ export const recordBeliefActor = async (
     bal: ActorBit,
     ste?: State,
 ): Promise<ActorModel> => {
-    const raw = bal.dat?.beliefParams || bal.dat || {}
+    const raw: any = bal.dat?.beliefParams || bal.dat || {}
     const observer_id: string = raw.observer_id || bal.src || ''
     const fact_id: string = raw.fact_id || ''
     const prob: number = raw.subjective_probability_bps ?? 10000
@@ -298,7 +406,10 @@ export const recordBeliefActor = async (
         }
     } catch (err: any) {
         const errorMsg = err.message || String(err)
-        await emitConsole(ste, `:: [FAIL] Belief registration failed: ${errorMsg}`)
+        await emitConsole(
+            ste,
+            `:: [FAIL] Belief registration failed: ${errorMsg}`,
+        )
         if (bal.slv) {
             bal.slv({
                 actBit: {
@@ -348,7 +459,7 @@ export const scrubEpistemicContextActor = async (
     bal: ActorBit,
     ste?: State,
 ): Promise<ActorModel> => {
-    const raw = bal.dat?.scrubParams || bal.dat || {}
+    const raw: any = bal.dat?.scrubParams || bal.dat || {}
     const observerId: string = raw.observer_id || bal.src || ''
     const facts: Record<string, string> = raw.world_facts || {}
 
@@ -424,7 +535,10 @@ export const buildSubtextDirectiveAction = async (
         }
     } catch (err: any) {
         const errorMsg = err.message || String(err)
-        await emitConsole(ste, `:: [FAIL] Subtext directive build failed: ${errorMsg}`)
+        await emitConsole(
+            ste,
+            `:: [FAIL] Subtext directive build failed: ${errorMsg}`,
+        )
         if (bal.slv) {
             bal.slv({
                 actBit: {
@@ -474,7 +588,10 @@ export const probeDialogueLeakAction = async (
                         idx: 'probe-leak-breach',
                         val: -1,
                         src: '[EPISTEMIC_HORIZON_LEAK]',
-                        dat: { leakProbeReceipt: receipt, error: receipt.error },
+                        dat: {
+                            leakProbeReceipt: receipt,
+                            error: receipt.error,
+                        },
                     },
                 })
             }
@@ -499,7 +616,10 @@ export const probeDialogueLeakAction = async (
         }
     } catch (err: any) {
         const errorMsg = err.message || String(err)
-        await emitConsole(ste, `:: [FAIL] Subtext leak probe failed: ${errorMsg}`)
+        await emitConsole(
+            ste,
+            `:: [FAIL] Subtext leak probe failed: ${errorMsg}`,
+        )
         if (bal.slv) {
             bal.slv({
                 actBit: {
@@ -514,12 +634,128 @@ export const probeDialogueLeakAction = async (
     return cpy
 }
 
+export const compileDialogueBeatAction = async (
+    cpy: ActorModel,
+    bal: ActorBit,
+    ste?: State,
+): Promise<ActorModel> => {
+    const params: CompileDialogueBeatParams | undefined =
+        bal.dat?.compileBeatParams
+    if (!params || !params.beat_id || !params.speaker) {
+        const err = '[INVALID_COMPILE_PARAMS] Missing beat_id or speaker'
+        await emitConsole(ste, `:: [FAIL] ${err}`)
+        if (bal.slv) {
+            bal.slv({
+                actBit: {
+                    idx: 'compile-beat-fail',
+                    val: -1,
+                    dat: { error: err },
+                },
+            })
+        }
+        return cpy
+    }
+
+    try {
+        const receipt = compileDialogueBeat(params)
+
+        if (!receipt.compiled || !receipt.beat) {
+            const err = receipt.error || '[COMPILE_FAILED]'
+            await emitConsole(ste, `:: [FAIL] ${err}`)
+            if (bal.slv) {
+                bal.slv({
+                    compileBeatReceipt: receipt,
+                    actBit: {
+                        idx: receipt.somatic_breach
+                            ? 'compile-beat-somatic-breach'
+                            : 'compile-beat-curtness-breach',
+                        val: -1,
+                        src: receipt.somatic_breach
+                            ? '[FATAL_SOMATIC_BREACH]'
+                            : '[CURTNESS_BUDGET_BREACH]',
+                        dat: { compileBeatReceipt: receipt, error: err },
+                    },
+                })
+            }
+            return cpy
+        }
+
+        cpy.compiledBeats.set(receipt.beat.beat_id, receipt.beat)
+
+        await emitConsole(
+            ste,
+            `>> [AST:COMPILE] [${receipt.beat.beat_id}] (${receipt.beat.speaker}) | Words: ${receipt.word_count}/${receipt.max_permitted_words} | Act: [${receipt.beat.speech_act}] [OK]`,
+        )
+
+        if (bal.slv) {
+            bal.slv({
+                beat: receipt.beat,
+                compileBeatReceipt: receipt,
+                actBit: {
+                    idx: 'compile-beat-pass',
+                    val: receipt.word_count,
+                    src: '[OK]',
+                    dat: { beat: receipt.beat, compileBeatReceipt: receipt },
+                },
+            })
+        }
+    } catch (err: any) {
+        const errorMsg = err.message || String(err)
+        await emitConsole(ste, `:: [FAIL] Beat compilation failed: ${errorMsg}`)
+        if (bal.slv) {
+            bal.slv({
+                actBit: {
+                    idx: 'compile-beat-fail',
+                    val: -1,
+                    dat: { error: errorMsg },
+                },
+            })
+        }
+    }
+
+    return cpy
+}
+
+export const enforceCurtnessBudgetAction = (
+    cpy: ActorModel,
+    bal: ActorBit,
+    _ste?: State,
+): ActorModel => {
+    const curtness = bal.dat?.curtnessLimit ?? 5000
+
+    try {
+        const cap = enforceCurtnessBudget(curtness)
+        if (bal.slv) {
+            bal.slv({
+                curtnessLimit: cap,
+                actBit: {
+                    idx: 'enforce-curtness-pass',
+                    val: cap,
+                    dat: { curtnessLimit: cap },
+                },
+            })
+        }
+    } catch (err: any) {
+        if (bal.slv) {
+            bal.slv({
+                actBit: {
+                    idx: 'enforce-curtness-fail',
+                    val: -1,
+                    dat: { error: err.message },
+                },
+            })
+        }
+    }
+
+    return cpy
+}
+
 export const calculateSalienceActor = (
     cpy: ActorModel,
     bal: ActorBit,
     _ste?: State,
 ): ActorModel => {
-    const raw = bal.dat?.salienceParams || bal.dat || {}
+    const raw: any = bal.dat?.salienceParams || bal.dat || {}
     const recCount = raw.recurrence_count ?? 1
     const turn: DramaticTurnLevel = raw.dramatic_turn || 'BACKGROUND'
 
@@ -535,7 +771,9 @@ export const calculateSalienceActor = (
                 actBit: {
                     idx: 'calculate-salience-pass',
                     val: receipt.salience_bps,
-                    src: receipt.isHarvestEligible ? 'HARVEST_ELIGIBLE' : 'EPHEMERAL_NOISE',
+                    src: receipt.isHarvestEligible
+                        ? 'HARVEST_ELIGIBLE'
+                        : 'EPHEMERAL_NOISE',
                     dat: { salienceReceipt: receipt },
                 },
             })
@@ -560,7 +798,7 @@ export const stageDetailActor = async (
     bal: ActorBit,
     ste?: State,
 ): Promise<ActorModel> => {
-    const raw = bal.dat?.stageDetailParams || bal.dat || {}
+    const raw: any = bal.dat?.stageDetailParams || bal.dat || {}
     const detail_id: string = raw.detail_id || bal.src || ''
     const scene_id: string = raw.scene_id || 'sc01'
     const label_candidate: string = raw.label_candidate || 'unnamed_detail'
@@ -571,7 +809,8 @@ export const stageDetailActor = async (
     const nowMs: number = raw.timestamp_ms || 1700000000000
 
     if (!detail_id || !claim_proposal) {
-        const err = '[INVALID_DETAIL_PARAMS] Missing detail_id or claim_proposal'
+        const err =
+            '[INVALID_DETAIL_PARAMS] Missing detail_id or claim_proposal'
         await emitConsole(ste, `:: [FAIL] ${err}`)
         if (bal.slv) {
             bal.slv({
@@ -649,7 +888,7 @@ export const stageDetailActor = async (
                         {
                             table: 'unratified_details',
                             action: 'INSERT',
-                            key: detail_id as string,
+                            key: detail_id,
                             record: stagedRec,
                         },
                     ],
@@ -695,13 +934,13 @@ export const ratifyDetailActor = async (
     bal: ActorBit,
     ste?: State,
 ): Promise<ActorModel> => {
-    const raw = bal.dat?.ratifyDetailParams || bal.dat || {}
+    const raw: any = bal.dat?.ratifyDetailParams || bal.dat || {}
     const detail_id = raw.detail_id || bal.src
     const ratified_id = raw.ratified_entity_id
     const nowMs = raw.timestamp_ms || 1700000000000
     const tick = raw.tick || 1
 
-    const existing = cpy.details.get(detail_id as string)
+    const existing = cpy.details.get(detail_id)
     if (!existing) {
         const err = `[DETAIL_NOT_FOUND] Detail '${detail_id}' not found in harvest queue`
         if (bal.slv) {
@@ -717,7 +956,8 @@ export const ratifyDetailActor = async (
     }
 
     if (!ratified_id) {
-        const err = '[MISSING_CANON_ID] ratified_entity_id required for promotion'
+        const err =
+            '[MISSING_CANON_ID] ratified_entity_id required for promotion'
         if (bal.slv) {
             bal.slv({
                 actBit: {
@@ -737,7 +977,7 @@ export const ratifyDetailActor = async (
         reviewed_at_ms: nowMs,
     }
 
-    cpy.details.set(detail_id as string, updated)
+    cpy.details.set(detail_id, updated)
 
     if (ste && typeof ste.hunt === 'function') {
         await ste.hunt(ActDbs.EXEC_BATCH_DATABASE, {
@@ -746,7 +986,7 @@ export const ratifyDetailActor = async (
                     {
                         table: 'unratified_details',
                         action: 'UPDATE',
-                        key: detail_id as string,
+                        key: detail_id,
                         record: updated,
                     },
                 ],
@@ -795,11 +1035,11 @@ export const discardDetailActor = async (
     bal: ActorBit,
     ste?: State,
 ): Promise<ActorModel> => {
-    const raw = bal.dat?.discardDetailParams || bal.dat || {}
+    const raw: any = bal.dat?.discardDetailParams || bal.dat || {}
     const detail_id = raw.detail_id || bal.src
     const nowMs = raw.timestamp_ms || 1700000000000
 
-    const existing = cpy.details.get(detail_id as string)
+    const existing = cpy.details.get(detail_id)
     if (!existing) {
         const err = `[DETAIL_NOT_FOUND] Detail '${detail_id}' not found`
         if (bal.slv) {
@@ -820,7 +1060,7 @@ export const discardDetailActor = async (
         reviewed_at_ms: nowMs,
     }
 
-    cpy.details.set(detail_id as string, updated)
+    cpy.details.set(detail_id, updated)
 
     if (ste && typeof ste.hunt === 'function') {
         await ste.hunt(ActDbs.EXEC_BATCH_DATABASE, {
@@ -829,7 +1069,7 @@ export const discardDetailActor = async (
                     {
                         table: 'unratified_details',
                         action: 'UPDATE',
-                        key: detail_id as string,
+                        key: detail_id,
                         record: updated,
                     },
                 ],
