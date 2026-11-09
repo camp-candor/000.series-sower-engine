@@ -1,98 +1,134 @@
-import { describe, it, expect, vi } from 'vitest'
-import { initEngine } from './buz/engine.buzz.js'
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { EngineModel } from './engine.model.js'
+import {
+    initEngine,
+    bootEngine,
+    statusEngine,
+    auditEngine,
+    resetEngine,
+} from './buz/engine.buzz.js'
+import { BOOT_ENGINE } from './engine.action.js'
+import { reducer } from './engine.reduce.js'
 
-describe('engine', () => {
-    it('should initialize engine', () => {
-        const model = new EngineModel()
-        const state = {
-            hunt: vi.fn().mockResolvedValue({}),
-            dispatch: vi.fn(),
-        } as any
+describe('00.engine.unit - Engine Master Lifecycle Orchestrator Battery', () => {
+    let model: EngineModel
+    let mockState: any
+    let dispatchedActions: string[]
 
-        const slv = vi.fn()
-        const bal = { idx: 'test', slv } as any
-
-        // Check if initEngine is a function and can be called
-        expect(typeof initEngine).toBe('function')
-
-        const result = initEngine(model, bal, state)
-        expect(result).toBe(model)
-        //expect(slv).toHaveBeenCalledWith({ intBit: { idx: 'init-engine' } });
+    beforeEach(async () => {
+        model = new EngineModel()
+        dispatchedActions = []
+        mockState = {
+            hunt: vi.fn(async (actionType: string) => {
+                dispatchedActions.push(actionType)
+                if (actionType.includes('Hydrate State')) {
+                    return { stateHash: 'a'.repeat(64) }
+                }
+                if (actionType.includes('Query Database')) {
+                    return { databaseBit: { dat: { records: [{ id: 1 }, { id: 2 }] } } }
+                }
+                return {}
+            }),
+        }
+        await initEngine(model)
     })
 
-    it('should wake up the engine if url is provided', async () => {
-        const model = new EngineModel()
-        const state = {} as any
+    afterEach(() => {
+        vi.unstubAllGlobals()
+        delete (global as any).LIBRARY
+        delete (globalThis as any).LIBRARY
+    })
+
+    it('initializes engine and sets status to READY', () => {
+        expect(model.status).toBe('READY')
+        expect(model.booted).toBe(false)
+    })
+
+    it('orchestrates 3-phase boot sequence and updates status to READY', async () => {
         const slv = vi.fn()
-        const bal = { idx: 'test', slv } as any
-
-        const urlengine = 'https://zero00-engine.onrender.com/api/engine/test'
-
-        const mockResponseengine = { status: 'engine-awake' }
-
-        const globalFetch = vi
-            .spyOn(global, 'fetch')
-            .mockImplementation((url) => {
-                if (url === urlengine) {
-                    return Promise.resolve({
-                        ok: true,
-                        json: () => Promise.resolve(mockResponseengine),
-                    } as any)
-                }
-                return Promise.reject(new Error('Unknown URL'))
-            })
-
-        initEngine(model, bal, state)
-
-        // Wait for the promise in initEngine to resolve
-        await new Promise((resolve) => setTimeout(resolve, 0))
-
-        expect(globalFetch).toHaveBeenCalledWith(urlengine)
-        expect(slv).toHaveBeenCalledWith({
-            intBit: {
-                idx: 'init-engine',
+        await bootEngine(
+            model,
+            {
+                idx: 'boot-test',
                 dat: {
-                    engine: mockResponseengine,
+                    bootParams: {
+                        seriesSlug: 'test-series',
+                        seedGenesis: true,
+                        timestampMs: 1000,
+                    },
                 },
+                slv,
             },
-        })
+            mockState,
+        )
 
-        globalFetch.mockRestore()
+        expect(slv).toHaveBeenCalled()
+        expect(model.status).toBe('READY')
+        expect(model.booted).toBe(true)
+        expect(model.lastStateHash).toBe('a'.repeat(64))
+        expect(model.lastBootMs).toBe(1000)
+
+        // Verify the 3-phase boot dispatches occurred
+        expect(dispatchedActions.some((a) => a.includes('Init Database'))).toBe(true)
+        expect(dispatchedActions.some((a) => a.includes('Seed Genesis'))).toBe(true)
+        expect(dispatchedActions.some((a) => a.includes('Hydrate State'))).toBe(true)
     })
 
-    it('should handle fetch errors', async () => {
-        const model = new EngineModel()
-        const state = {} as any
+    it('aggregates table inventory and compiles status report', async () => {
         const slv = vi.fn()
-        const bal = { idx: 'test', slv } as any
+        await statusEngine(model, { idx: 'status-test', slv }, mockState)
 
-        const urlengine = 'https://zero00-engine.onrender.com/api/engine/test'
+        expect(slv).toHaveBeenCalled()
+        const report = slv.mock.calls[0][0].report
+        expect(report).toBeDefined()
+        expect(report.status).toBe('READY')
+        expect(report.tables).toHaveLength(6)
+        expect(report.totalRows).toBe(12) // 6 tables * 2 mock rows
+    })
 
-        const errorMessage = 'Network error'
-        const globalFetch = vi
-            .spyOn(global, 'fetch')
-            .mockImplementation((url) => {
-                if (url === urlengine) {
-                    return Promise.reject(new Error(errorMessage))
-                }
-                return Promise.resolve({
-                    ok: true,
-                    json: async () => ({}),
-                } as any)
-            })
+    it('executes invariant audit and compiles cryptographic audit receipt', async () => {
+        const slv = vi.fn()
+        await auditEngine(model, { idx: 'audit-test', slv }, mockState)
 
-        initEngine(model, bal, state)
+        expect(slv).toHaveBeenCalled()
+        const receipt = slv.mock.calls[0][0].receipt
+        expect(receipt.auditPassed).toBe(true)
+        expect(receipt.immutabilityBlocked).toBe(true)
+        expect(receipt.handCapacityBlocked).toBe(true)
+        expect(receipt.antiReflexivityBlocked).toBe(true)
+        expect(receipt.auditHash).toMatch(/^[a-f0-9]{64}$/)
+    })
 
-        // Wait for the promise in initEngine to resolve
-        await new Promise((resolve) => setTimeout(resolve, 0))
+    it('resets engine state to OFFLINE', async () => {
+        model.status = 'READY'
+        model.booted = true
+        model.lastBootMs = 5000
 
-        expect(globalFetch).toHaveBeenCalledWith(urlengine)
+        const slv = vi.fn()
+        await resetEngine(model, { idx: 'reset-test', slv }, mockState)
 
-        expect(slv).toHaveBeenCalledWith({
-            intBit: { idx: 'init-engine-err', dat: errorMessage },
-        })
+        expect(slv).toHaveBeenCalled()
+        expect(model.status).toBe('OFFLINE')
+        expect(model.booted).toBe(false)
+        expect(model.lastBootMs).toBe(0)
+    })
 
-        globalFetch.mockRestore()
+    it('routes BOOT_ENGINE cleanly through pure reducer using clone-deep', async () => {
+        const slv = vi.fn()
+        const result = (await reducer(
+            model,
+            {
+                type: BOOT_ENGINE,
+                bale: {
+                    idx: 'reducer-boot',
+                    dat: { bootParams: { seriesSlug: 'reducer-test' } },
+                    slv,
+                } as any,
+            },
+            mockState,
+        )) as EngineModel
+
+        expect(result).toBeInstanceOf(EngineModel)
+        expect(slv).toHaveBeenCalled()
     })
 })

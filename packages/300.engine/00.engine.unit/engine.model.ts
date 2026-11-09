@@ -1,34 +1,22 @@
-import Engine from './fce/engine.interface.js'
+/**
+ * 00.engine.unit - Engine State Model Container
+ */
+import type Engine from './fce/engine.interface.js'
+import type {
+    EngineStatus,
+    EngineAuditReceipt,
+    EngineStatusReport,
+} from './fce/engine.interface.js'
 
 export class EngineModel implements Engine {
-    // Not used in this implementation, but keeping the class structure
+    idx: string = '00.engine'
+    status: EngineStatus = 'OFFLINE'
+    booted: boolean = false
+    seriesSlug: string = 'under-the-floorboards'
+    lastBootMs: number = 0
+    lastStateHash: string = '0'.repeat(64)
+    lastAuditReceipt?: EngineAuditReceipt
+    lastStatusReport?: EngineStatusReport
 }
 
-/**
- * The single source of truth for the active game session.
- * This acts as our in-memory database.
- */
-export const gameState = {
-    activeSession: {
-        id: 'prototype-session-1',
-        startTime: new Date().toISOString(),
-    },
-    players: {
-        mock_player_1: {
-            name: 'Kaelen',
-            hp: 20,
-            maxHp: 20,
-            ac: 14,
-        },
-    },
-    monsters: {
-        monster_a: {
-            name: 'Goblin',
-            hp: 10,
-            maxHp: 10,
-            ac: 12,
-        },
-    },
-    turnOrder: ['mock_player_1', 'monster_a'],
-    currentTurnIndex: 0,
-}
+export default EngineModel

@@ -15,3 +15,19 @@ export { divisionAudit } from './buz/engine.buzz.js'
 export { bigintAudit } from './buz/engine.buzz.js'
 export { antiGamingAudit } from './buz/engine.buzz.js'
 export { runGauntlet, executeStage } from './buz/gauntlet.buzz.js'
+
+export { bootEngine } from './buz/engine.buzz.js'
+export { statusEngine } from './buz/engine.buzz.js'
+export { auditEngine } from './buz/engine.buzz.js'
+export { resetEngine } from './buz/engine.buzz.js'
+export type {
+    EngineStatus,
+    TableStatusReport,
+    EngineStatusReport,
+    EngineAuditReceipt,
+    EngineBootReceipt,
+    BootEngineParams,
+} from './fce/engine.interface.js'
+export type {
+    EnginePayload,
+} from './fce/engine.bit.js'
