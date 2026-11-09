@@ -9,6 +9,8 @@ export {
     scrubEpistemicContextActor,
     buildSubtextDirectiveAction,
     probeDialogueLeakAction,
+    compileDialogueBeatAction,
+    enforceCurtnessBudgetAction,
     calculateSalienceActor,
     stageDetailActor,
     ratifyDetailActor,
@@ -19,6 +21,8 @@ export {
     calculateCompositeSalience,
     buildSubtextAttenuationDirective,
     probeDialogueSubtextLeak,
+    enforceCurtnessBudget,
+    compileDialogueBeat,
 } from './buz/actor.buzz.js'
 export type {
     BeliefSourceType,
@@ -38,7 +42,12 @@ export type {
     BuildSubtextParams,
     DialogueLeakProbeParams,
     DialogueLeakProbeReceipt,
+    SpeechActEnum,
+    EmotionTag,
+    SwainMRUPhase,
+    DialogueBeatAST,
+    DialogueSceneAST,
+    CompileDialogueBeatParams,
+    CompileDialogueBeatReceipt,
 } from './fce/actor.interface.js'
-export type {
-    ActorPayload,
-} from './fce/actor.bit.js'
+export type { ActorPayload } from './fce/actor.bit.js'

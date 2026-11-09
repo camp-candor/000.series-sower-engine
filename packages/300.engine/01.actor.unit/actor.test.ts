@@ -1,19 +1,26 @@
-import type { ActorBeliefRecord } from './fce/actor.interface.js'
-
-import { STAGE_DETAIL_ACTOR, BUILD_SUBTEXT_DIRECTIVE_ACTOR, PROBE_DIALOGUE_LEAK_ACTOR } from './actor.action.js'
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { ActorModel } from './actor.model.js'
 import {
+    STAGE_DETAIL_ACTOR,
+    BUILD_SUBTEXT_DIRECTIVE_ACTOR,
+    PROBE_DIALOGUE_LEAK_ACTOR,
+    COMPILE_DIALOGUE_BEAT_ACTOR,
+} from './actor.action.js'
+import type { ActorBeliefRecord } from './fce/actor.interface.js'
+
+import {
     initActor,
-    queryHorizonActor,
     recordBeliefActor,
-    calculateCompositeSalience,
+    queryHorizonActor,
+    scrubEpistemicContextActor,
     stageDetailActor,
     ratifyDetailActor,
-    scrubEpistemicContextActor,
+    assertBasisPoints,
+    calculateCompositeSalience,
     buildSubtextAttenuationDirective,
     probeDialogueSubtextLeak,
-    assertBasisPoints,
+    enforceCurtnessBudget,
+    compileDialogueBeat,
 } from './buz/actor.buzz.js'
 
 import { reducer } from './actor.reduce.js'
@@ -93,7 +100,8 @@ describe('01.actor.unit - Core Features & Stage 5 Features', () => {
                         category: 'SPATIAL_SET',
                         recurrence_count: 1,
                         dramatic_turn: 'BACKGROUND',
-                        claim_proposal: 'Incidental gravel on culvert pipe floor',
+                        claim_proposal:
+                            'Incidental gravel on culvert pipe floor',
                     },
                 },
                 slv,
@@ -129,7 +137,8 @@ describe('01.actor.unit - Core Features & Stage 5 Features', () => {
                         category: 'PROP',
                         recurrence_count: 3,
                         dramatic_turn: 'GAZE_PROXIMITY',
-                        claim_proposal: 'A chipped green enamel cup Bog keeps in his pocket',
+                        claim_proposal:
+                            'A chipped green enamel cup Bog keeps in his pocket',
                     },
                 },
                 slv,
@@ -210,7 +219,11 @@ describe('01.actor.unit - Core Features & Stage 5 Features', () => {
         )
 
         const slv = vi.fn()
-        queryHorizonActor(model, { idx: 'q', dat: { observerId: 'char_bog' }, slv }, mockState)
+        queryHorizonActor(
+            model,
+            { idx: 'q', dat: { observerId: 'char_bog' }, slv },
+            mockState,
+        )
 
         expect(slv).toHaveBeenCalled()
         const beliefs = slv.mock.calls[0][0].beliefs as ActorBeliefRecord[]
@@ -233,7 +246,8 @@ describe('01.actor.unit - Core Features & Stage 5 Features', () => {
 
         const worldFacts = {
             fact_water_tainted: 'The culvert water contains caustic lye.',
-            fact_secret_cache: 'Wart buried an iron crowbar under the pipe joint.',
+            fact_secret_cache:
+                'Wart buried an iron crowbar under the pipe joint.',
         }
 
         const slv = vi.fn()
@@ -260,7 +274,9 @@ describe('01.actor.unit - Core Features & Stage 5 Features', () => {
     })
 
     it('rejects floating-point basis points with FLOAT_PROHIBITED', () => {
-        expect(() => assertBasisPoints(7500.5, 'salience_bps')).toThrow(/FLOAT_PROHIBITED/)
+        expect(() => assertBasisPoints(7500.5, 'salience_bps')).toThrow(
+            /FLOAT_PROHIBITED/,
+        )
     })
 
     it('routes STAGE_DETAIL_ACTOR cleanly through pure reducer using clone-deep', async () => {
@@ -345,9 +361,13 @@ describe('01.actor.unit - Core Features & Stage 5 Features', () => {
         expect(directive.directive_type).toBe('FALSE_INTERPRETATION_ANCHOR')
         expect(directive.anchor_prop).toBe('item_copper_tea_kettle')
         expect(directive.overt_topic).toBe('broken kettle lid')
-        expect(directive.suppressed_emotion).toBe('fear of seasonal abandonment')
+        expect(directive.suppressed_emotion).toBe(
+            'fear of seasonal abandonment',
+        )
         expect(directive.guidance_prompt).toContain('broken kettle lid')
-        expect(directive.guidance_prompt).toContain('fear of seasonal abandonment')
+        expect(directive.guidance_prompt).toContain(
+            'fear of seasonal abandonment',
+        )
     })
 
     it('builds DIRECT_EXPRESSION directive when tension < 7000 bps', () => {
@@ -368,7 +388,8 @@ describe('01.actor.unit - Core Features & Stage 5 Features', () => {
         const secretLemmas = ['poison', 'well', 'arsenic', 'tainted', 'cistern']
         // 1 match ('well') out of 5 lemmas = 1/5 = 2000 bps <= 3500 bps
         const receipt = probeDialogueSubtextLeak({
-            dialogue_text: 'I went to fetch clean water from the deep well yesterday.',
+            dialogue_text:
+                'I went to fetch clean water from the deep well yesterday.',
             secret_id: 'secret_poisoned_water',
             secret_lemmas: secretLemmas,
             threshold_bps: 3500,
@@ -397,7 +418,9 @@ describe('01.actor.unit - Core Features & Stage 5 Features', () => {
     })
 
     it('rejects floating-point tension or threshold with FLOAT_PROHIBITED', () => {
-        expect(() => assertBasisPoints(7000.5, 'tension_bps')).toThrow(/FLOAT_PROHIBITED/)
+        expect(() => assertBasisPoints(7000.5, 'tension_bps')).toThrow(
+            /FLOAT_PROHIBITED/,
+        )
     })
 
     it('routes BUILD_SUBTEXT_DIRECTIVE_ACTOR and PROBE_DIALOGUE_LEAK_ACTOR through pure reducer', async () => {
@@ -448,5 +471,143 @@ describe('01.actor.unit - Core Features & Stage 5 Features', () => {
 
         expect(res2).toBeInstanceOf(ActorModel)
         expect(slv2).toHaveBeenCalled()
+    })
+})
+
+describe('01.actor.unit - Stage 5 Dual-Field Dialogue AST Compilation Battery', () => {
+    let model: ActorModel
+    let mockState: any
+
+    beforeEach(async () => {
+        model = new ActorModel()
+        mockState = {
+            hunt: vi.fn(async () => ({})),
+        }
+        await initActor(model)
+    })
+
+    afterEach(() => {
+        vi.unstubAllGlobals()
+        delete (global as any).LIBRARY
+        delete (globalThis as any).LIBRARY
+    })
+
+    it('calculates directorial curtness budget word ceiling correctly', () => {
+        // C = 10000 bps (max curtness) -> max(2, floor(24 - 18 * 1.0)) = 6 words
+        expect(enforceCurtnessBudget(10000)).toBe(6)
+        // C = 0 bps (relaxed) -> max(2, floor(24 - 0)) = 24 words
+        expect(enforceCurtnessBudget(0)).toBe(24)
+        // C = 5000 bps -> max(2, floor(24 - 9)) = 15 words
+        expect(enforceCurtnessBudget(5000)).toBe(15)
+        // C = 9000 bps -> max(2, floor(24 - 16.2)) = 7 words
+        expect(enforceCurtnessBudget(9000)).toBe(7)
+    })
+
+    it('rejects dialogue turn that breaches the curtness budget with [CURTNESS_BUDGET_BREACH]', () => {
+        // High curtness C = 10000 bps (max 6 words)
+        const receipt = compileDialogueBeat({
+            beat_id: 'b01',
+            speaker: 'char_bog',
+            dialogue_text:
+                'I told you once before that we cannot touch that valve under any circumstances whatsoever.', // 15 words
+            camera_parenthetical: 'Bog stares coldly through the gloom.',
+            observable_parenthetical: 'Bog stands motionless.',
+            speech_act: 'ASSERT',
+            emotion: 'cold_urgency',
+            swain_mru_phase: 'SPEECH',
+            extracted_motor_actions: ['STAND'],
+            curtness_bps: 10000,
+        })
+
+        expect(receipt.compiled).toBe(false)
+        expect(receipt.curtness_breach).toBe(true)
+        expect(receipt.error).toContain('CURTNESS_BUDGET_BREACH')
+        expect(receipt.word_count).toBe(15)
+        expect(receipt.max_permitted_words).toBe(6)
+    })
+
+    it('compiles compliant dual-field dialogue beat successfully', () => {
+        // High curtness C = 10000 bps (max 6 words)
+        const receipt = compileDialogueBeat({
+            beat_id: 'b02',
+            speaker: 'char_bog',
+            dialogue_text: 'Leave the brass valve alone.', // 5 words <= 6 words
+            camera_parenthetical:
+                'Camera pushes in close on Bog trembling jaw.',
+            observable_parenthetical: 'Bog tightens his stance.',
+            speech_act: 'IMPLICIT_WARNING',
+            emotion: 'cold_urgency',
+            swain_mru_phase: 'SPEECH',
+            extracted_motor_actions: ['STAND'],
+            curtness_bps: 10000,
+        })
+
+        expect(receipt.compiled).toBe(true)
+        expect(receipt.beat).toBeDefined()
+        expect(receipt.beat?.camera_parenthetical).toBe(
+            'Camera pushes in close on Bog trembling jaw.',
+        )
+        expect(receipt.beat?.observable_parenthetical).toBe(
+            'Bog tightens his stance.',
+        )
+        expect(receipt.beat?.word_count).toBe(5)
+    })
+
+    it('intercepts somatic capability violations with [FATAL_SOMATIC_BREACH]', () => {
+        // Bog has a crushed arm and cannot sprint
+        const receipt = compileDialogueBeat({
+            beat_id: 'b03',
+            speaker: 'char_bog',
+            dialogue_text: 'Run!',
+            camera_parenthetical: 'Bog sprints across the flooding culvert.',
+            observable_parenthetical: 'Bog bolts away.',
+            speech_act: 'ASSERT',
+            emotion: 'suppressed_panic',
+            swain_mru_phase: 'MOTOR_ACTION',
+            extracted_motor_actions: ['SPRINT'],
+            curtness_bps: 5000,
+            banned_kinetic_verbs: ['SPRINT'],
+        })
+
+        expect(receipt.compiled).toBe(false)
+        expect(receipt.somatic_breach).toBe(true)
+        expect(receipt.error).toContain('FATAL_SOMATIC_BREACH')
+    })
+
+    it('rejects fractional curtness_bps with FLOAT_PROHIBITED', () => {
+        expect(() => enforceCurtnessBudget(5000.5)).toThrow(/FLOAT_PROHIBITED/)
+    })
+
+    it('routes COMPILE_DIALOGUE_BEAT_ACTOR cleanly through pure reducer', async () => {
+        const slv = vi.fn()
+        const result = (await reducer(
+            model,
+            {
+                type: COMPILE_DIALOGUE_BEAT_ACTOR,
+                bale: {
+                    idx: 'compile-test',
+                    dat: {
+                        compileBeatParams: {
+                            beat_id: 'b04',
+                            speaker: 'char_wart',
+                            dialogue_text: 'No.',
+                            camera_parenthetical: 'Wart scowls.',
+                            observable_parenthetical: 'Wart refuses.',
+                            speech_act: 'DENY',
+                            emotion: 'cynical_defiance',
+                            swain_mru_phase: 'SPEECH',
+                            extracted_motor_actions: [],
+                            curtness_bps: 10000,
+                        },
+                    },
+                    slv,
+                } as any,
+            },
+            mockState,
+        )) as ActorModel
+
+        expect(result).toBeInstanceOf(ActorModel)
+        expect(slv).toHaveBeenCalled()
+        expect(result.compiledBeats.has('b04')).toBe(true)
     })
 })

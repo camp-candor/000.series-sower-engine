@@ -33,6 +33,4 @@ export type {
     FoldEventsParams,
     WhyDirtyParams,
 } from './fce/state.interface.js'
-export type {
-    StatePayload,
-} from './fce/state.bit.js'
+export type { StatePayload } from './fce/state.bit.js'
