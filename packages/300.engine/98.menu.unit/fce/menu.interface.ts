@@ -1,3 +1,12 @@
+import type MenuBit from './menu.bit.js'
+export interface CompiledUniverseDescriptor {
+    seriesSlug: string
+    manifestPath: string
+    byteSize: number
+    merkleRootHex: string
+    hasBibleState: boolean
+}
+
 /**
  * 98.menu.unit - Blessed Terminal Flight Deck Menu Interface Contracts
  */
@@ -16,6 +25,9 @@ export interface MenuFlightDeckState {
 }
 
 export default interface Menu {
+    discoveredUniverses?: CompiledUniverseDescriptor[]
+    activeUniverseSlug?: string
+    menuBits?: Record<string, MenuBit>
     idx: string
     activeSelection: string
     isHeadless: boolean
