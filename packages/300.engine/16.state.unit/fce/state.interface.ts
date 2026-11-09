@@ -4,7 +4,10 @@
  */
 import type { LocomotionTier } from '../../18.trauma.unit/fce/trauma.interface.js'
 import type { GrievanceStatus } from '../../06.grievance.unit/fce/grievance.interface.js'
-import type { BeliefSourceType, DetailStatus } from '../../01.actor.unit/fce/actor.interface.js'
+import type {
+    BeliefSourceType,
+    DetailStatus,
+} from '../../01.actor.unit/fce/actor.interface.js'
 
 export interface SomaticLiveState {
     readonly entity_id: string

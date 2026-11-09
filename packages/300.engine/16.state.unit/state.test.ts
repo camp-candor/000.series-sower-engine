@@ -7,8 +7,6 @@ import {
     reduceLedgerState,
     foldLedgerEvents,
     whyDirtyEntity,
-
-
 } from './buz/state.buzz.js'
 import { FOLD_EVENTS_STATE } from './state.action.js'
 import { reducer } from './state.reduce.js'
@@ -95,7 +93,10 @@ describe('16.state.unit - Deterministic State Fold Execution Battery', () => {
             actorId: 'char_bog',
             tick: 2,
             timestampMs: 2000,
-            payload: { fatigueBpsDelta: 1500, conditionsAdded: ['wnd_fractured_rib'] },
+            payload: {
+                fatigueBpsDelta: 1500,
+                conditionsAdded: ['wnd_fractured_rib'],
+            },
         }
 
         const next = reduceLedgerState(initial, event)
@@ -106,7 +107,9 @@ describe('16.state.unit - Deterministic State Fold Execution Battery', () => {
 
         // Verify next state reduced correctly
         expect(next.entities.char_bog.fatigue_bps).toBe(2500)
-        expect(next.entities.char_bog.open_wounds).toContain('wnd_fractured_rib')
+        expect(next.entities.char_bog.open_wounds).toContain(
+            'wnd_fractured_rib',
+        )
         expect(next.tick).toBe(2)
         expect(next.lastSequenceNumber).toBe(1)
         expect(next.stateHash).not.toBe(initial.stateHash)
@@ -121,7 +124,10 @@ describe('16.state.unit - Deterministic State Fold Execution Battery', () => {
                 actorId: 'char_bog',
                 tick: 2,
                 timestampMs: 2000,
-                payload: { toCoord: { q: 1, r: 0 }, locationId: 'loc_culvert_junction' },
+                payload: {
+                    toCoord: { q: 1, r: 0 },
+                    locationId: 'loc_culvert_junction',
+                },
             },
             {
                 eventId: 'e2',

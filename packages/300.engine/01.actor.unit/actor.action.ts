@@ -81,6 +81,20 @@ export class ProbeDialogueLeakActor implements Action {
     constructor(public bale?: ActorBit) {}
 }
 
+export const COMPILE_DIALOGUE_BEAT_ACTOR =
+    '[Actor action] Compile Dialogue Beat Actor'
+export class CompileDialogueBeatActor implements Action {
+    readonly type = COMPILE_DIALOGUE_BEAT_ACTOR
+    constructor(public bale?: ActorBit) {}
+}
+
+export const ENFORCE_CURTNESS_BUDGET_ACTOR =
+    '[Actor action] Enforce Curtness Budget Actor'
+export class EnforceCurtnessBudgetActor implements Action {
+    readonly type = ENFORCE_CURTNESS_BUDGET_ACTOR
+    constructor(public bale?: ActorBit) {}
+}
+
 export type Actions =
     | InitActor
     | UpdateActor
@@ -94,3 +108,5 @@ export type Actions =
     | ListUnratifiedDetailsActor
     | BuildSubtextDirectiveActor
     | ProbeDialogueLeakActor
+    | CompileDialogueBeatActor
+    | EnforceCurtnessBudgetActor
