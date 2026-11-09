@@ -1,4 +1,5 @@
 import type MenuBit from './menu.bit.js'
+
 export interface CompiledUniverseDescriptor {
     seriesSlug: string
     manifestPath: string
@@ -7,9 +8,12 @@ export interface CompiledUniverseDescriptor {
     hasBibleState: boolean
 }
 
-/**
- * 98.menu.unit - Blessed Terminal Flight Deck Menu Interface Contracts
- */
+export type AirlockState =
+    | 'IDLE'
+    | 'SCANNING'
+    | 'SELECTING'
+    | 'DISPATCHED'
+    | 'ABORTED'
 
 export interface MenuOptionDescriptor {
     readonly label: string
@@ -25,13 +29,14 @@ export interface MenuFlightDeckState {
 }
 
 export default interface Menu {
+    idx: string
     discoveredUniverses?: CompiledUniverseDescriptor[]
     activeUniverseSlug?: string
+    airlockState?: AirlockState
+    activeSelection?: string
+    lastActionTimestamp?: number
+    isHeadless?: boolean
     menuBits?: Record<string, MenuBit>
-    idx: string
-    activeSelection: string
-    isHeadless: boolean
-    lastActionTimestamp: number
     lst?: string[]
     geoJsonNow?: any
     atlasNow?: any

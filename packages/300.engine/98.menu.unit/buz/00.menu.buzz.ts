@@ -151,6 +151,7 @@ async function emitConsole(ste: State | undefined, src: string): Promise<void> {
 export const handleMenuSelection = async (
     selection: string,
     ste?: State,
+    model?: MenuModel,
 ): Promise<void> => {
     if (!ste || typeof ste.hunt !== 'function') {
         return
@@ -158,14 +159,27 @@ export const handleMenuSelection = async (
 
     switch (selection) {
         case '[01] BOOT ENGINE & ENSURE SCHEMA': {
+            if (model) model.airlockState = 'SELECTING'
+            const selectedSlug = await promptAirlockUniverseSelection(ste)
+
+            if (!selectedSlug) {
+                if (model) model.airlockState = 'ABORTED'
+                break
+            }
+
+            if (model) {
+                model.activeUniverseSlug = selectedSlug
+                model.airlockState = 'DISPATCHED'
+            }
+
             await emitConsole(
                 ste,
-                '>> [MENU:ACTION] Dispatching BOOT_ENGINE...',
+                `>> [MENU:ACTION] Dispatching BOOT_ENGINE with realm [${selectedSlug}]...`,
             )
             await ste.hunt(ActEng.BOOT_ENGINE, {
                 dat: {
                     bootParams: {
-                        seriesSlug: 'under-the-floorboards',
+                        seriesSlug: selectedSlug,
                         seedGenesis: true,
                     },
                 },
@@ -349,7 +363,7 @@ export const selectMenuOptionAction = async (
     const selection = bal.dat?.selection || bal.src || ''
     cpy.activeSelection = selection
 
-    await handleMenuSelection(selection, ste)
+    await handleMenuSelection(selection, ste, cpy)
 
     if (bal.slv) {
         bal.slv({
@@ -477,6 +491,134 @@ export function scanCompiledUniverses(
     return results.sort((a, b) => a.seriesSlug.localeCompare(b.seriesSlug))
 }
 
+export function calculateSubmenuSpan(candidateCount: number): number {
+    return Math.min(12, Math.max(6, candidateCount + 2))
+}
+
+export async function promptAirlockUniverseSelection(
+    ste?: State,
+    baseDir?: string,
+): Promise<string | null> {
+    await emitConsole(
+        ste,
+        '>> [AIRLOCK::SCAN] Sweeping compiled/ universe manifests from host volume...',
+    )
+
+    const candidates = scanCompiledUniverses(baseDir)
+
+    if (candidates.length === 0) {
+        await emitConsole(
+            ste,
+            ':: [ERROR] No valid compiled universe manifests found in compiled/.',
+        )
+        await emitConsole(
+            ste,
+            ':: Please copy compiled universes from 000.goblin-lore/compiled/.',
+        )
+        return null
+    }
+
+    await emitConsole(
+        ste,
+        `>> [AIRLOCK::FOUND] ${candidates.length} sealed world artifact(s) detected:`,
+    )
+    for (const c of candidates) {
+        await emitConsole(
+            ste,
+            `>>                  * [${c.seriesSlug}] (${c.byteSize} bytes)`,
+        )
+    }
+
+    const lib =
+        (globalThis as any).LIBRARY ||
+        (typeof global !== 'undefined' ? (global as any).LIBRARY : undefined)
+
+    // Headless CI fallback
+    if (!lib || typeof lib.hunt !== 'function') {
+        const fallbackSlug = candidates[0].seriesSlug
+        await emitConsole(
+            ste,
+            `>> [AIRLOCK::HEADLESS] Auto-selecting target: [${fallbackSlug}]`,
+        )
+        return fallbackSlug
+    }
+
+    await emitConsole(
+        ste,
+        '>> [AIRLOCK::PROMPT] Presenting operator selection switchboard in left deck...',
+    )
+
+    const choiceList = [
+        ...candidates.map((c) => c.seriesSlug),
+        '[ABORT AIRLOCK SEQUENCE]',
+    ]
+    const ySpan = calculateSubmenuSpan(choiceList.length)
+
+    const gridBit: any = await lib.hunt(UPDATE_GRID, {
+        x: 0,
+        y: 4,
+        xSpan: 4,
+        ySpan,
+    })
+
+    const choiceRes: any = await lib.hunt(OPEN_CHOICE, {
+        dat: {
+            clr0: Color.BLACK,
+            clr1: Color.GREEN,
+            cb: async (focusedSlug: string) => {
+                const item = candidates.find(
+                    (c) => c.seriesSlug === focusedSlug,
+                )
+                if (item) {
+                    const shortHash = item.merkleRootHex.slice(0, 16)
+                    await emitConsole(
+                        ste,
+                        `:: [AIRLOCK::PREVIEW] [${item.seriesSlug}] Root: ${shortHash}... | Size: ${item.byteSize}B`,
+                    )
+                } else if (focusedSlug === '[ABORT AIRLOCK SEQUENCE]') {
+                    await emitConsole(
+                        ste,
+                        ':: [AIRLOCK::PREVIEW] Cancel selection and return to main flight deck.',
+                    )
+                }
+            },
+        },
+        src: Align.VERTICAL,
+        lst: choiceList,
+        net: gridBit?.grdBit?.dat,
+    })
+
+    const picked: string = choiceRes?.chcBit?.src || ''
+
+    if (!picked || picked === '[ABORT AIRLOCK SEQUENCE]') {
+        await emitConsole(
+            ste,
+            '>> [AIRLOCK::ABORT] Engine boot aborted by operator. Restoring flight deck.',
+        )
+        return null
+    }
+
+    await emitConsole(
+        ste,
+        '>> ==============================================================================',
+    )
+    await emitConsole(
+        ste,
+        '>> [EPIC-08] INITIATING CANON AIRLOCK & DISCRETE REALM VAULT',
+    )
+    await emitConsole(ste, `>> [AIRLOCK::INGEST] Target selected: [${picked}]`)
+    await emitConsole(
+        ste,
+        `>> [AIRLOCK::BYTE_0] Reading compiled/${picked}/bible-state.json`,
+    )
+    await emitConsole(
+        ste,
+        '>> ==============================================================================',
+    )
+
+    return picked
+}
+
 export const initMenu = async (
     cpy: MenuModel,
     bal?: MenuBit,
@@ -497,6 +639,7 @@ export const initMenu = async (
     const lib = (globalThis as any).LIBRARY || (global as any).LIBRARY
     if (!lib || typeof lib.hunt !== 'function') {
         cpy.isHeadless = true
+        cpy.discoveredUniverses = scanCompiledUniverses()
         if (bal?.slv) {
             bal.slv({
                 mnuBit: {
@@ -560,6 +703,7 @@ export const updateMenu = async (
     const lib = (globalThis as any).LIBRARY || (global as any).LIBRARY
     if (!lib || typeof lib.hunt !== 'function') {
         cpy.isHeadless = true
+        cpy.discoveredUniverses = scanCompiledUniverses()
         if (bal?.slv) {
             bal.slv({
                 mnuBit: {
@@ -801,7 +945,7 @@ export const updateMenu = async (
         src !== '[ROOT MENU]' &&
         src !== '[03] AUDIT SIMULATION INVARIANTS'
     ) {
-        await handleMenuSelection(src, ste)
+        await handleMenuSelection(src, ste, cpy)
     }
 
     if (src === '[ROOT MENU]') {
@@ -834,82 +978,7 @@ export const updateMenu = async (
     }
 
     switch (src) {
-        case '[01] BOOT ENGINE & ENSURE SCHEMA': {
-            // Canon Airlock: sweep compiled/ manifests, then present the
-            // operator universe switchboard in the left choice deck.
-            await emitConsole(
-                ste,
-                '>> [AIRLOCK::SCAN] Sweeping compiled/ universe manifests from host volume...',
-            )
-            let discovered: CompiledUniverseDescriptor[] = []
-            try {
-                discovered = scanCompiledUniverses()
-            } catch {
-                discovered = []
-            }
-            cpy.discoveredUniverses = discovered
-            await emitConsole(
-                ste,
-                `>> [AIRLOCK::FOUND] ${discovered.length} sealed world artifacts detected:`,
-            )
-            for (const universe of discovered) {
-                await emitConsole(
-                    ste,
-                    `:: - ${universe.seriesSlug} (${universe.byteSize} bytes, ${universe.merkleRootHex.slice(0, 12)}...)`,
-                )
-            }
-            await emitConsole(
-                ste,
-                '>> [AIRLOCK::PROMPT] Presenting operator selection switchboard in left deck...',
-            )
-            const airlockGrid = await lib.hunt(UPDATE_GRID, {
-                x: 0,
-                y: 4,
-                xSpan: 4,
-                ySpan: 8,
-            })
-            const airlockChoices = [
-                ...discovered.map((u) => u.seriesSlug),
-                '[ABORT AIRLOCK SEQUENCE]',
-            ]
-            const airlockBit = await lib.hunt(OPEN_CHOICE, {
-                dat: {
-                    clr0: Color.BLACK,
-                    clr1: Color.YELLOW,
-                    cb: (choice: string) => {
-                        const text =
-                            choice === '[ABORT AIRLOCK SEQUENCE]'
-                                ? 'Abort airlock sequence and return to flight deck.'
-                                : `Seal compiled universe: ${choice}`
-                        lib.hunt(UPDATE_CONSOLE, {
-                            idx: 'cns00',
-                            src: text,
-                        })
-                    },
-                },
-                src: Align.VERTICAL,
-                lst: airlockChoices,
-                net: airlockGrid?.grdBit?.dat,
-            })
-            const picked = airlockBit?.chcBit?.src || ''
-            if (
-                picked &&
-                picked !== '[ABORT AIRLOCK SEQUENCE]' &&
-                discovered.some((u) => u.seriesSlug === picked)
-            ) {
-                cpy.activeUniverseSlug = picked
-                await emitConsole(
-                    ste,
-                    `>> [AIRLOCK::SEALED] Operator sealed universe: ${picked}`,
-                )
-            } else {
-                await emitConsole(
-                    ste,
-                    '>> [AIRLOCK::ABORTED] Airlock sequence aborted, returning to flight deck.',
-                )
-            }
-            break
-        }
+        case '[01] BOOT ENGINE & ENSURE SCHEMA':
         case '[02] STATUS ENGINE & TABLE INVENTORY':
         case '[04] RESET ENGINE TO OFFLINE':
             break
