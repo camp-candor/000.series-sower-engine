@@ -7,6 +7,8 @@ export {
     recordBeliefActor,
     queryHorizonActor,
     scrubEpistemicContextActor,
+    buildSubtextDirectiveAction,
+    probeDialogueLeakAction,
     calculateSalienceActor,
     stageDetailActor,
     ratifyDetailActor,
@@ -15,6 +17,8 @@ export {
     assertBasisPoints,
     makeBeliefId,
     calculateCompositeSalience,
+    buildSubtextAttenuationDirective,
+    probeDialogueSubtextLeak,
 } from './buz/actor.buzz.js'
 export type {
     BeliefSourceType,
@@ -30,6 +34,10 @@ export type {
     StageDetailParams,
     RatifyDetailParams,
     DiscardDetailParams,
+    SubtextAttenuationDirective,
+    BuildSubtextParams,
+    DialogueLeakProbeParams,
+    DialogueLeakProbeReceipt,
 } from './fce/actor.interface.js'
 export type {
     ActorPayload,
