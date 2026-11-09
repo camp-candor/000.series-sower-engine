@@ -18,7 +18,15 @@ export default interface MenuBit {
     idx: string
     src?: string
     val?: number
-    dat?: MenuPayload | any
+    dat?:
+        | {
+              discovered?: import('./menu.interface.js').CompiledUniverseDescriptor[]
+              selectedSlug?: string
+              targetPath?: string
+              [key: string]: any
+          }
+        | MenuPayload
+        | any
     lst?: readonly string[] | any
     slv?: Function
 }
