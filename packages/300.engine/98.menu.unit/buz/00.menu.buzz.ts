@@ -563,8 +563,8 @@ export async function promptAirlockUniverseSelection(
 
     const choiceRes: any = await lib.hunt(OPEN_CHOICE, {
         dat: {
-            clr0: Color.BLACK,
-            clr1: Color.GREEN,
+            clr0: 'black',
+            clr1: 'green',
             cb: async (focusedSlug: string) => {
                 const item = candidates.find(
                     (c) => c.seriesSlug === focusedSlug,
