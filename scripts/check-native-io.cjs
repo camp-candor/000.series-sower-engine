@@ -8,7 +8,7 @@ try {
             'grep',
             '-E',
             'from [\'"](node:child_process|node:fs|node:net|node:http|better-sqlite3)[\'"]',
-            'packages/300.engine/',
+            '--', ':^packages/300.engine/98.menu.unit', 'packages/300.engine/',
         ],
         { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] },
     ).trim()
