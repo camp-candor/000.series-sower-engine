@@ -67,6 +67,20 @@ export class ListUnratifiedDetailsActor implements Action {
     constructor(public bale?: ActorBit) {}
 }
 
+export const BUILD_SUBTEXT_DIRECTIVE_ACTOR =
+    '[Actor action] Build Subtext Directive Actor'
+export class BuildSubtextDirectiveActor implements Action {
+    readonly type = BUILD_SUBTEXT_DIRECTIVE_ACTOR
+    constructor(public bale?: ActorBit) {}
+}
+
+export const PROBE_DIALOGUE_LEAK_ACTOR =
+    '[Actor action] Probe Dialogue Leak Actor'
+export class ProbeDialogueLeakActor implements Action {
+    readonly type = PROBE_DIALOGUE_LEAK_ACTOR
+    constructor(public bale?: ActorBit) {}
+}
+
 export type Actions =
     | InitActor
     | UpdateActor
@@ -78,3 +92,5 @@ export type Actions =
     | RatifyDetailActor
     | DiscardDetailActor
     | ListUnratifiedDetailsActor
+    | BuildSubtextDirectiveActor
+    | ProbeDialogueLeakActor

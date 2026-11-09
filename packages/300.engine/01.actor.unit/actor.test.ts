@@ -1,21 +1,24 @@
+import type { ActorBeliefRecord } from './fce/actor.interface.js'
+
+import { STAGE_DETAIL_ACTOR, BUILD_SUBTEXT_DIRECTIVE_ACTOR, PROBE_DIALOGUE_LEAK_ACTOR } from './actor.action.js'
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { ActorModel } from './actor.model.js'
 import {
     initActor,
-    recordBeliefActor,
     queryHorizonActor,
-    scrubEpistemicContextActor,
+    recordBeliefActor,
     calculateCompositeSalience,
     stageDetailActor,
     ratifyDetailActor,
+    scrubEpistemicContextActor,
+    buildSubtextAttenuationDirective,
+    probeDialogueSubtextLeak,
     assertBasisPoints,
 } from './buz/actor.buzz.js'
-import { STAGE_DETAIL_ACTOR } from './actor.action.js'
+
 import { reducer } from './actor.reduce.js'
-import type { ActorBeliefRecord } from './fce/actor.interface.js'
 
-
-describe('01.actor.unit - Epistemic Horizon & Unratified Detail Salience Battery', () => {
+describe('01.actor.unit - Core Features & Stage 5 Features', () => {
     let model: ActorModel
     let mockState: any
     let dbOperations: any[]
@@ -26,17 +29,12 @@ describe('01.actor.unit - Epistemic Horizon & Unratified Detail Salience Battery
         dbOperations = []
         eventAppends = []
         mockState = {
-            hunt: vi.fn(async (actionType: string, payload: any) => {
-                if (actionType.includes('Exec Batch Database')) {
+            hunt: vi.fn(async (actionType, payload) => {
+                if (actionType === '[Database action] Exec Batch Database') {
                     dbOperations.push(...payload.dat.operations)
-                    return { databaseBit: { val: payload.dat.operations.length } }
                 }
-                if (actionType.includes('Append Event')) {
-                    eventAppends.push(payload.dat.appendParams)
-                    return { eventBit: { val: 1 } }
-                }
-                if (actionType.includes('Query Database')) {
-                    return { databaseBit: { val: 0 } }
+                if (actionType === '[Event action] Append Event') {
+                    eventAppends.push(payload.dat)
                 }
                 return {}
             }),
@@ -192,7 +190,7 @@ describe('01.actor.unit - Epistemic Horizon & Unratified Detail Salience Battery
         // Assert database updated and historical event appended
         expect(dbOperations).toHaveLength(1)
         expect(eventAppends).toHaveLength(1)
-        expect(eventAppends[0].eventType).toBe('DETAIL_RATIFIED')
+        expect(eventAppends[0].appendParams.eventType).toBe('DETAIL_RATIFIED')
     })
 
     it('records and queries subjective epistemic belief horizons', async () => {
@@ -220,7 +218,7 @@ describe('01.actor.unit - Epistemic Horizon & Unratified Detail Salience Battery
         expect(beliefs[0].fact_id).toBe('fact_water_tainted')
     })
 
-    it('scrubs objective world facts by ignorance omission for characters without belief', () => {
+    it('scrubs objective world facts by ignorance omission for characters without belief', async () => {
         // Bog knows the water is tainted
         model.beliefs.set('char_bog->fact_water_tainted', {
             belief_id: 'char_bog->fact_water_tainted',
@@ -239,7 +237,7 @@ describe('01.actor.unit - Epistemic Horizon & Unratified Detail Salience Battery
         }
 
         const slv = vi.fn()
-        scrubEpistemicContextActor(
+        await scrubEpistemicContextActor(
             model,
             {
                 idx: 'scrub',
@@ -287,5 +285,168 @@ describe('01.actor.unit - Epistemic Horizon & Unratified Detail Salience Battery
 
         expect(result).toBeInstanceOf(ActorModel)
         expect(slv).toHaveBeenCalled()
+    })
+
+    it('scrubs unobserved facts from context via ignorance by omission', async () => {
+        // Bog only knows that the pipe is cold
+        await recordBeliefActor(
+            model,
+            {
+                idx: 'b1',
+                dat: {
+                    beliefParams: {
+                        observer_id: 'char_bog',
+                        fact_id: 'fact_pipe_cold',
+                        subjective_probability_bps: 10000,
+                    },
+                },
+            },
+            mockState,
+        )
+
+        const worldFacts = {
+            fact_pipe_cold: 'The drainage pipe is freezing cold.',
+            fact_hidden_key: 'A copper key is hidden under the grate.',
+            fact_poison_well: 'The central well water is poisoned.',
+        }
+
+        const slv = vi.fn()
+        await scrubEpistemicContextActor(
+            model,
+            {
+                idx: 'scrub-test',
+                dat: {
+                    scrubParams: {
+                        observer_id: 'char_bog',
+                        world_facts: worldFacts,
+                    },
+                },
+                slv,
+            },
+            mockState,
+        )
+
+        expect(slv).toHaveBeenCalled()
+        const result = slv.mock.calls[0][0].scrubbedFacts
+        expect(result.fact_pipe_cold).toBeDefined()
+        expect(result.fact_hidden_key).toBeUndefined()
+        expect(result.fact_poison_well).toBeUndefined()
+    })
+
+    it('builds FALSE_INTERPRETATION_ANCHOR directive when tension >= 7000 bps', () => {
+        const directive = buildSubtextAttenuationDirective({
+            actor_id: 'char_bog',
+            tension_bps: 7500,
+            candidate_props: ['item_copper_tea_kettle', 'item_grease_bucket'],
+            surface_dispute: 'broken kettle lid',
+            underlying_conflict: 'fear of seasonal abandonment',
+        })
+
+        expect(directive.directive_type).toBe('FALSE_INTERPRETATION_ANCHOR')
+        expect(directive.anchor_prop).toBe('item_copper_tea_kettle')
+        expect(directive.overt_topic).toBe('broken kettle lid')
+        expect(directive.suppressed_emotion).toBe('fear of seasonal abandonment')
+        expect(directive.guidance_prompt).toContain('broken kettle lid')
+        expect(directive.guidance_prompt).toContain('fear of seasonal abandonment')
+    })
+
+    it('builds DIRECT_EXPRESSION directive when tension < 7000 bps', () => {
+        const directive = buildSubtextAttenuationDirective({
+            actor_id: 'char_wart',
+            tension_bps: 3200,
+            candidate_props: ['item_valve'],
+            surface_dispute: 'valve threads',
+            underlying_conflict: 'resentment over rations',
+        })
+
+        expect(directive.directive_type).toBe('DIRECT_EXPRESSION')
+        expect(directive.anchor_prop).toBe('item_valve')
+        expect(directive.suppressed_emotion).toBe('')
+    })
+
+    it('passes dialogue probe when secret lemma overlap <= 3500 bps (35%)', () => {
+        const secretLemmas = ['poison', 'well', 'arsenic', 'tainted', 'cistern']
+        // 1 match ('well') out of 5 lemmas = 1/5 = 2000 bps <= 3500 bps
+        const receipt = probeDialogueSubtextLeak({
+            dialogue_text: 'I went to fetch clean water from the deep well yesterday.',
+            secret_id: 'secret_poisoned_water',
+            secret_lemmas: secretLemmas,
+            threshold_bps: 3500,
+        })
+
+        expect(receipt.passed).toBe(true)
+        expect(receipt.overlap_count).toBe(1)
+        expect(receipt.similarity_bps).toBe(2000)
+        expect(receipt.error).toBeUndefined()
+    })
+
+    it('fails dialogue probe with EPISTEMIC_HORIZON_LEAK when overlap > 3500 bps', () => {
+        const secretLemmas = ['poison', 'well', 'arsenic', 'tainted', 'cistern']
+        // 2 matches ('poison', 'well') out of 5 lemmas = 2/5 = 4000 bps > 3500 bps
+        const receipt = probeDialogueSubtextLeak({
+            dialogue_text: 'Someone put poison in the well cistern!',
+            secret_id: 'secret_poisoned_water',
+            secret_lemmas: secretLemmas,
+            threshold_bps: 3500,
+        })
+
+        expect(receipt.passed).toBe(false)
+        expect(receipt.overlap_count).toBe(3) // poison, well, cistern = 3/5 = 6000 bps
+        expect(receipt.similarity_bps).toBe(6000)
+        expect(receipt.error).toContain('EPISTEMIC_HORIZON_LEAK')
+    })
+
+    it('rejects floating-point tension or threshold with FLOAT_PROHIBITED', () => {
+        expect(() => assertBasisPoints(7000.5, 'tension_bps')).toThrow(/FLOAT_PROHIBITED/)
+    })
+
+    it('routes BUILD_SUBTEXT_DIRECTIVE_ACTOR and PROBE_DIALOGUE_LEAK_ACTOR through pure reducer', async () => {
+        const slv1 = vi.fn()
+        const res1 = (await reducer(
+            model,
+            {
+                type: BUILD_SUBTEXT_DIRECTIVE_ACTOR,
+                bale: {
+                    idx: 'subtext-action',
+                    dat: {
+                        subtextParams: {
+                            actor_id: 'char_bog',
+                            tension_bps: 8000,
+                            candidate_props: ['item_bucket'],
+                            surface_dispute: 'spilled grease',
+                            underlying_conflict: 'distrust',
+                        },
+                    },
+                    slv: slv1,
+                } as any,
+            },
+            mockState,
+        )) as ActorModel
+
+        expect(res1).toBeInstanceOf(ActorModel)
+        expect(slv1).toHaveBeenCalled()
+
+        const slv2 = vi.fn()
+        const res2 = (await reducer(
+            model,
+            {
+                type: PROBE_DIALOGUE_LEAK_ACTOR,
+                bale: {
+                    idx: 'probe-action',
+                    dat: {
+                        leakProbeParams: {
+                            dialogue_text: 'The valve is rusted tight.',
+                            secret_id: 'sec_murder',
+                            secret_lemmas: ['blood', 'knife', 'body'],
+                        },
+                    },
+                    slv: slv2,
+                } as any,
+            },
+            mockState,
+        )) as ActorModel
+
+        expect(res2).toBeInstanceOf(ActorModel)
+        expect(slv2).toHaveBeenCalled()
     })
 })

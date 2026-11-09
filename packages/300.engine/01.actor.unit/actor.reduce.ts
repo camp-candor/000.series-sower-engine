@@ -43,6 +43,12 @@ export function reducer(
         case Act.LIST_UNRATIFIED_DETAILS_ACTOR:
             return Buzz.listUnratifiedDetailsActor(clone(model), act.bale as any, state)
 
+        case Act.BUILD_SUBTEXT_DIRECTIVE_ACTOR:
+            return Buzz.buildSubtextDirectiveAction(clone(model), act.bale as any, state)
+
+        case Act.PROBE_DIALOGUE_LEAK_ACTOR:
+            return Buzz.probeDialogueLeakAction(clone(model), act.bale as any, state)
+
         default:
             return model
     }
