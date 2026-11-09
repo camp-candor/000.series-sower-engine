@@ -14,7 +14,7 @@ export function reducer(
             return Buzz.updateEngine(clone(model), act.bale, state as State)
 
         case Act.INIT_ENGINE:
-            return Buzz.initEngine(clone(model), act.bale, state as State)
+            return Buzz.initEngine(clone(model), act.bale as any, state as State)
 
         case Act.TEST_ENGINE:
             return Buzz.testEngine(clone(model), act.bale, state as State)
@@ -68,6 +68,19 @@ export function reducer(
                 act.bale as any,
                 state as State,
             )
+
+
+        case Act.BOOT_ENGINE:
+            return Buzz.bootEngine(clone(model), act.bale as any, state as any)
+
+        case Act.STATUS_ENGINE:
+            return Buzz.statusEngine(clone(model), act.bale as any, state as any)
+
+        case Act.AUDIT_ENGINE:
+            return Buzz.auditEngine(clone(model), act.bale as any, state as any)
+
+        case Act.RESET_ENGINE:
+            return Buzz.resetEngine(clone(model), act.bale as any, state as any)
 
         default:
             return model
