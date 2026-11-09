@@ -2,6 +2,7 @@
  * 98.menu.unit - Menu Bit Payload Contracts
  */
 import type {
+    CompiledUniverseDescriptor,
     MenuFlightDeckState,
     MenuOptionDescriptor,
 } from './menu.interface.js'
@@ -12,6 +13,9 @@ export interface MenuPayload {
     readonly options?: readonly MenuOptionDescriptor[]
     readonly timestampMs?: number
     readonly error?: string
+    discovered?: CompiledUniverseDescriptor[]
+    selectedSlug?: string
+    targetPath?: string
 }
 
 export default interface MenuBit {
