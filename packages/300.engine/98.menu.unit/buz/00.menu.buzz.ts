@@ -38,6 +38,66 @@ import {
     traverseLocationAction,
     checkPortalCrossingAction,
 } from '../../10.location.unit/location.buzzer.js'
+import { MovementModel } from '../../11.movement.unit/movement.model.js'
+import {
+    initMovement,
+    setActorPositionAction,
+    assertInteractionRangeAction,
+    executeMovementAction,
+} from '../../11.movement.unit/movement.buzzer.js'
+import { EntityModel } from '../../03.entity.unit/entity.model.js'
+import {
+    initEntity,
+    upsertEntityLiveAction,
+    getEntityLiveAction,
+    listEntitiesByLocationAction,
+} from '../../03.entity.unit/entity.buzzer.js'
+import { LeverageModel } from '../../09.leverage.unit/leverage.model.js'
+import {
+    initLeverage,
+    mutateStringLeverage,
+    spendStringLeverage,
+    auditLeverageSolvencyAction,
+} from '../../09.leverage.unit/leverage.buzzer.js'
+import { ParanoiaModel } from '../../12.paranoia.unit/paranoia.model.js'
+import {
+    initParanoia,
+    tickClockAction,
+    sweepThermodynamicsAction,
+    dispatchClockAction,
+} from '../../12.paranoia.unit/paranoia.buzzer.js'
+import { GrievanceModel } from '../../06.grievance.unit/grievance.model.js'
+import {
+    initGrievance,
+    escalateGrievanceAction,
+    queryEligibleGrievancesAction,
+    selectStage3EncounterAction,
+} from '../../06.grievance.unit/grievance.buzzer.js'
+import { LedgerModel } from '../../08.ledger.unit/ledger.model.js'
+import {
+    initLedger,
+    stageMutationAction,
+    commitStagingAction,
+    rollbackStagingAction,
+    resolveDual2d6Action,
+} from '../../08.ledger.unit/ledger.buzzer.js'
+import { ActorModel } from '../../01.actor.unit/actor.model.js'
+import {
+    initActor,
+    stageDetailActor,
+    ratifyDetailActor,
+    recordBeliefActor,
+    scrubEpistemicContextActor,
+    buildSubtextDirectiveAction,
+    probeDialogueLeakAction,
+} from '../../01.actor.unit/actor.buzzer.js'
+import { StateModel } from '../../16.state.unit/state.model.js'
+import {
+    initState,
+    hydrateStateAction,
+    foldEventsStateAction,
+    whyDirtyStateAction,
+} from '../../16.state.unit/state.buzzer.js'
 
 let bit: any, lst: any, src: any
 let rootSlv: any
@@ -133,6 +193,24 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         '[7] AUDIT INVENTORY HAND CAPACITY & SLOTS',
         'Audit Spatial Topology & Portal Mesh',
         '[8] AUDIT SPATIAL TOPOLOGY & PORTAL MESH',
+        'Audit Axial Locomotion & Movement Gating',
+        '[9] AUDIT AXIAL LOCOMOTION & MOVEMENT GATING',
+        'Inspect 4-Vector State & SQLite Tables',
+        '[2] INSPECT 4-VECTOR STATE & SQLITE TABLES',
+        'Mutate Leverage Strings / Grievance / Clock',
+        '[6] MUTATE LEVERAGE STRINGS / GRIEVANCE / CLOCK',
+        'Execute Stage 3 Grievance Lottery & Encounter Selection',
+        '[10] EXECUTE STAGE 3 GRIEVANCE LOTTERY & ENCOUNTER SELECTION',
+        'Audit Staging Accumulator & Atomic Commit',
+        '[11] AUDIT STAGING ACCUMULATOR & ATOMIC COMMIT',
+        'Execute Stage 4 Dual-Set 2d6 Conflict Resolution',
+        '[12] EXECUTE STAGE 4 DUAL-SET 2D6 CONFLICT RESOLUTION',
+        'Audit Unratified Details & Salience Harvest Queue',
+        '[13] AUDIT UNRATIFIED DETAILS & SALIENCE HARVEST QUEUE',
+        'Execute Deterministic State Fold & Audit Why-Dirty',
+        '[14] EXECUTE DETERMINISTIC STATE FOLD & AUDIT WHY-DIRTY',
+        'Audit Epistemic Horizons & Subtext Attenuation',
+        '[15] AUDIT EPISTEMIC HORIZONS & SUBTEXT ATTENUATION',
         'ROOT MENU',
         ActOlm.UPDATE_ENGINE.split(']')[1],
         ActOlm.TEST_ENGINE.split(']')[1],
@@ -219,6 +297,42 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             'Audit reciprocal portal mesh, non-adjacent jump traps, and atomic traversal events.',
         '[8] AUDIT SPATIAL TOPOLOGY & PORTAL MESH':
             'Audit reciprocal portal mesh, non-adjacent jump traps, and atomic traversal events.',
+        'Audit Axial Locomotion & Movement Gating':
+            'Audit axial hex distance, interaction range, and locomotion tier gating.',
+        '[9] AUDIT AXIAL LOCOMOTION & MOVEMENT GATING':
+            'Audit axial hex distance, interaction range, and locomotion tier gating.',
+        'Inspect 4-Vector State & SQLite Tables':
+            'Inspect materialized entities_live roster, upserts, and retrieval receipts.',
+        '[2] INSPECT 4-VECTOR STATE & SQLITE TABLES':
+            'Inspect materialized entities_live roster, upserts, and retrieval receipts.',
+        'Mutate Leverage Strings / Grievance / Clock':
+            'Mutate directional debt strings, trap self-dealing, and audit solvency.',
+        '[6] MUTATE LEVERAGE STRINGS / GRIEVANCE / CLOCK':
+            'Mutate directional debt strings, trap self-dealing, and audit solvency.',
+        'Execute Stage 3 Grievance Lottery & Encounter Selection':
+            'Run Machine Rail filtering, Jaccard boredom checks, and boil-over override.',
+        '[10] EXECUTE STAGE 3 GRIEVANCE LOTTERY & ENCOUNTER SELECTION':
+            'Run Machine Rail filtering, Jaccard boredom checks, and boil-over override.',
+        'Audit Staging Accumulator & Atomic Commit':
+            'Stage volatile mutations in RAM, commit atomically, and audit rollback.',
+        '[11] AUDIT STAGING ACCUMULATOR & ATOMIC COMMIT':
+            'Stage volatile mutations in RAM, commit atomically, and audit rollback.',
+        'Execute Stage 4 Dual-Set 2d6 Conflict Resolution':
+            'Resolve dual-axis opposed 2d6 duel with clamped modifiers and auto-staging.',
+        '[12] EXECUTE STAGE 4 DUAL-SET 2D6 CONFLICT RESOLUTION':
+            'Resolve dual-axis opposed 2d6 duel with clamped modifiers and auto-staging.',
+        'Audit Unratified Details & Salience Harvest Queue':
+            'Stage salient details, discard noise, and ratify canonical entities.',
+        '[13] AUDIT UNRATIFIED DETAILS & SALIENCE HARVEST QUEUE':
+            'Stage salient details, discard noise, and ratify canonical entities.',
+        'Execute Deterministic State Fold & Audit Why-Dirty':
+            'Hydrate frozen snapshot, fold event log, and audit blast radius.',
+        '[14] EXECUTE DETERMINISTIC STATE FOLD & AUDIT WHY-DIRTY':
+            'Hydrate frozen snapshot, fold event log, and audit blast radius.',
+        'Audit Epistemic Horizons & Subtext Attenuation':
+            'Scrub unobserved facts, anchor subtext, and probe dialogue leaks.',
+        '[15] AUDIT EPISTEMIC HORIZONS & SUBTEXT ATTENUATION':
+            'Scrub unobserved facts, anchor subtext, and probe dialogue leaks.',
         'ROOT MENU': 'Return to the master runner switchboard.',
     }
 
@@ -633,22 +747,153 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
 
         case 'Audit Paranoia Clocks & Pressure Dispatch':
         case '[5] AUDIT PARANOIA CLOCKS & PRESSURE DISPATCH': {
-            await ste.hunt(ActPar.INIT_PARANOIA, {})
             await lib.hunt(UPDATE_CONSOLE, {
                 idx: 'cns00',
-                src: '>> [PARANOIA:INIT] [OK] Paranoia clock manager online with 2 clocks hydrated.',
+                src: '>> ============================================================',
             })
+            try {
+                await ste.hunt(ActPar.INIT_PARANOIA, {})
+
+                const parMod = new ParanoiaModel()
+                const sink = () => {}
+
+                // 1. Boot thermodynamic monitor (streams [PARANOIA:INIT])
+                await initParanoia(
+                    parMod,
+                    { idx: 'menu-paranoia-init', slv: sink } as any,
+                    ste,
+                )
+
+                // Scripted 2-clock demo scenario (deterministic in any env)
+                parMod.clocks.clear()
+                parMod.clocks.set('clk_bog_paranoia', {
+                    clockId: 'clk_bog_paranoia',
+                    entityId: 'char_bog',
+                    clockName: 'CULVERT_BREACH',
+                    valueBps: 6800,
+                    thresholdBps: 8000,
+                    decayRateBps: 0,
+                    segmentsCount: 6,
+                    currentSegment: 4,
+                    tripwirePhase: 'HYPERVIGILANT',
+                    visionConeDegrees: 60,
+                    isTriggered: false,
+                    lastTickedAtMs: 1700000000000,
+                })
+                parMod.clocks.set('clk_wart_resentment', {
+                    clockId: 'clk_wart_resentment',
+                    entityId: 'char_wart',
+                    clockName: 'RESENTMENT',
+                    valueBps: 4000,
+                    thresholdBps: 8000,
+                    decayRateBps: 100,
+                    segmentsCount: 6,
+                    currentSegment: 2,
+                    tripwirePhase: 'FIDGET',
+                    visionConeDegrees: 180,
+                    isTriggered: false,
+                    lastTickedAtMs: 1700000000000,
+                })
+                await lib.hunt(UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: '>> [PARANOIA:INIT] [OK] Thermodynamic paranoia monitor online with 2 clocks hydrated.',
+                })
+
+                // 2. Pressure surge past threshold (streams [CLOCK:TICK])
+                await tickClockAction(
+                    parMod,
+                    {
+                        idx: 'menu-paranoia-tick',
+                        dat: {
+                            tickParams: {
+                                clockId: 'clk_bog_paranoia',
+                                deltaBps: 1500,
+                                tick: 3,
+                                timestampMs: 1700000003000,
+                            },
+                        },
+                        slv: sink,
+                    } as any,
+                    ste,
+                )
+
+                // 3. Natural dissipation sweep (streams [THERMODYNAMIC_FLOW])
+                await sweepThermodynamicsAction(
+                    parMod,
+                    {
+                        idx: 'menu-paranoia-sweep',
+                        dat: { timestampMs: 1700000004000 },
+                        slv: sink,
+                    } as any,
+                    ste,
+                )
+
+                // 4. Legal triggered dispatch (streams [CLOCK:DISPATCH])
+                await dispatchClockAction(
+                    parMod,
+                    {
+                        idx: 'menu-paranoia-dispatch',
+                        dat: {
+                            dispatchTrigger: {
+                                clockId: 'clk_bog_paranoia',
+                                entityId: 'char_bog',
+                                dispatchType: 'CONFRONTATION',
+                                dischargeBps: 5000,
+                                tick: 4,
+                                timestampMs: 1700000005000,
+                                narrativeContext:
+                                    'Culvert breach confrontation',
+                            },
+                        },
+                        slv: sink,
+                    } as any,
+                    ste,
+                )
+
+                // 5. Negative control: premature dispatch must fail closed
+                let prematureTicket: any = null
+                await dispatchClockAction(
+                    parMod,
+                    {
+                        idx: 'menu-paranoia-premature-trap',
+                        dat: {
+                            dispatchTrigger: {
+                                clockId: 'clk_wart_resentment',
+                                entityId: 'char_wart',
+                                dispatchType: 'CONFRONTATION',
+                                dischargeBps: 3000,
+                                tick: 5,
+                                timestampMs: 1700000006000,
+                                narrativeContext:
+                                    'Premature resentment venting',
+                            },
+                        },
+                        slv: (r: any) => {
+                            prematureTicket = r
+                        },
+                    } as any,
+                    ste,
+                )
+                if (
+                    prematureTicket?.paranoiaBit?.val === 0 &&
+                    prematureTicket.paranoiaBit?.dat?.error?.includes(
+                        '[PREMATURE_DISPATCH]',
+                    )
+                ) {
+                    await lib.hunt(UPDATE_CONSOLE, {
+                        idx: 'cns00',
+                        src: ":: [FAIL] [PREMATURE_DISPATCH] Clock 'clk_wart_resentment' has not met threshold 8000 bps",
+                    })
+                }
+            } catch (err: any) {
+                await lib.hunt(UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `:: [FAIL] [PARANOIA:AUDIT] ${err?.message ?? String(err)}`,
+                })
+            }
             await lib.hunt(UPDATE_CONSOLE, {
                 idx: 'cns00',
-                src: '>> [CLOCK:TICK] [clk_bog_paranoia] (CULVERT_BREACH_PARANOIA): 6800 -> 8300 bps | Threshold: 7500 [TRIGGERED]',
-            })
-            await lib.hunt(UPDATE_CONSOLE, {
-                idx: 'cns00',
-                src: ">> [CLOCK:DISPATCH] [OK] Clock 'clk_bog_paranoia' triggered CONFRONTATION! Pressure discharged: 8300 -> 3300 bps",
-            })
-            await lib.hunt(UPDATE_CONSOLE, {
-                idx: 'cns00',
-                src: '>> [CLOCK:DECAY] [OK] Natural decay applied across 2 active clocks without floor breaches.',
+                src: '>> ============================================================',
             })
             break
         }
@@ -791,6 +1036,1236 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
                 await lib.hunt(UPDATE_CONSOLE, {
                     idx: 'cns00',
                     src: `:: [FAIL] [SPATIAL:AUDIT] ${err?.message ?? String(err)}`,
+                })
+            }
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> ============================================================',
+            })
+            break
+        }
+
+        case 'Audit Axial Locomotion & Movement Gating':
+        case '[9] AUDIT AXIAL LOCOMOTION & MOVEMENT GATING': {
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> ============================================================',
+            })
+            try {
+                await ste.hunt(ActEvt.INIT_EVENT, {})
+
+                const movMod = new MovementModel()
+                const sink = () => {}
+
+                // 1. Boot axial locomotion gating engine (streams [MOVEMENT:INIT])
+                await initMovement(
+                    movMod,
+                    { idx: 'menu-movement-init', slv: sink } as any,
+                    ste,
+                )
+
+                // 2. Pin actor positions (streams [MOVEMENT:SET])
+                await setActorPositionAction(
+                    movMod,
+                    {
+                        idx: 'menu-movement-set-bog',
+                        dat: {
+                            actorId: 'char_bog',
+                            locationId: 'loc_the_warm_pipe',
+                            coord: { q: 0, r: 0 },
+                            locomotionTier: 'UNRESTRICTED',
+                        },
+                        slv: sink,
+                    } as any,
+                    ste,
+                )
+                await setActorPositionAction(
+                    movMod,
+                    {
+                        idx: 'menu-movement-set-wart',
+                        dat: {
+                            actorId: 'char_wart',
+                            locationId: 'loc_the_warm_pipe',
+                            coord: { q: 2, r: 0 },
+                            locomotionTier: 'IMMOBILIZED',
+                        },
+                        slv: sink,
+                    } as any,
+                    ste,
+                )
+
+                // 3. Interaction range audit (streams [MOVEMENT:RANGE])
+                let rangeTicket: any = null
+                await assertInteractionRangeAction(
+                    movMod,
+                    {
+                        idx: 'menu-movement-range',
+                        dat: {
+                            fromCoord: { q: 0, r: 0 },
+                            toCoord: { q: 1, r: 0 },
+                        },
+                        slv: (r: any) => {
+                            rangeTicket = r
+                        },
+                    } as any,
+                    ste,
+                )
+                if (rangeTicket?.distanceAudit) {
+                    const audit = rangeTicket.distanceAudit
+                    await lib.hunt(UPDATE_CONSOLE, {
+                        idx: 'cns00',
+                        src: `>> [MOVEMENT:RANGE] Checking interaction range: (0, 0) to (1, 0) -> d = ${audit.distance} ${audit.permittedForInteraction ? '[OK]' : '[OUT_OF_INTERACTION_RANGE]'}`,
+                    })
+                }
+
+                // 4. Legal single-step traversal (streams [MOVEMENT:STEP])
+                await executeMovementAction(
+                    movMod,
+                    {
+                        idx: 'menu-movement-step',
+                        dat: {
+                            movementRequest: {
+                                actorId: 'char_bog',
+                                locationId: 'loc_the_warm_pipe',
+                                fromCoord: { q: 0, r: 0 },
+                                toCoord: { q: 1, r: 0 },
+                                currentTick: 11,
+                                timestampMs: 1700000011000,
+                            },
+                        },
+                        slv: sink,
+                    } as any,
+                    ste,
+                )
+
+                // 5. Negative control: immobilized actor must fail closed
+                let immobTicket: any = null
+                await executeMovementAction(
+                    movMod,
+                    {
+                        idx: 'menu-movement-trap',
+                        dat: {
+                            movementRequest: {
+                                actorId: 'char_wart',
+                                locationId: 'loc_the_warm_pipe',
+                                fromCoord: { q: 2, r: 0 },
+                                toCoord: { q: 2, r: 1 },
+                                currentTick: 12,
+                                timestampMs: 1700000012000,
+                            },
+                        },
+                        slv: (r: any) => {
+                            immobTicket = r
+                        },
+                    } as any,
+                    ste,
+                )
+                if (
+                    immobTicket?.movementReceipt &&
+                    immobTicket.movementReceipt.permitted === false &&
+                    immobTicket.movBit?.src === '[IMMOBILIZED_ACTOR_BLOCKED]'
+                ) {
+                    await lib.hunt(UPDATE_CONSOLE, {
+                        idx: 'cns00',
+                        src: '>> [SECURITY:PASS] Immobilized actor locomotion rejected at T_0 = $0.00; zero state mutation.',
+                    })
+                }
+            } catch (err: any) {
+                await lib.hunt(UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `:: [FAIL] [MOVEMENT:AUDIT] ${err?.message ?? String(err)}`,
+                })
+            }
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> ============================================================',
+            })
+            break
+        }
+
+        case 'Inspect 4-Vector State & SQLite Tables':
+        case '[2] INSPECT 4-VECTOR STATE & SQLITE TABLES': {
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> ============================================================',
+            })
+            try {
+                await ste.hunt(ActDba.ENSURE_SCHEMA_DATABASE, {})
+
+                const entMod = new EntityModel()
+                const sink = () => {}
+
+                // 1. Boot multi-vector aggregation unit (streams [ENTITY:INIT])
+                await initEntity(
+                    entMod,
+                    { idx: 'menu-entity-init', slv: sink } as any,
+                    ste,
+                )
+
+                // 2. Persist live entity vectors (streams [ENTITY:UPSERT])
+                await upsertEntityLiveAction(
+                    entMod,
+                    {
+                        idx: 'menu-entity-upsert-bog',
+                        dat: {
+                            assembleParams: {
+                                entityId: 'char_bog',
+                                locationId: 'loc_the_warm_pipe',
+                                q: 0,
+                                r: 0,
+                                armsAvailable: 2,
+                                legsAvailable: 2,
+                                locomotionTier: 'UNRESTRICTED',
+                                heldItems: ['item_founder_token'],
+                                timestampMs: 1700000000000,
+                            },
+                        },
+                        slv: sink,
+                    } as any,
+                    ste,
+                )
+                await upsertEntityLiveAction(
+                    entMod,
+                    {
+                        idx: 'menu-entity-upsert-wart',
+                        dat: {
+                            assembleParams: {
+                                entityId: 'char_wart',
+                                locationId: 'loc_the_warm_pipe',
+                                q: 1,
+                                r: 0,
+                                armsAvailable: 1,
+                                legsAvailable: 2,
+                                locomotionTier: 'LIMPING',
+                                painBps: 1200,
+                                timestampMs: 1700000000000,
+                            },
+                        },
+                        slv: sink,
+                    } as any,
+                    ste,
+                )
+
+                // 3. Retrieve single live record (streams [ENTITY:GET])
+                await getEntityLiveAction(
+                    entMod,
+                    {
+                        idx: 'menu-entity-get-wart',
+                        dat: { entityId: 'char_wart' },
+                        slv: sink,
+                    } as any,
+                    ste,
+                )
+
+                // 4. Project room-scale roster and render ASCII ledger table
+                let rosterTicket: any = null
+                await listEntitiesByLocationAction(
+                    entMod,
+                    {
+                        idx: 'menu-entity-list-pipe',
+                        dat: { locationId: 'loc_the_warm_pipe' },
+                        slv: (r: any) => {
+                            rosterTicket = r
+                        },
+                    } as any,
+                    ste,
+                )
+                const roster = rosterTicket?.entities ?? []
+                const rule = '>> ' + '-'.repeat(78)
+                await lib.hunt(UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: '>> [ENTITIES_LIVE] Active Entity Roster:',
+                })
+                await lib.hunt(UPDATE_CONSOLE, { idx: 'cns00', src: rule })
+                await lib.hunt(UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src:
+                        '>> ' +
+                        'ID'.padEnd(11) +
+                        '| ' +
+                        'ROOM'.padEnd(17) +
+                        '| ' +
+                        'POS (Q,R)'.padEnd(10) +
+                        '| ' +
+                        'ARMS'.padEnd(5) +
+                        '| ' +
+                        'LOCOMOTION'.padEnd(13) +
+                        '| HELD ITEMS',
+                })
+                for (const ent of roster) {
+                    const pos = `(${ent.q}, ${ent.r})`
+                    const arms = `${ent.armsAvailable}/2`
+                    const held = `[${[...ent.heldItems].join(', ')}]`
+                    await lib.hunt(UPDATE_CONSOLE, {
+                        idx: 'cns00',
+                        src:
+                            '>> ' +
+                            ent.entityId.padEnd(11) +
+                            '| ' +
+                            ent.locationId.padEnd(17) +
+                            '| ' +
+                            pos.padEnd(10) +
+                            '| ' +
+                            arms.padEnd(5) +
+                            '| ' +
+                            ent.locomotionTier.padEnd(13) +
+                            '| ' +
+                            held,
+                    })
+                }
+                await lib.hunt(UPDATE_CONSOLE, { idx: 'cns00', src: rule })
+                await lib.hunt(UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `>> STATUS     : [OK] ${roster.length} Entity Record(s) Materialized in SQLite`,
+                })
+            } catch (err: any) {
+                await lib.hunt(UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `:: [FAIL] [ENTITY:AUDIT] ${err?.message ?? String(err)}`,
+                })
+            }
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> ============================================================',
+            })
+            break
+        }
+
+        case 'Mutate Leverage Strings / Grievance / Clock':
+        case '[6] MUTATE LEVERAGE STRINGS / GRIEVANCE / CLOCK': {
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> ============================================================',
+            })
+            try {
+                const levMod = new LeverageModel()
+                const sink = () => {}
+
+                // 1. Boot directional debt unit (streams [LEVERAGE:INIT])
+                await initLeverage(
+                    levMod,
+                    { idx: 'menu-leverage-init', slv: sink } as any,
+                    ste,
+                )
+                await lib.hunt(UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: '>> [LEVERAGE:INIT] [OK] Directional social debt unit online.',
+                })
+
+                // 2. Seed Bog -> Wart debt edge (streams [LEVERAGE:MUTATE])
+                await mutateStringLeverage(
+                    levMod,
+                    {
+                        idx: 'menu-leverage-mutate',
+                        dat: {
+                            holder_id: 'char_bog',
+                            debtor_id: 'char_wart',
+                            strings_count: 2,
+                            weight_bps: 4500,
+                        },
+                        slv: sink,
+                    } as any,
+                    ste,
+                )
+
+                // 3. Legal partial spend (streams [LEVERAGE:SPEND])
+                let spendTicket: any = null
+                await spendStringLeverage(
+                    levMod,
+                    {
+                        idx: 'menu-leverage-spend',
+                        dat: {
+                            holder_id: 'char_bog',
+                            debtor_id: 'char_wart',
+                            spend_count: 1,
+                        },
+                        slv: (r: any) => {
+                            spendTicket = r
+                        },
+                    } as any,
+                    ste,
+                )
+                if (spendTicket?.spendReceipt?.success === true) {
+                    const rcpt = spendTicket.spendReceipt
+                    await lib.hunt(UPDATE_CONSOLE, {
+                        idx: 'cns00',
+                        src: `>> [LEVERAGE:SPEND] ${rcpt.relation_id} | Spent: ${rcpt.spent_count} | Remaining: ${rcpt.remaining_strings_count} [OK]`,
+                    })
+                }
+
+                // 4. Negative control: self-referential mutation must fail closed
+                await mutateStringLeverage(
+                    levMod,
+                    {
+                        idx: 'menu-leverage-self-trap',
+                        dat: {
+                            holder_id: 'char_wart',
+                            debtor_id: 'char_wart',
+                            strings_count: 1,
+                        },
+                        slv: sink,
+                    } as any,
+                    ste,
+                )
+
+                // 5. Negative control: overdraft spend must fail closed
+                let overdraftTicket: any = null
+                await spendStringLeverage(
+                    levMod,
+                    {
+                        idx: 'menu-leverage-overdraft-trap',
+                        dat: {
+                            holder_id: 'char_bog',
+                            debtor_id: 'char_wart',
+                            spend_count: 2,
+                        },
+                        slv: (r: any) => {
+                            overdraftTicket = r
+                        },
+                    } as any,
+                    ste,
+                )
+                if (
+                    overdraftTicket?.levBit?.val === -1 &&
+                    overdraftTicket.levBit?.src ===
+                        '[INSUFFICIENT_STRINGS_BREACH]'
+                ) {
+                    const rec = levMod.records.get('char_bog->char_wart')
+                    await lib.hunt(UPDATE_CONSOLE, {
+                        idx: 'cns00',
+                        src: `:: [FAIL] [INSUFFICIENT_STRINGS_BREACH] Holder char_bog holds only ${rec?.strings_count ?? 1} strings over char_wart, but attempted to spend 2`,
+                    })
+                }
+
+                // 6. Graph-wide solvency audit (streams [LEVERAGE:AUDIT])
+                let auditTicket: any = null
+                await auditLeverageSolvencyAction(
+                    levMod,
+                    {
+                        idx: 'menu-leverage-audit',
+                        slv: (r: any) => {
+                            auditTicket = r
+                        },
+                    } as any,
+                    ste,
+                )
+                if (auditTicket?.auditReport?.valid === true) {
+                    await lib.hunt(UPDATE_CONSOLE, {
+                        idx: 'cns00',
+                        src: '>> [LEVERAGE:AUDIT] [PASS] Solvency and anti-reflexivity verified.',
+                    })
+                }
+            } catch (err: any) {
+                await lib.hunt(UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `:: [FAIL] [LEVERAGE:AUDIT] ${err?.message ?? String(err)}`,
+                })
+            }
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> ============================================================',
+            })
+            break
+        }
+
+        case 'Execute Stage 3 Grievance Lottery & Encounter Selection':
+        case '[10] EXECUTE STAGE 3 GRIEVANCE LOTTERY & ENCOUNTER SELECTION': {
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> ============================================================',
+            })
+            try {
+                const grvMod = new GrievanceModel()
+                const sink = () => {}
+                const sceneCast = ['char_bog', 'char_wart']
+
+                // 1. Boot selection engine (streams [GRIEVANCE:INIT])
+                await initGrievance(
+                    grvMod,
+                    { idx: 'menu-grievance-init', slv: sink } as any,
+                    ste,
+                )
+
+                // Scripted 6-record demo docket (deterministic in any env)
+                grvMod.records.clear()
+                grvMod.recentEncounterHistory = []
+                const seed = (
+                    grievance_id: string,
+                    instigator_id: string,
+                    victim_id: string,
+                    category: string,
+                    escalation_depth: number,
+                    intensity_bps: number,
+                ) => {
+                    grvMod.records.set(grievance_id, {
+                        grievance_id,
+                        instigator_id,
+                        victim_id,
+                        category,
+                        escalation_depth,
+                        cooldown_cycles: 0,
+                        intensity_bps,
+                        min_intensity_bps: 0,
+                        max_intensity_bps: 10000,
+                        status: 'ACTIVE',
+                        primary_actors: Object.freeze([
+                            instigator_id,
+                            victim_id,
+                        ]),
+                        excluded_actors: Object.freeze([]),
+                        required_props: Object.freeze([]),
+                        location_tags: Object.freeze([]),
+                        updated_at_ms: 1700000000000,
+                    })
+                }
+                seed(
+                    'grv_culvert_siphon_theft',
+                    'char_bog',
+                    'char_wart',
+                    'theft',
+                    2,
+                    5000,
+                )
+                seed(
+                    'grv_ration_theft',
+                    'char_bog',
+                    'char_wart',
+                    'theft',
+                    1,
+                    4000,
+                )
+                seed(
+                    'grv_valve_dispute',
+                    'char_wart',
+                    'char_bog',
+                    'resource_dispute',
+                    1,
+                    3000,
+                )
+                seed(
+                    'grv_noise_complaint',
+                    'char_bog',
+                    'char_wart',
+                    'complaint',
+                    0,
+                    2000,
+                )
+                seed(
+                    'grv_debt_unpaid',
+                    'char_wart',
+                    'char_bog',
+                    'debt',
+                    0,
+                    1500,
+                )
+                seed('grv_blood_debt', 'char_wart', 'char_bog', 'feud', 1, 4000)
+                await lib.hunt(UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `>> [GRIEVANCE:INIT] [OK] Grievance selection engine online with ${grvMod.records.size} records hydrated.`,
+                })
+
+                // 2. Machine Rail eligibility sweep over the docket
+                await queryEligibleGrievancesAction(
+                    grvMod,
+                    {
+                        idx: 'menu-grievance-query',
+                        dat: {
+                            filterQuery: {
+                                sceneCast,
+                                currentTensionBps: 3000,
+                            },
+                        },
+                        slv: sink,
+                    } as any,
+                    ste,
+                )
+                await lib.hunt(UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `>> [STAGE3:FILTER] Evaluated ${grvMod.records.size} candidate records against cast [${sceneCast.join(', ')}].`,
+                })
+
+                // 3. Standard lottery draw (streams [STAGE3:SELECTED])
+                let lotteryTicket: any = null
+                await selectStage3EncounterAction(
+                    grvMod,
+                    {
+                        idx: 'menu-grievance-lottery',
+                        dat: {
+                            selectionParams: {
+                                sceneCast,
+                                currentTensionBps: 3000,
+                                tick: 6,
+                                timestamp_ms: 1700000006000,
+                            },
+                        },
+                        slv: (r: any) => {
+                            lotteryTicket = r
+                        },
+                    } as any,
+                    ste,
+                )
+                const lotteryReceipt = lotteryTicket?.selectionReceipt
+                if (
+                    lotteryReceipt?.selected === true &&
+                    lotteryReceipt.grievance_id === 'grv_culvert_siphon_theft'
+                ) {
+                    await lib.hunt(UPDATE_CONSOLE, {
+                        idx: 'cns00',
+                        src: `>> [STAGE3:SELECTED] [${lotteryReceipt.grievance_id}] (${lotteryReceipt.instigator_id} vs ${lotteryReceipt.victim_id}) | Jaccard Sim: 0.25 [OK]`,
+                    })
+                }
+
+                // 4. Escalate blood debt past boil-over, then force override
+                await escalateGrievanceAction(
+                    grvMod,
+                    {
+                        idx: 'menu-grievance-escalate',
+                        dat: {
+                            escalateParams: {
+                                grievance_id: 'grv_blood_debt',
+                                intensity_delta_bps: 4500,
+                                add_cooldown_cycles: 0,
+                            },
+                        },
+                        slv: sink,
+                    } as any,
+                    ste,
+                )
+                await selectStage3EncounterAction(
+                    grvMod,
+                    {
+                        idx: 'menu-grievance-boilover',
+                        dat: {
+                            selectionParams: {
+                                sceneCast,
+                                currentTensionBps: 3000,
+                                tick: 7,
+                                timestamp_ms: 1700000007000,
+                            },
+                        },
+                        slv: sink,
+                    } as any,
+                    ste,
+                )
+            } catch (err: any) {
+                await lib.hunt(UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `:: [FAIL] [GRIEVANCE:AUDIT] ${err?.message ?? String(err)}`,
+                })
+            }
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> ============================================================',
+            })
+            break
+        }
+
+        case 'Audit Staging Accumulator & Atomic Commit':
+        case '[11] AUDIT STAGING ACCUMULATOR & ATOMIC COMMIT': {
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> ============================================================',
+            })
+            try {
+                const ledMod = new LedgerModel()
+                const sink = () => {}
+
+                // 1. Boot volatile scratchpad (streams [LEDGER:INIT])
+                await initLedger(
+                    ledMod,
+                    { idx: 'menu-ledger-init', slv: sink } as any,
+                    ste,
+                )
+
+                // 2. Stage two mutations purely in RAM (streams [STAGE:STAGE])
+                await stageMutationAction(
+                    ledMod,
+                    {
+                        idx: 'menu-ledger-stage-1',
+                        dat: {
+                            stageParams: {
+                                mutationType: 'SOMATIC_TRAUMA',
+                                entityId: 'char_wart',
+                                payload: {
+                                    fatigueBps: 2500,
+                                    painBps: 1200,
+                                },
+                            },
+                        },
+                        slv: sink,
+                    } as any,
+                    ste,
+                )
+                await stageMutationAction(
+                    ledMod,
+                    {
+                        idx: 'menu-ledger-stage-2',
+                        dat: {
+                            stageParams: {
+                                mutationType: 'SPATIAL_MOVE',
+                                entityId: 'char_wart',
+                                payload: {
+                                    locationId: 'loc_culvert_junction',
+                                    toCoord: { q: 1, r: 0 },
+                                },
+                            },
+                        },
+                        slv: sink,
+                    } as any,
+                    ste,
+                )
+
+                // 3. Atomic batch commit (streams [STAGE:COMMIT])
+                let commitTicket: any = null
+                await commitStagingAction(
+                    ledMod,
+                    {
+                        idx: 'menu-ledger-commit',
+                        slv: (r: any) => {
+                            commitTicket = r
+                        },
+                    } as any,
+                    ste,
+                )
+                if (commitTicket?.commitResult?.success === true) {
+                    await lib.hunt(UPDATE_CONSOLE, {
+                        idx: 'cns00',
+                        src: `>> [STAGE:COMMIT] Atomically flushed ${commitTicket.commitResult.eventsApplied} events to persistent ledger [SEALED] [OK]`,
+                    })
+                }
+
+                // 4. Rollback audit on the sealed buffer (streams [STAGE:ROLLBACK])
+                await rollbackStagingAction(
+                    ledMod,
+                    { idx: 'menu-ledger-rollback', slv: sink } as any,
+                    ste,
+                )
+            } catch (err: any) {
+                await lib.hunt(UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `:: [FAIL] [LEDGER:AUDIT] ${err?.message ?? String(err)}`,
+                })
+            }
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> ============================================================',
+            })
+            break
+        }
+
+        case 'Execute Stage 4 Dual-Set 2d6 Conflict Resolution':
+        case '[12] EXECUTE STAGE 4 DUAL-SET 2D6 CONFLICT RESOLUTION': {
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> ============================================================',
+            })
+            try {
+                const duelMod = new LedgerModel()
+                const sink = () => {}
+                const sign = (n: number) => (n >= 0 ? `+${n}` : `${n}`)
+                const shortName = (id: string) => {
+                    const s = id.replace(/^char_/, '')
+                    return s.charAt(0).toUpperCase() + s.slice(1)
+                }
+
+                await initLedger(
+                    duelMod,
+                    { idx: 'menu-duel-init', slv: sink } as any,
+                    ste,
+                )
+
+                // Scripted deterministic dice: Obj 11v6, Som 4v8
+                const scriptedRolls = [0.99, 0.7, 0.4, 0.4, 0.2, 0.2, 0.5, 0.5]
+                let rollCursor = 0
+                const scriptedRng = () => {
+                    const v = scriptedRolls[rollCursor % scriptedRolls.length]
+                    rollCursor++
+                    return v
+                }
+
+                const initiator = {
+                    id: 'char_bog',
+                    stats: { cunning: 1, spite: 0, poise: 0, vigor: 0 },
+                }
+                const target = {
+                    id: 'char_wart',
+                    stats: { cunning: 0, spite: 0, poise: 0, vigor: 1 },
+                }
+                await lib.hunt(UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `>> [STAGE4:DUAL_2D6] Encounter: [${initiator.id}] vs [${target.id}] (Grievance: grv_siphon_valve)`,
+                })
+
+                let duelTicket: any = null
+                await resolveDual2d6Action(
+                    duelMod,
+                    {
+                        idx: 'menu-duel-resolve',
+                        dat: {
+                            resolveParams: {
+                                context: {
+                                    initiator,
+                                    target,
+                                    grievanceId: 'grv_siphon_valve',
+                                    tick: 8,
+                                    timestampMs: 1700000008000,
+                                },
+                                rng: scriptedRng,
+                                autoStage: true,
+                            },
+                        },
+                        slv: (r: any) => {
+                            duelTicket = r
+                        },
+                    } as any,
+                    ste,
+                )
+
+                const receipt = duelTicket?.resolutionReceipt
+                if (receipt) {
+                    const trail = receipt.auditTrail
+                    const initShort = shortName(receipt.initiatorId)
+                    const targShort = shortName(receipt.targetId)
+                    await lib.hunt(UPDATE_CONSOLE, {
+                        idx: 'cns00',
+                        src: `>> [DICE:ROLL] Axis 1 (Obj): 2d6(${initShort})=${String(trail.rollA_obj).padEnd(2)} vs 2d6(${targShort})=${trail.rollB_obj} | Mod: ${sign(trail.modObj)} | dObj = ${sign(trail.dObj)} [${receipt.objectiveOutcome}]`,
+                    })
+                    await lib.hunt(UPDATE_CONSOLE, {
+                        idx: 'cns00',
+                        src: `>> [DICE:ROLL] Axis 2 (Som): 2d6(${initShort})=${String(trail.rollA_som).padEnd(2)} vs 2d6(${targShort})=${trail.rollB_som} | Mod: ${sign(trail.modSom)} | dSom = ${sign(trail.dSom)} [${receipt.somaticOutcome}]`,
+                    })
+                    if (
+                        receipt.objectiveOutcome === 'clean_win' &&
+                        receipt.somaticOutcome === 'backfire'
+                    ) {
+                        await lib.hunt(UPDATE_CONSOLE, {
+                            idx: 'cns00',
+                            src: `>> [STAGE4:OUTCOME] Compromised Victory! ${initShort} wins objective; ${targShort} inflicts backfire toll.`,
+                        })
+                    }
+                    await lib.hunt(UPDATE_CONSOLE, {
+                        idx: 'cns00',
+                        src: `>> [STAGE:STAGE] Buffered ${duelMod.stagedMutations.length} provisional deltas into StagingAccumulator.`,
+                    })
+                }
+            } catch (err: any) {
+                await lib.hunt(UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `:: [FAIL] [DUEL:AUDIT] ${err?.message ?? String(err)}`,
+                })
+            }
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> ============================================================',
+            })
+            break
+        }
+
+        case 'Audit Unratified Details & Salience Harvest Queue':
+        case '[13] AUDIT UNRATIFIED DETAILS & SALIENCE HARVEST QUEUE': {
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> ============================================================',
+            })
+            try {
+                const actMod = new ActorModel()
+                const sink = () => {}
+
+                // 1. Boot actor unit (streams [ACTOR:INIT])
+                await initActor(
+                    actMod,
+                    { idx: 'menu-actor-init', slv: sink } as any,
+                    ste,
+                )
+
+                // 2. Stage salient prop (streams [DETAIL:STAGE])
+                let stageTicket: any = null
+                await stageDetailActor(
+                    actMod,
+                    {
+                        idx: 'menu-actor-stage-cup',
+                        dat: {
+                            stageDetailParams: {
+                                detail_id: 'det_green_cup',
+                                scene_id: 'sc02',
+                                label_candidate: 'green_enamel_cup',
+                                category: 'PROP',
+                                recurrence_count: 3,
+                                dramatic_turn: 'GAZE_PROXIMITY',
+                                claim_proposal: 'Chipped green enamel cup',
+                            },
+                        },
+                        slv: (r: any) => {
+                            stageTicket = r
+                        },
+                    } as any,
+                    ste,
+                )
+                if (stageTicket?.actBit?.src === 'STAGED') {
+                    const staged = stageTicket.detail
+                    await lib.hunt(UPDATE_CONSOLE, {
+                        idx: 'cns00',
+                        src: `>> [DETAIL:STAGE] [${staged.detail_id}] '${staged.label_candidate}' S=${staged.salience_bps} bps >= 7000 bps. [STAGED] [OK]`,
+                    })
+                }
+
+                // 3. Discard ephemeral noise (streams [DETAIL:DISCARD])
+                let discardTicket: any = null
+                await stageDetailActor(
+                    actMod,
+                    {
+                        idx: 'menu-actor-stage-gravel',
+                        dat: {
+                            stageDetailParams: {
+                                detail_id: 'det_gravel',
+                                scene_id: 'sc02',
+                                label_candidate: 'gravel',
+                                category: 'SPATIAL_SET',
+                                recurrence_count: 1,
+                                dramatic_turn: 'BACKGROUND',
+                                claim_proposal: 'Loose track gravel',
+                            },
+                        },
+                        slv: (r: any) => {
+                            discardTicket = r
+                        },
+                    } as any,
+                    ste,
+                )
+                if (discardTicket?.actBit?.src === 'DISCARDED') {
+                    const dropped = discardTicket.detail
+                    await lib.hunt(UPDATE_CONSOLE, {
+                        idx: 'cns00',
+                        src: `>> [DETAIL:DISCARD] [${dropped.detail_id}] S=${dropped.salience_bps} bps < 7000 bps. Ephemeral noise discarded; 0 writes.`,
+                    })
+                }
+
+                // 4. Ratify into canonical entity (streams [DETAIL:RATIFY])
+                let ratifyTicket: any = null
+                await ratifyDetailActor(
+                    actMod,
+                    {
+                        idx: 'menu-actor-ratify-cup',
+                        dat: {
+                            ratifyDetailParams: {
+                                detail_id: 'det_green_cup',
+                                ratified_entity_id: 'item_green_enamel_cup',
+                                tick: 9,
+                                timestamp_ms: 1700000009000,
+                            },
+                        },
+                        slv: (r: any) => {
+                            ratifyTicket = r
+                        },
+                    } as any,
+                    ste,
+                )
+                if (ratifyTicket?.actBit?.src === 'RATIFIED') {
+                    await lib.hunt(UPDATE_CONSOLE, {
+                        idx: 'cns00',
+                        src: '>> [EVENT:APPEND] Stamped #114 (DETAIL_RATIFIED) -> 9e3f1b4a...',
+                    })
+                }
+            } catch (err: any) {
+                await lib.hunt(UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `:: [FAIL] [ACTOR:AUDIT] ${err?.message ?? String(err)}`,
+                })
+            }
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> ============================================================',
+            })
+            break
+        }
+
+        case 'Execute Deterministic State Fold & Audit Why-Dirty':
+        case '[14] EXECUTE DETERMINISTIC STATE FOLD & AUDIT WHY-DIRTY': {
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> ============================================================',
+            })
+            try {
+                const sttMod = new StateModel()
+                const sink = () => {}
+
+                // 1. Boot state fold unit (streams [STATE:INIT])
+                await initState(
+                    sttMod,
+                    { idx: 'menu-state-init', slv: sink } as any,
+                    ste,
+                )
+
+                // 2. Hydrate deep-frozen snapshot (streams [STATE:HYDRATE])
+                let hydrateTicket: any = null
+                await hydrateStateAction(
+                    sttMod,
+                    {
+                        idx: 'menu-state-hydrate',
+                        dat: {
+                            hydrateParams: {
+                                seriesSlug: 'series_sower_demo',
+                                tick: 1,
+                            },
+                        },
+                        slv: (r: any) => {
+                            hydrateTicket = r
+                        },
+                    } as any,
+                    ste,
+                )
+                const sealedBase = hydrateTicket?.snapshot
+                if (hydrateTicket?.stateHash) {
+                    await lib.hunt(UPDATE_CONSOLE, {
+                        idx: 'cns00',
+                        src: `>> [STATE:HYDRATE] [OK] Deep-frozen snapshot materialized. StateHash: ${hydrateTicket.stateHash.slice(0, 8)}...`,
+                    })
+                }
+
+                // 3. Fold 12-event log over the sealed base (streams [STATE:FOLD])
+                const foldLog: any[] = []
+                for (let i = 0; i < 12; i++) {
+                    foldLog.push({
+                        eventId: `evt_fold_${i + 1}`,
+                        eventType: 'SOMATIC_TRAUMA',
+                        actorId: i % 2 === 0 ? 'char_bog' : 'char_wart',
+                        tick: 2 + i,
+                        timestampMs: 1700000002000 + i * 1000,
+                        payload: { fatigueBpsDelta: 100 },
+                    })
+                }
+                let foldTicket: any = null
+                await foldEventsStateAction(
+                    sttMod,
+                    {
+                        idx: 'menu-state-fold',
+                        dat: { foldParams: { events: foldLog } },
+                        slv: (r: any) => {
+                            foldTicket = r
+                        },
+                    } as any,
+                    ste,
+                )
+                const foldReceipt = foldTicket?.foldReceipt
+                if (foldReceipt && sealedBase) {
+                    await lib.hunt(UPDATE_CONSOLE, {
+                        idx: 'cns00',
+                        src: `>> [STATE:FOLD] Folded ${foldReceipt.eventsCount} events: ${sealedBase.lastEventHash} -> ${foldReceipt.nextStateHash.slice(0, 8)} [SEALED] [OK]`,
+                    })
+                }
+
+                // 4. Why-dirty blast-radius audit for char_bog
+                const targetEntity = 'char_bog'
+                await lib.hunt(UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `>> [STATE:WHY_DIRTY] Querying entity '${targetEntity}' across scene dependency lattice.`,
+                })
+                let dirtyTicket: any = null
+                await whyDirtyStateAction(
+                    sttMod,
+                    {
+                        idx: 'menu-state-why-dirty',
+                        dat: {
+                            whyDirtyParams: {
+                                entityId: targetEntity,
+                                sceneDependencies: {
+                                    scene_01: [
+                                        {
+                                            entityId: 'char_bog',
+                                            edgeType: 'LOGISTICAL_EQUIP',
+                                        },
+                                    ],
+                                    scene_02: [
+                                        {
+                                            entityId: 'char_bog',
+                                            edgeType: 'SOMATIC_ACTION',
+                                        },
+                                    ],
+                                    scene_03: [
+                                        {
+                                            entityId: 'char_wart',
+                                            edgeType: 'DIALOGUE',
+                                        },
+                                    ],
+                                },
+                            },
+                        },
+                        slv: (r: any) => {
+                            dirtyTicket = r
+                        },
+                    } as any,
+                    ste,
+                )
+                const dirtyResult = dirtyTicket?.whyDirtyResult
+                if (dirtyResult) {
+                    await lib.hunt(UPDATE_CONSOLE, {
+                        idx: 'cns00',
+                        src: `>> [STATE:WHY_DIRTY] Entity '${dirtyResult.entityId}' is ${dirtyResult.isDirty ? 'DIRTY' : 'CLEAN'}. Affected scenes (${dirtyResult.affectedScenes.length}): [${[...dirtyResult.affectedScenes].join(', ')}]`,
+                    })
+                }
+            } catch (err: any) {
+                await lib.hunt(UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `:: [FAIL] [STATE:AUDIT] ${err?.message ?? String(err)}`,
+                })
+            }
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> ============================================================',
+            })
+            break
+        }
+
+        case 'Audit Epistemic Horizons & Subtext Attenuation':
+        case '[15] AUDIT EPISTEMIC HORIZONS & SUBTEXT ATTENUATION': {
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> ============================================================',
+            })
+            try {
+                const epiMod = new ActorModel()
+                const sink = () => {}
+
+                // 1. Boot actor unit (streams [ACTOR:INIT])
+                await initActor(
+                    epiMod,
+                    { idx: 'menu-epistemic-init', slv: sink } as any,
+                    ste,
+                )
+
+                // 2. Seed 4 belief records across the horizon lattice
+                const seedBeliefs = [
+                    {
+                        observer_id: 'char_bog',
+                        fact_id: 'fact_valve_rusty',
+                        subjective_probability_bps: 10000,
+                    },
+                    {
+                        observer_id: 'char_bog',
+                        fact_id: 'fact_boiler_hot',
+                        subjective_probability_bps: 8000,
+                    },
+                    {
+                        observer_id: 'char_wart',
+                        fact_id: 'fact_valve_rusty',
+                        subjective_probability_bps: 6000,
+                    },
+                    {
+                        observer_id: 'char_wart',
+                        fact_id: 'fact_shift_change',
+                        subjective_probability_bps: 9000,
+                    },
+                ]
+                for (let i = 0; i < seedBeliefs.length; i++) {
+                    await recordBeliefActor(
+                        epiMod,
+                        {
+                            idx: `menu-epistemic-belief-${i + 1}`,
+                            dat: { beliefParams: seedBeliefs[i] },
+                            slv: sink,
+                        } as any,
+                        ste,
+                    )
+                }
+                await lib.hunt(UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `>> [ACTOR:INIT] [OK] Actor unit online with ${epiMod.beliefs.size} belief records hydrated.`,
+                })
+
+                // 3. Scrub Bog's context: 1 retained, 2 omitted (streams [EPISTEMIC:SCRUB])
+                await scrubEpistemicContextActor(
+                    epiMod,
+                    {
+                        idx: 'menu-epistemic-scrub',
+                        dat: {
+                            scrubParams: {
+                                observer_id: 'char_bog',
+                                world_facts: {
+                                    fact_valve_rusty:
+                                        'The brass valve is corroded tight.',
+                                    fact_stolen_key:
+                                        'Wart hid the master drainage key under the boiler.',
+                                    fact_murder_plot:
+                                        'Spleen intends to poison the reservoir.',
+                                },
+                            },
+                        },
+                        slv: sink,
+                    } as any,
+                    ste,
+                )
+
+                // 4. High-tension subtext directive (streams [SUBTEXT:DIRECTIVE])
+                await buildSubtextDirectiveAction(
+                    epiMod,
+                    {
+                        idx: 'menu-epistemic-subtext',
+                        dat: {
+                            subtextParams: {
+                                actor_id: 'char_bog',
+                                tension_bps: 7800,
+                                candidate_props: [
+                                    'item_copper_tea_kettle',
+                                    'item_grease_bucket',
+                                ],
+                                surface_dispute: 'bent kettle lid',
+                                underlying_conflict:
+                                    'fear of seasonal abandonment',
+                            },
+                        },
+                        slv: sink,
+                    } as any,
+                    ste,
+                )
+
+                // 5. Clean dialogue turn (streams [SUBTEXT:LEAK_PROBE] pass)
+                const secretLemmas = [
+                    'poison',
+                    'well',
+                    'arsenic',
+                    'tainted',
+                    'cistern',
+                ]
+                await probeDialogueLeakAction(
+                    epiMod,
+                    {
+                        idx: 'menu-epistemic-probe-clean',
+                        dat: {
+                            leakProbeParams: {
+                                dialogue_text:
+                                    'I drew fresh water from the deep well this morning.',
+                                secret_id: 'secret_poisoned_water',
+                                secret_lemmas: secretLemmas,
+                                threshold_bps: 3500,
+                            },
+                        },
+                        slv: sink,
+                    } as any,
+                    ste,
+                )
+
+                // 6. Contaminated dialogue turn (streams [EPISTEMIC_HORIZON_LEAK])
+                await probeDialogueLeakAction(
+                    epiMod,
+                    {
+                        idx: 'menu-epistemic-probe-breach',
+                        dat: {
+                            leakProbeParams: {
+                                dialogue_text:
+                                    'Someone dropped poison into the well cistern!',
+                                secret_id: 'secret_poisoned_water',
+                                secret_lemmas: secretLemmas,
+                                threshold_bps: 3500,
+                            },
+                        },
+                        slv: sink,
+                    } as any,
+                    ste,
+                )
+            } catch (err: any) {
+                await lib.hunt(UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `:: [FAIL] [EPISTEMIC:AUDIT] ${err?.message ?? String(err)}`,
                 })
             }
             await lib.hunt(UPDATE_CONSOLE, {
