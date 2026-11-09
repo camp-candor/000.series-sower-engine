@@ -264,7 +264,7 @@ export function compileDialogueBeat(
                 word_count,
                 max_permitted_words,
                 somatic_breach: true,
-                error: `[FATAL_SOMATIC_BREACH] Speaker '${speaker}' smuggled banned kinetic verb '${banned}' in parenthetical`,
+                error: `[FATAL_SOMATIC_BREACH] Speaker '${speaker}' smuggled banned kinetic verb '${banned}'`,
             }
         }
     }

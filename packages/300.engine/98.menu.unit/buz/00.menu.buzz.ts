@@ -90,6 +90,8 @@ import {
     scrubEpistemicContextActor,
     buildSubtextDirectiveAction,
     probeDialogueLeakAction,
+    compileDialogueBeatAction,
+    enforceCurtnessBudget,
 } from '../../01.actor.unit/actor.buzzer.js'
 import { StateModel } from '../../16.state.unit/state.model.js'
 import {
@@ -211,6 +213,8 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         '[14] EXECUTE DETERMINISTIC STATE FOLD & AUDIT WHY-DIRTY',
         'Audit Epistemic Horizons & Subtext Attenuation',
         '[15] AUDIT EPISTEMIC HORIZONS & SUBTEXT ATTENUATION',
+        'Compile Dual-Field Dialogue AST & Enforce Curtness',
+        '[16] COMPILE DUAL-FIELD DIALOGUE AST & ENFORCE CURTNESS',
         'ROOT MENU',
         ActOlm.UPDATE_ENGINE.split(']')[1],
         ActOlm.TEST_ENGINE.split(']')[1],
@@ -333,6 +337,10 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             'Scrub unobserved facts, anchor subtext, and probe dialogue leaks.',
         '[15] AUDIT EPISTEMIC HORIZONS & SUBTEXT ATTENUATION':
             'Scrub unobserved facts, anchor subtext, and probe dialogue leaks.',
+        'Compile Dual-Field Dialogue AST & Enforce Curtness':
+            'Compile dialogue beats into dual-field AST, enforce curtness budget, and gate somatic verbs.',
+        '[16] COMPILE DUAL-FIELD DIALOGUE AST & ENFORCE CURTNESS':
+            'Compile dialogue beats into dual-field AST, enforce curtness budget, and gate somatic verbs.',
         'ROOT MENU': 'Return to the master runner switchboard.',
     }
 
@@ -2266,6 +2274,170 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
                 await lib.hunt(UPDATE_CONSOLE, {
                     idx: 'cns00',
                     src: `:: [FAIL] [EPISTEMIC:AUDIT] ${err?.message ?? String(err)}`,
+                })
+            }
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> ============================================================',
+            })
+            break
+        }
+
+        case 'Compile Dual-Field Dialogue AST & Enforce Curtness':
+        case '[16] COMPILE DUAL-FIELD DIALOGUE AST & ENFORCE CURTNESS': {
+            await lib.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> ============================================================',
+            })
+            try {
+                const actMod = new ActorModel()
+                const sink = () => {}
+                // NOTE: pass undefined ste; engine hunt for console updates never
+                // settles, so actor buzzers route cns00 telemetry via global LIBRARY.
+
+                // 1. Boot actor unit and hydrate the belief horizon (streams [ACTOR:INIT])
+                await initActor(
+                    actMod,
+                    { idx: 'menu-actor-init', slv: sink } as any,
+                    undefined,
+                )
+
+                const seedBeliefs = [
+                    {
+                        observer_id: 'char_bog',
+                        fact_id: 'fact_valve_rusty',
+                        subjective_probability_bps: 10000,
+                    },
+                    {
+                        observer_id: 'char_bog',
+                        fact_id: 'fact_boiler_hot',
+                        subjective_probability_bps: 8000,
+                    },
+                    {
+                        observer_id: 'char_wart',
+                        fact_id: 'fact_valve_rusty',
+                        subjective_probability_bps: 6000,
+                    },
+                    {
+                        observer_id: 'char_wart',
+                        fact_id: 'fact_shift_change',
+                        subjective_probability_bps: 9000,
+                    },
+                ]
+                for (let i = 0; i < seedBeliefs.length; i++) {
+                    await recordBeliefActor(
+                        actMod,
+                        {
+                            idx: `menu-actor-belief-${i + 1}`,
+                            dat: { beliefParams: seedBeliefs[i] },
+                            slv: sink,
+                        } as any,
+                        undefined,
+                    )
+                }
+                await lib.hunt(UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `>> [ACTOR:INIT] [OK] Actor unit online with ${actMod.beliefs.size} belief records hydrated.`,
+                })
+
+                // 2. Directorial curtness budget enforcement (streams [CURTNESS:ENFORCE])
+                const curtnessBps = 10000
+                const wordBudget = enforceCurtnessBudget(curtnessBps)
+                await lib.hunt(UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `>> [CURTNESS:ENFORCE] Curtness: ${curtnessBps} bps -> Max Permitted Words: ${wordBudget} words.`,
+                })
+
+                // 3. Valid dual-field beat compilation (streams [AST:COMPILE])
+                let b02Beat: any = null
+                await compileDialogueBeatAction(
+                    actMod,
+                    {
+                        idx: 'menu-actor-compile-b02',
+                        dat: {
+                            compileBeatParams: {
+                                beat_id: 'b02',
+                                speaker: 'char_bog',
+                                dialogue_text: 'Leave it. Let him bleed.',
+                                camera_parenthetical: 'Camera pushes in close.',
+                                observable_parenthetical:
+                                    'Bog tightens stance.',
+                                speech_act: 'IMPLICIT_WARNING',
+                                emotion: 'cold_urgency',
+                                swain_mru_phase: 'SPEECH',
+                                extracted_motor_actions: [],
+                                curtness_bps: curtnessBps,
+                            },
+                        },
+                        slv: (r: any) => {
+                            b02Beat = r.beat
+                        },
+                    } as any,
+                    undefined,
+                )
+
+                // 4. Dual-field split parenthetical channels (streams [AST:CHANNELS])
+                if (b02Beat) {
+                    await lib.hunt(UPDATE_CONSOLE, {
+                        idx: 'cns00',
+                        src: `>> [AST:CHANNELS] Camera: '${b02Beat.camera_parenthetical}' | Interlocutor: '${b02Beat.observable_parenthetical}' [OK]`,
+                    })
+                }
+
+                // 5. Verbose turn breach (streams [CURTNESS_BUDGET_BREACH])
+                await compileDialogueBeatAction(
+                    actMod,
+                    {
+                        idx: 'menu-actor-compile-breach',
+                        dat: {
+                            compileBeatParams: {
+                                beat_id: 'b_verbose',
+                                speaker: 'char_bog',
+                                dialogue_text:
+                                    'We must never touch the brass drainage valve control wheel when the boiler is hot.',
+                                camera_parenthetical: 'Bog drones on.',
+                                observable_parenthetical: 'Bog talks.',
+                                speech_act: 'ASSERT',
+                                emotion: 'neutral_curt',
+                                swain_mru_phase: 'SPEECH',
+                                extracted_motor_actions: [],
+                                curtness_bps: curtnessBps,
+                            },
+                        },
+                        slv: sink,
+                    } as any,
+                    undefined,
+                )
+
+                // 6. Smuggled kinetic verb breach (streams [FATAL_SOMATIC_BREACH])
+                await compileDialogueBeatAction(
+                    actMod,
+                    {
+                        idx: 'menu-actor-compile-somatic-breach',
+                        dat: {
+                            compileBeatParams: {
+                                beat_id: 'b_smuggle',
+                                speaker: 'char_bog',
+                                dialogue_text: 'Move!',
+                                camera_parenthetical:
+                                    'Bog sprints toward the ladder.',
+                                observable_parenthetical: 'Bog lunges forward.',
+                                speech_act: 'ASSERT',
+                                emotion: 'suppressed_panic',
+                                swain_mru_phase: 'MOTOR_ACTION',
+                                extracted_motor_actions: [],
+                                curtness_bps: 5000,
+                                banned_kinetic_verbs: ['SPRINT'],
+                            },
+                        },
+                        slv: sink,
+                    } as any,
+                    undefined,
+                )
+            } catch (err: any) {
+                await lib.hunt(UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `:: [FAIL] [DIALOGUE:AST] ${err?.message ?? String(err)}`,
                 })
             }
             await lib.hunt(UPDATE_CONSOLE, {
