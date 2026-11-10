@@ -50,6 +50,9 @@ export interface DatabaseOperation {
 }
 
 export interface DatabasePayload {
+    seriesSlug?: string
+    storageTarget?: string
+
     readonly table?: DatabaseTableName
     readonly key?: string
     readonly record?: DatabaseRecordUnion

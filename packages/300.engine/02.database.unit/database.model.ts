@@ -18,6 +18,8 @@ import type {
 
 export class DatabaseModel implements Database {
     idx: string = '02.database'
+    connection?: any
+    activeMetadata?: import('./fce/database.interface.js').DatabaseConnectionMetadata
     isInitialized: boolean = false
     tables = {
         event_log: new Map<string, EventLogRecord>(),
