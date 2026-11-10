@@ -14,6 +14,8 @@ export class EngineModel implements Engine {
     booted: boolean = false
     seriesSlug: string = 'under-the-floorboards'
     lastBootMs: number = 0
+    headSequence?: number
+    activeSeriesSlug?: string
     lastStateHash: string = '0'.repeat(64)
     lastAuditReceipt?: EngineAuditReceipt
     lastStatusReport?: EngineStatusReport
