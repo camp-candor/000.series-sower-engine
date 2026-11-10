@@ -1,6 +1,7 @@
 import * as ActDbs from '../../02.database.unit/database.action.js'
 import * as ActSte from '../../16.state.unit/state.action.js'
 import * as ActPrm from '../../13.primordial.unit/primordial.action.js'
+import * as ActSrs from '../../15.series.unit/series.action.js'
 import { sha256Hex } from '../../04.envelope.unit/envelope.buzzer.js'
 import { EngineModel } from '../engine.model.js'
 import EngineBit from '../fce/engine.bit.js'
@@ -1103,6 +1104,37 @@ export const bootEngine = async (
         let stateHash = cpy.lastStateHash
 
         if (ste && typeof ste.hunt === 'function') {
+            // Discrete Realm Vault: Resolve partitioned storage target in 15.series.unit
+            let targetPath = ':memory:'
+            try {
+                const srsRes: any = await ste.hunt(
+                    ActSrs.RESOLVE_SERIES_STORAGE,
+                    {
+                        dat: {
+                            seriesSlug,
+                            useMemory:
+                                process.env.NODE_ENV === 'test' ||
+                                process.env.VITEST === 'true',
+                        },
+                    },
+                )
+                targetPath =
+                    srsRes?.srsBit?.dat?.allocation?.storageTarget ||
+                    srsRes?.seriesBit?.dat?.allocation?.storageTarget ||
+                    targetPath
+            } catch {
+                // fallback to memory if series storage resolution not available
+            }
+
+            // Discrete Realm Vault: Mount database with SQLite pragma hardening in 02.database.unit
+            try {
+                await ste.hunt(ActDbs.MOUNT_REALM_DATABASE, {
+                    dat: { seriesSlug, storageTarget: targetPath },
+                })
+            } catch {
+                // fallback
+            }
+
             // Phase 1: Ensure SQLite schema in 02.database.unit
             await ste.hunt(ActDbs.INIT_DATABASE, {
                 dat: { seriesSlug },

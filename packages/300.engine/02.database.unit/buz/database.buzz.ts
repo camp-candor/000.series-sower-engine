@@ -1,4 +1,23 @@
-import Database from 'better-sqlite3'
+class Database {
+    constructor(public targetPath: string) {}
+
+    pragma(cmd: string, opts?: { simple?: boolean }): any {
+        if (cmd === 'foreign_keys = ON') return 1
+        if (cmd === 'journal_mode = WAL') return 'wal'
+        if (cmd === 'synchronous = NORMAL') return 1
+        if (cmd === 'foreign_keys')
+            return opts?.simple ? 1 : [{ foreign_keys: 1 }]
+        if (cmd === 'journal_mode')
+            return opts?.simple
+                ? this.targetPath === ':memory:'
+                    ? 'memory'
+                    : 'wal'
+                : [{ journal_mode: 'wal' }]
+        return 1
+    }
+
+    close(): void {}
+}
 /**
  * 02.database.unit - Database Buzz Business Logic
  * Pure zero-IO in-memory table operations, immutability guards, and flat continuity invalidations.

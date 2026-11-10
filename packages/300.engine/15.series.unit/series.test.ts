@@ -31,7 +31,7 @@ describe('15.series.unit :: Storage Path Allocation (Phase 4)', () => {
         expect(computeStoragePathForSlug(':memory:', false)).toBe(':memory:')
     })
 
-    it('resolves series storage through action buzzer and records allocation', () => {
+    it('resolves series storage through action buzzer and records allocation', async () => {
         const bit: any = {
             src: 'wiregrass-basin',
             dat: {
@@ -41,7 +41,7 @@ describe('15.series.unit :: Storage Path Allocation (Phase 4)', () => {
             },
         }
 
-        const updated = resolveSeriesStorage(model, bit)
+        const updated = await resolveSeriesStorage(model, bit)
         expect(updated.activeSeriesSlug).toBe('wiregrass-basin')
         expect(updated.activeStorageTarget).toBe(
             'data/sqlite/wiregrass-basin.local.db',

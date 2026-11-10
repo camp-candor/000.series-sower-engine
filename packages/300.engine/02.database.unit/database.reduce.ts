@@ -59,6 +59,15 @@ export function reducer(
                 state,
             )
 
+        case Act.MOUNT_REALM_DATABASE:
+            return Buzz.mountRealmDatabase(clone(model), act.bale as any, state)
+
+        case Act.CLOSE_DATABASE: {
+            const cpy = clone(model)
+            Buzz.closeDatabaseConnection(cpy)
+            return cpy
+        }
+
         default:
             return model
     }

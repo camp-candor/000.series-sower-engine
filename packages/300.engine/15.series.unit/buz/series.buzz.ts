@@ -63,11 +63,11 @@ export const updateSeries = (
     return cpy
 }
 
-export const resolveSeriesStorage = (
+export const resolveSeriesStorage = async (
     cpy: SeriesModel,
     bal?: SeriesBit,
     ste?: any,
-): SeriesModel => {
+): Promise<SeriesModel> => {
     const seriesSlug = bal?.dat?.seriesSlug || bal?.src || 'default-realm'
     const useMemory = Boolean(
         bal?.dat?.useMemory || process.env.VITEST === 'true',
@@ -89,7 +89,7 @@ export const resolveSeriesStorage = (
     cpy.activeStorageTarget = storageTarget
     cpy.allocations[seriesSlug] = allocation
 
-    emitConsole(
+    await emitConsole(
         ste,
         `>> [VAULT:RESOLVE] Slug: [${seriesSlug}] Target: [${storageTarget}] (Memory: ${allocation.isMemoryOnly})`,
     )
@@ -105,5 +105,26 @@ export const resolveSeriesStorage = (
         })
     }
 
+    return cpy
+}
+
+export const getActiveSeries = (
+    cpy: SeriesModel,
+    bal?: SeriesBit,
+    _ste?: any,
+): SeriesModel => {
+    if (bal?.slv) {
+        bal.slv({
+            srsBit: {
+                idx: 'get-active-series-pass',
+                val: 1,
+                src: cpy.activeSeriesSlug,
+                dat: {
+                    activeSeriesSlug: cpy.activeSeriesSlug,
+                    activeStorageTarget: cpy.activeStorageTarget,
+                },
+            },
+        })
+    }
     return cpy
 }

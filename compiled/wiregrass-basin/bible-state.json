@@ -1,0 +1,147 @@
+{
+    "catalog_summary": {
+        "characterCount": 3,
+        "characters": 3,
+        "grievanceCount": 1,
+        "grievances": 1,
+        "items": 3,
+        "locationCount": 2,
+        "locations": 2,
+        "mysteries": 0,
+        "mysteryCount": 0,
+        "possessionCount": 3,
+        "totalEntities": 9
+    },
+    "compiled_at": "2026-11-08T20:13:35.045Z",
+    "compiler_duration_ms": 1,
+    "entities": {
+        "char_johnny_walkman": {
+            "available_arms": 2,
+            "available_legs": 2,
+            "banned_kinetic_verbs": ["sit_still", "freeze_posture"],
+            "baseline_actions": ["sway", "broadcast", "adjust_boom_mic"],
+            "entity_type": "character",
+            "held_items": ["item_walkman_headset"],
+            "id": "char_johnny_walkman",
+            "locomotion_tier": "BIPEDAL_STANDARD",
+            "paranoia": 2800,
+            "prose_body": "Johnny Walkman stands six-foot-four in a faded hibiscus shirt, swaying from heel\nto toe while speaking into the foam-tipped boom microphone wired to his belt\ncassette deck.",
+            "somatic_strain": 1500,
+            "title": "Johnny Walkman",
+            "trust": 4500,
+            "voice_callbacks": ["folks across the basin", "dead reckoning"]
+        },
+        "char_miss_beverly": {
+            "available_arms": 2,
+            "available_legs": 1,
+            "banned_kinetic_verbs": [
+                "sprint",
+                "leap",
+                "jump",
+                "climb",
+                "vault",
+                "dash"
+            ],
+            "baseline_actions": ["pour_coffee", "drop_menus", "limp"],
+            "entity_type": "character",
+            "held_items": ["item_glass_carafe"],
+            "id": "char_miss_beverly",
+            "locomotion_tier": "BIPEDAL_LIMPING",
+            "paranoia": 1800,
+            "prose_body": "Miss Beverly navigates the waxed linoleum aisle of the Dixie-Starlight Diner,\nfavoring her swollen right ankle while carrying a fresh pot of decaf and lemon\nwedges.",
+            "somatic_strain": 5200,
+            "title": "Miss Beverly",
+            "trust": 5000,
+            "voice_callbacks": ["hot water and lemon", "check on booth seven"]
+        },
+        "char_orbie_mayhaw": {
+            "available_arms": 2,
+            "available_legs": 2,
+            "banned_kinetic_verbs": ["nod", "head_tilt", "slouch"],
+            "baseline_actions": ["inspect", "sanitize_frame", "rotate_torso"],
+            "entity_type": "character",
+            "held_items": ["item_brass_loupe"],
+            "id": "char_orbie_mayhaw",
+            "locomotion_tier": "BIPEDAL_RIGID",
+            "paranoia": 3600,
+            "prose_body": "Dr. Orbie Mayhaw sits upright in a pressed beige linen optometrist coat and\nwhite cotton gloves, rotating her upper torso as a single rigid block whenever\nshe addresses the booth.",
+            "somatic_strain": 1200,
+            "title": "Dr. Orbie Mayhaw",
+            "trust": 3000,
+            "voice_callbacks": ["progressive lenses", "optical parallax"]
+        },
+        "grv_parallax_alignment": {
+            "entity_type": "grievance",
+            "escalation_ceiling_bp": 8000,
+            "id": "grv_parallax_alignment",
+            "intensity_bp": 3200,
+            "max_intensity": 4,
+            "min_intensity": 1,
+            "participants": ["char_johnny_walkman", "char_orbie_mayhaw"],
+            "prose_body": "Dr. Orbie Mayhaw insists that Johnny Walkman nocturnal radio monologue distorts\nthe true optical geometry of the Wiregrass highway corridor.",
+            "spawns_on_max_escalation": [],
+            "title": "Dispute Over Uncalibrated Horizon Sightlines"
+        },
+        "item_brass_loupe": {
+            "entity_type": "item",
+            "id": "item_brass_loupe",
+            "occupies_hands": 1,
+            "owner_id": "char_orbie_mayhaw",
+            "prose_body": "A precision-ground monocular diopter loupe kept wrapped in alcohol-sterilized\nlinen inside Dr. Mayhaw coat pocket.",
+            "title": "Calibrated Brass Optometrist Loupe",
+            "weight_class": "LIGHT"
+        },
+        "item_glass_carafe": {
+            "entity_type": "item",
+            "id": "item_glass_carafe",
+            "occupies_hands": 1,
+            "owner_id": "char_miss_beverly",
+            "prose_body": "A heat-tempered glass diner coffee pot with a scorched orange handle for\nlate-night counter refills.",
+            "title": "Diner Glass Coffee Carafe",
+            "weight_class": "LIGHT"
+        },
+        "item_walkman_headset": {
+            "entity_type": "item",
+            "id": "item_walkman_headset",
+            "occupies_hands": 1,
+            "owner_id": "char_johnny_walkman",
+            "prose_body": "A modified portable cassette headset with bright yellow ear pads and a\ngoose-neck condenser microphone clipped to a coiled black cord.",
+            "title": "Yellow Foam Walkman Boom Headset",
+            "weight_class": "LIGHT"
+        },
+        "loc_dixie_starlight_diner": {
+            "acoustic_dampening_cdb": 1400,
+            "adjacent_to": ["loc_dixie_starlight_lot"],
+            "entity_type": "location",
+            "id": "loc_dixie_starlight_diner",
+            "occupancy_limit": 8,
+            "prose_body": "Fluorescent tubes hum at sixty hertz above green-checkered vinyl booths, chrome\nnapkin dispensers, and rain-streaked plate glass windows.",
+            "temperature_bp": 6600,
+            "title": "Dixie-Starlight Diner Booth Seven"
+        },
+        "loc_dixie_starlight_lot": {
+            "acoustic_dampening_cdb": 800,
+            "adjacent_to": ["loc_dixie_starlight_diner"],
+            "entity_type": "location",
+            "id": "loc_dixie_starlight_lot",
+            "occupancy_limit": 12,
+            "prose_body": "Rain sheets across the cracked blacktop outside the truck stop where\neighteen-wheelers idle beneath amber sodium floodlights.",
+            "temperature_bp": 7400,
+            "title": "Dixie-Starlight Truck Stop Asphalt Lot"
+        }
+    },
+    "entity_hashes": {
+        "char_johnny_walkman": "6cfefad4d3081bb9280336f1b11ccd3ed0bea7fb4940b7fba284bfe76922cfe2",
+        "char_miss_beverly": "79d4eec955bed11e711fd5e1b4d7fd54d538c32fb0ab9248c94d8376a8e1fb43",
+        "char_orbie_mayhaw": "8a2ffb95e7916271dfab6d60de440ed182026c5261379b9dfa9b2266d9dde778",
+        "grv_parallax_alignment": "b08ec64310058cd6b42ffcd44500a1754dc19e5e8075ca8cd595ff9ff95c0120",
+        "item_brass_loupe": "8830d3ff7f2ecba9533dabadeacd7894b3bbe8df0fd13c46c7698ab18c2e1bc9",
+        "item_glass_carafe": "07bca2ab3825fbf202c1eb8ed3a4fac06617c12c396346e025fc287b7ee25ce0",
+        "item_walkman_headset": "455e52ec62dab93fe4bfa947300e4b51726f5bfcbf4e147a583be5b31fe9e04a",
+        "loc_dixie_starlight_diner": "809719bf375ab383d0f50853a864360bd0545776eda72fe38417377b4c81bf6b",
+        "loc_dixie_starlight_lot": "5dcfca6bf1d90b77d843b1eae9ebc0f4386a8cf041d178cd0ef16d43b223d20b"
+    },
+    "root_merkle_hash": "81d31614fa5a17080971e5573a31a75911711ab4c5446e5575a64eacf8c30c3b",
+    "schema_version": "1.0.0",
+    "series_slug": "wiregrass-basin"
+}

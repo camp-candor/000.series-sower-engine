@@ -17,6 +17,8 @@ export {
     queryWhyDirty,
     getFactCentralityTelemetry,
     inspectContinuityDatabase,
+    mountRealmDatabase,
+    closeDatabaseConnection,
 } from './buz/database.buzz.js'
 export type {
     EventLogRecord,
