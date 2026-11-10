@@ -108,6 +108,7 @@ export type Actions =
     | MountRealmDatabase
     | CloseDatabase
     | ExecDatabase
+    | EnsureSchema
 
 export const MOUNT_REALM_DATABASE = '[Database action] Mount Realm Database'
 export class MountRealmDatabase implements Action {
@@ -124,5 +125,11 @@ export class CloseDatabase implements Action {
 export const EXEC_DATABASE = '[Database action] Exec Database'
 export class ExecDatabase implements Action {
     readonly type = EXEC_DATABASE
+    constructor(public bale?: DatabaseBit) {}
+}
+
+export const ENSURE_SCHEMA = '[Database action] Ensure Schema'
+export class EnsureSchema implements Action {
+    readonly type = ENSURE_SCHEMA
     constructor(public bale?: DatabaseBit) {}
 }

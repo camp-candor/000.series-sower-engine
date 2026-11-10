@@ -186,9 +186,17 @@ export interface DatabaseConnectionMetadata {
     mountedAtMs: number
 }
 
+export interface SchemaInventoryReport {
+    tables: string[]
+    views: string[]
+    triggers: string[]
+    isArmored: boolean
+}
+
 export default interface Database {
     connection?: any
     activeMetadata?: DatabaseConnectionMetadata
+    schemaReport?: SchemaInventoryReport
     idx: string
     isInitialized: boolean
     tables: {

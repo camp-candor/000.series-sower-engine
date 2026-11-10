@@ -68,6 +68,9 @@ export function reducer(
             return cpy
         }
 
+        case Act.ENSURE_SCHEMA:
+            return Buzz.ensureSchema(clone(model), act.bale, state)
+
         default:
             return model
     }

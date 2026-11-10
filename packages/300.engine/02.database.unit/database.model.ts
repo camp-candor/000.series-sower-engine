@@ -3,6 +3,7 @@
  * Pure in-memory relational table storage.
  */
 import type Database from './fce/database.interface.js'
+import type { SchemaInventoryReport } from './fce/database.interface.js'
 import type {
     EventLogRecord,
     EntityLiveRecord,
@@ -20,6 +21,7 @@ export class DatabaseModel implements Database {
     idx: string = '02.database'
     connection?: any
     activeMetadata?: import('./fce/database.interface.js').DatabaseConnectionMetadata
+    schemaReport?: SchemaInventoryReport
     isInitialized: boolean = false
     tables = {
         event_log: new Map<string, EventLogRecord>(),

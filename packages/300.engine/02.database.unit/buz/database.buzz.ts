@@ -1,28 +1,15 @@
-class Database {
-    constructor(public targetPath: string) {}
-
-    pragma(cmd: string, opts?: { simple?: boolean }): any {
-        if (cmd === 'foreign_keys = ON') return 1
-        if (cmd === 'journal_mode = WAL') return 'wal'
-        if (cmd === 'synchronous = NORMAL') return 1
-        if (cmd === 'foreign_keys')
-            return opts?.simple ? 1 : [{ foreign_keys: 1 }]
-        if (cmd === 'journal_mode')
-            return opts?.simple
-                ? this.targetPath === ':memory:'
-                    ? 'memory'
-                    : 'wal'
-                : [{ journal_mode: 'wal' }]
-        return 1
-    }
-
-    close(): void {}
-}
+import Database from 'better-sqlite3'
+import fs from 'node:fs'
+import path from 'node:path'
 /**
  * 02.database.unit - Database Buzz Business Logic
  * Pure zero-IO in-memory table operations, immutability guards, and flat continuity invalidations.
  */
 import { DatabaseModel } from '../database.model.js'
+import {
+    FOUR_VECTOR_AND_CONTINUITY_DDL,
+    SCHEMA_TRIGGERS_DDL,
+} from './schemaDdl.buzz.js'
 import type DatabaseBit from '../fce/database.bit.js'
 import type {
     DatabaseTableName,
@@ -43,6 +30,7 @@ import type {
     SceneFactDependencyRecord,
     FactCentralityTelemetry,
     FactStanding,
+    SchemaInventoryReport,
 } from '../fce/database.interface.js'
 import type State from '../../99.core/state.js'
 
@@ -183,12 +171,105 @@ export const updateDatabase = (
     return cpy
 }
 
+export const ensureSchema = async (
+    cpy: DatabaseModel,
+    bal?: DatabaseBit,
+    ste?: State,
+): Promise<DatabaseModel> => {
+    if (!cpy.connection) {
+        // If no active connection, mount transient in-memory handle by default
+        await mountRealmDatabase(
+            cpy,
+            {
+                dat: {
+                    seriesSlug: 'transient',
+                    storageTarget: ':memory:',
+                },
+            } as any,
+            ste,
+        )
+    }
+
+    const db = cpy.connection
+
+    await emitConsole(
+        ste,
+        '>> [DB:SCHEMA] Bootstrapping Four-Vector and Continuity tables...',
+    )
+    db.exec(FOUR_VECTOR_AND_CONTINUITY_DDL)
+
+    await emitConsole(
+        ste,
+        '>> [DB:TRIGGERS] Arming append-only and monotonic invalidation triggers...',
+    )
+    db.exec(SCHEMA_TRIGGERS_DDL)
+
+    // Compile Schema Inventory
+    const tables = db
+        .prepare(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name ASC",
+        )
+        .all()
+        .map((r: any) => r.name)
+
+    const views = db
+        .prepare(
+            "SELECT name FROM sqlite_master WHERE type='view' ORDER BY name ASC",
+        )
+        .all()
+        .map((r: any) => r.name)
+
+    const triggers = db
+        .prepare(
+            "SELECT name FROM sqlite_master WHERE type='trigger' ORDER BY name ASC",
+        )
+        .all()
+        .map((r: any) => r.name)
+
+    const isArmored =
+        triggers.includes('trg_event_log_no_update') &&
+        triggers.includes('trg_event_log_no_delete') &&
+        triggers.includes('trg_fact_version_bump')
+
+    const report: SchemaInventoryReport = {
+        tables,
+        views,
+        triggers,
+        isArmored,
+    }
+
+    cpy.schemaReport = report
+
+    await emitConsole(
+        ste,
+        `>> [DB:READY] Relational schema armed. ${tables.length} tables, ${views.length} view, ${triggers.length} triggers [OK]`,
+    )
+
+    if (bal?.slv) {
+        bal.slv({
+            dbsBit: {
+                idx: 'ensure-schema-pass',
+                val: 1,
+                src: cpy.activeMetadata?.seriesSlug || 'unknown',
+                dat: { report },
+            },
+        })
+    }
+
+    return cpy
+}
+
 export const ensureSchemaDatabase = async (
     cpy: DatabaseModel,
     bal?: DatabaseBit,
     ste?: State,
 ): Promise<DatabaseModel> => {
     cpy.isInitialized = true
+
+    // Provision the relational DDL on the mounted handle (transient
+    // :memory: when unmounted). No bale is forwarded so the inner call
+    // never resolves the outer delivery contract twice.
+    await ensureSchema(cpy, undefined, ste)
 
     await emitConsole(
         ste,
@@ -1126,6 +1207,12 @@ export const mountRealmDatabase = async (
         ste,
         `>> [DB:MOUNT] Opening discrete realm storage at [${targetPath}]...`,
     )
+
+    // Self-healing vault: ensure the realm directory exists before open.
+    // better-sqlite3 creates the file but never parent directories.
+    if (targetPath !== ':memory:') {
+        fs.mkdirSync(path.dirname(targetPath), { recursive: true })
+    }
 
     // Open SQLite database instance
     const db = new (Database as any)(targetPath)

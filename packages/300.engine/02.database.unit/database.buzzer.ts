@@ -19,6 +19,7 @@ export {
     inspectContinuityDatabase,
     mountRealmDatabase,
     closeDatabaseConnection,
+    ensureSchema,
 } from './buz/database.buzz.js'
 export type {
     EventLogRecord,

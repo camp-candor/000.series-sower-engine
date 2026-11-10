@@ -1,9 +1,12 @@
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 import { DatabaseModel } from './database.model.js'
 import {
     ensureSchemaDatabase,
     execBatchDatabase,
     checkIntegrityDatabase,
+    mountRealmDatabase,
+    ensureSchema,
+    closeDatabaseConnection,
 } from './buz/database.buzz.js'
 import { ENSURE_SCHEMA_DATABASE } from './database.action.js'
 import { reducer } from './database.reduce.js'
@@ -373,5 +376,159 @@ describe('02.database.unit - Four-Vector Table Memory Structures Battery', () =>
 
         expect(result).toBeInstanceOf(DatabaseModel)
         expect(slv).toHaveBeenCalled()
+    })
+})
+
+describe('02.database.unit :: Discrete Realm Relational Schema Provisioning (Phase 5)', () => {
+    let model: DatabaseModel
+
+    beforeEach(() => {
+        model = new DatabaseModel()
+    })
+
+    afterEach(() => {
+        closeDatabaseConnection(model)
+    })
+
+    it('provisions 10 relational tables, 1 view, and 3 triggers on memory instance', async () => {
+        await mountRealmDatabase(model, {
+            dat: { seriesSlug: 'test-realm', storageTarget: ':memory:' },
+        } as any)
+
+        await ensureSchema(model)
+
+        expect(model.schemaReport).toBeDefined()
+        expect(model.schemaReport?.tables).toContain('event_log')
+        expect(model.schemaReport?.tables).toContain('entities_live')
+        expect(model.schemaReport?.tables).toContain('strings_ledger')
+        expect(model.schemaReport?.tables).toContain('grievance_status')
+        expect(model.schemaReport?.tables).toContain('paranoia_clocks')
+        expect(model.schemaReport?.tables).toContain('actor_beliefs')
+        expect(model.schemaReport?.tables).toContain('unratified_details')
+        expect(model.schemaReport?.tables).toContain('facts')
+        expect(model.schemaReport?.tables).toContain('scenes')
+        expect(model.schemaReport?.tables).toContain('scene_fact_dependencies')
+
+        expect(model.schemaReport?.views).toContain(
+            'v_fact_centrality_telemetry',
+        )
+        expect(model.schemaReport?.triggers).toContain(
+            'trg_event_log_no_update',
+        )
+        expect(model.schemaReport?.triggers).toContain(
+            'trg_event_log_no_delete',
+        )
+        expect(model.schemaReport?.triggers).toContain('trg_fact_version_bump')
+        expect(model.schemaReport?.isArmored).toBe(true)
+    })
+
+    it('enforces append-only triggers on event_log, blocking updates and deletes', async () => {
+        await mountRealmDatabase(model, {
+            dat: { seriesSlug: 'test-immutability', storageTarget: ':memory:' },
+        } as any)
+        await ensureSchema(model)
+
+        const db = model.connection
+
+        // Insert baseline sequence #1
+        db.prepare(
+            `
+      INSERT INTO event_log (sequence_number, event_id, event_type, tick, payload_json, state_hash, prev_hash, seed, timestamp_ms)
+      VALUES (1, 'evt_01', 'GENESIS_SEEDED', 0, '{}', 'hash_01', 'hash_00', 'seed_01', 1700000000000)
+    `,
+        ).run()
+
+        // Verify UPDATE is blocked
+        expect(() => {
+            db.prepare(
+                "UPDATE event_log SET event_type = 'CORRUPTED' WHERE sequence_number = 1",
+            ).run()
+        }).toThrow(/\[IMMUTABILITY_VIOLATION\] Updates forbidden on event_log/)
+
+        // Verify DELETE is blocked
+        expect(() => {
+            db.prepare('DELETE FROM event_log WHERE sequence_number = 1').run()
+        }).toThrow(
+            /\[IMMUTABILITY_VIOLATION\] Deletions forbidden on event_log/,
+        )
+    })
+
+    it('enforces anti-reflexive constraint on strings_ledger', async () => {
+        await mountRealmDatabase(model, {
+            dat: { seriesSlug: 'test-strings', storageTarget: ':memory:' },
+        } as any)
+        await ensureSchema(model)
+
+        const db = model.connection
+
+        // Self-referential debt must fail
+        expect(() => {
+            db.prepare(
+                `
+        INSERT INTO strings_ledger (string_id, holder_id, debtor_id, weight_bps, created_at_ms, updated_at_ms)
+        VALUES ('str_01', 'char_bog', 'char_bog', 5000, 1700000000000, 1700000000000)
+      `,
+            ).run()
+        }).toThrow(/CHECK constraint failed/)
+
+        // Valid asymmetric debt succeeds
+        expect(() => {
+            db.prepare(
+                `
+        INSERT INTO strings_ledger (string_id, holder_id, debtor_id, weight_bps, created_at_ms, updated_at_ms)
+        VALUES ('str_01', 'char_bog', 'char_wart', 5000, 1700000000000, 1700000000000)
+      `,
+            ).run()
+        }).not.toThrow()
+    })
+
+    it('executes monotonic version bump trigger on facts and cascades is_dirty to dependent scenes', async () => {
+        await mountRealmDatabase(model, {
+            dat: { seriesSlug: 'test-cascade', storageTarget: ':memory:' },
+        } as any)
+        await ensureSchema(model)
+
+        const db = model.connection
+
+        // Seed fact
+        db.prepare(
+            `
+      INSERT INTO facts (id, claim_text, scope, authority_level, standing, author, timestamp_ms, version)
+      VALUES ('fact_01', 'Valve is sealed shut', 'LOCATION', 'CANON', 'ACTIVE_ENDORSED', 'Brad', 1700000000000, 1)
+    `,
+        ).run()
+
+        // Seed clean scene
+        db.prepare(
+            `
+      INSERT INTO scenes (id, episode_num, scene_num, text, status, is_dirty)
+      VALUES ('sc_01', 1, 1, 'Bog looks at valve.', 'clean', 0)
+    `,
+        ).run()
+
+        // Link dependency pinned to v1
+        db.prepare(
+            `
+      INSERT INTO scene_fact_dependencies (scene_id, fact_id, entity_type, pinned_version)
+      VALUES ('sc_01', 'fact_01', 'location', 1)
+    `,
+        ).run()
+
+        // Verify scene is clean
+        const beforeScene = db
+            .prepare('SELECT status, is_dirty FROM scenes WHERE id = ?')
+            .get('sc_01') as any
+        expect(beforeScene.status).toBe('clean')
+        expect(beforeScene.is_dirty).toBe(0)
+
+        // Bump fact version to v2
+        db.prepare('UPDATE facts SET version = 2 WHERE id = ?').run('fact_01')
+
+        // Verify trigger marked scene dirty
+        const afterScene = db
+            .prepare('SELECT status, is_dirty FROM scenes WHERE id = ?')
+            .get('sc_01') as any
+        expect(afterScene.status).toBe('dirty')
+        expect(afterScene.is_dirty).toBe(1)
     })
 })

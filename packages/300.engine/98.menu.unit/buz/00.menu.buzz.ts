@@ -447,7 +447,7 @@ export function validateUniverseManifestShape(candidate: any): boolean {
         return false
     }
 
-    const slug = candidate.seriesSlug || candidate.slug
+    const slug = candidate.seriesSlug || candidate.slug || candidate.series_slug
     if (typeof slug !== 'string' || slug.trim().length === 0) {
         return false
     }
@@ -455,6 +455,7 @@ export function validateUniverseManifestShape(candidate: any): boolean {
     const hash =
         candidate.merkleRootHex ||
         candidate.stateHash ||
+        candidate.root_merkle_hash ||
         candidate._meta?.corpusHash
     if (typeof hash !== 'string' || !/^[a-f0-9]{64}$/i.test(hash)) {
         return false
@@ -476,7 +477,37 @@ export function validateUniverseManifestShape(candidate: any): boolean {
         entities.grievances && typeof entities.grievances === 'object',
     )
 
-    return hasCharacters && hasLocations && hasPossessions && hasGrievances
+    if (hasCharacters && hasLocations && hasPossessions && hasGrievances) {
+        return true
+    }
+
+    // Compiler-emitted flat entity maps keyed by id with entity_type
+    // discriminators. Every accepted manifest still proves a non-empty slug,
+    // a 64-hex root hash, and all four populated collections.
+    if (!entities || typeof entities !== 'object') {
+        return false
+    }
+    const groups: Record<string, number> = {
+        characters: 0,
+        locations: 0,
+        possessions: 0,
+        grievances: 0,
+    }
+    for (const key of Object.keys(entities)) {
+        const ent = (entities as any)[key]
+        const kind =
+            ent && typeof ent === 'object' ? ent.entity_type : undefined
+        if (kind === 'character') groups.characters++
+        else if (kind === 'location') groups.locations++
+        else if (kind === 'item' || kind === 'possession') groups.possessions++
+        else if (kind === 'grievance') groups.grievances++
+    }
+    return (
+        groups.characters > 0 &&
+        groups.locations > 0 &&
+        groups.possessions > 0 &&
+        groups.grievances > 0
+    )
 }
 
 export function scanCompiledUniverses(
@@ -522,6 +553,7 @@ export function scanCompiledUniverses(
             const hash =
                 parsed.merkleRootHex ||
                 parsed.stateHash ||
+                parsed.root_merkle_hash ||
                 parsed._meta?.corpusHash ||
                 ''
 

@@ -206,4 +206,6 @@ dist/
 
 data/flat
 data/unit
+data/sqlite/
+data/*.local.db
 /data/scratch-pad.md
