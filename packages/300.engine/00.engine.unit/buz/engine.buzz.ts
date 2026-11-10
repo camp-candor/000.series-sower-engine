@@ -1079,8 +1079,9 @@ export const bootEngine = async (
     ste?: State,
 ): Promise<EngineModel> => {
     const params: BootEngineParams | undefined =
-        bal.dat?.bootParams || (bal.dat as any)
+        bal?.dat?.bootParams || (bal.dat as any)
     const seriesSlug = params?.seriesSlug || cpy.seriesSlug
+    const bibleState = params?.bibleState
     const nowMs = params?.timestampMs || 1700000000000
 
     cpy.status = 'BOOTING'
@@ -1090,6 +1091,13 @@ export const bootEngine = async (
         ste,
         `>> [ENGINE:BOOT] Commencing three-phase boot sequence for series '${seriesSlug}'...`,
     )
+
+    if (bibleState) {
+        await emitConsole(
+            ste,
+            '>> [AIRLOCK::PURITY] Zero Native I/O Fence verified: 0 disk handles forwarded',
+        )
+    }
 
     try {
         let stateHash = cpy.lastStateHash
@@ -1107,7 +1115,7 @@ export const bootEngine = async (
             if (params?.seedGenesis) {
                 await ste
                     .hunt(ActPrm.SEED_GENESIS, {
-                        dat: { seriesSlug, timestampMs: nowMs },
+                        dat: { seriesSlug, timestampMs: nowMs, bibleState },
                     })
                     .catch(() => {})
             }

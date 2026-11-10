@@ -130,6 +130,20 @@ export class AntiGamingAudit implements Action {
 }
 
 export const BOOT_ENGINE = '[Engine action] Boot Engine'
+export interface BootParamsPayload {
+    seriesSlug: string
+    databasePath?: string
+    bibleState: Readonly<Record<string, any>>
+    seedGenesis?: boolean
+}
+
+export interface BootEngineActionPayload {
+    dat?: {
+        bootParams?: BootParamsPayload
+        [key: string]: any
+    }
+}
+
 export class BootEngine implements Action {
     readonly type = BOOT_ENGINE
     constructor(public bale?: EngineBit) {}

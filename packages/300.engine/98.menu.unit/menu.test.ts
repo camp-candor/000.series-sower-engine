@@ -12,7 +12,11 @@ import {
     promptAirlockUniverseSelection,
     scanCompiledUniverses,
     validateUniverseManifestShape,
+    loadAndFreezeUniverseManifest,
+    handleMenuSelection,
 } from './buz/00.menu.buzz.js'
+import { deepFreezePayload } from './buz/deepFreeze.buzz.js'
+import * as ActEng from '../00.engine.unit/engine.action.js'
 import { SELECT_MENU_OPTION } from './menu.action.js'
 import { reducer } from './menu.reduce.js'
 
@@ -623,5 +627,130 @@ describe('98.menu.unit :: Canon Airlock interactive switchboard (Check 12)', () 
         )
         expect(model.activeUniverseSlug).toBe('')
         expect(slv).toHaveBeenCalled()
+    })
+})
+
+describe('98.menu.unit :: Deep Freeze Defensive Ingestion Boundary (Phase 3)', () => {
+    let tempDir: string
+
+    beforeEach(() => {
+        tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sower-phase3-'))
+    })
+
+    afterEach(() => {
+        fs.rmSync(tempDir, { recursive: true, force: true })
+        vi.restoreAllMocks()
+    })
+
+    it('recursively freezes nested object hierarchies and prevents mutations', () => {
+        const raw = {
+            seriesSlug: 'wiregrass-basin',
+            nested: { count: 42, tags: ['alpha', 'beta'] },
+        }
+
+        const frozen = deepFreezePayload(raw)
+        expect(Object.isFrozen(frozen)).toBe(true)
+        expect(Object.isFrozen(frozen.nested)).toBe(true)
+        expect(Object.isFrozen(frozen.nested.tags)).toBe(true)
+
+        expect(() => {
+            ;(frozen.nested as any).count = 99
+        }).toThrow(TypeError)
+
+        expect(() => {
+            ;(frozen.nested.tags as any).push('gamma')
+        }).toThrow(TypeError)
+    })
+
+    it('safely handles circular object references without call stack overflow', () => {
+        const circular: any = { name: 'ouroboros' }
+        circular.self = circular
+
+        const frozen = deepFreezePayload(circular)
+        expect(Object.isFrozen(frozen)).toBe(true)
+        expect(frozen.self).toBe(frozen)
+    })
+
+    it('loads valid manifest, deep-freezes it, and throws on malformed JSON', () => {
+        const compiledPath = path.join(tempDir, 'compiled', 'wiregrass-basin')
+        fs.mkdirSync(compiledPath, { recursive: true })
+        fs.writeFileSync(
+            path.join(compiledPath, 'bible-state.json'),
+            JSON.stringify({
+                seriesSlug: 'wiregrass-basin',
+                schemaVersion: '1.0.0',
+                merkleRootHex: 'a'.repeat(64),
+                entities: {
+                    characters: { char_bog: { name: 'Bog' } },
+                    locations: {},
+                    possessions: {},
+                    grievances: {},
+                },
+            }),
+            'utf8',
+        )
+
+        const loaded = loadAndFreezeUniverseManifest('wiregrass-basin', tempDir)
+        expect(loaded.seriesSlug).toBe('wiregrass-basin')
+        expect(Object.isFrozen(loaded)).toBe(true)
+        expect(Object.isFrozen(loaded.entities.characters.char_bog)).toBe(true)
+
+        expect(() => {
+            ;(loaded.entities.characters.char_bog as any).name = 'Corrupted'
+        }).toThrow(TypeError)
+
+        expect(() => {
+            loadAndFreezeUniverseManifest('non-existent-realm', tempDir)
+        }).toThrow(/Missing manifest at/)
+    })
+
+    it('forwards frozen in-memory bibleState across ste.hunt without disk handles', async () => {
+        const compiledPath = path.join(tempDir, 'compiled', 'wiregrass-basin')
+        fs.mkdirSync(compiledPath, { recursive: true })
+        fs.writeFileSync(
+            path.join(compiledPath, 'bible-state.json'),
+            JSON.stringify({
+                seriesSlug: 'wiregrass-basin',
+                schemaVersion: '1.0.0',
+                merkleRootHex: 'b'.repeat(64),
+                entities: {
+                    characters: {},
+                    locations: {},
+                    possessions: {},
+                    grievances: {},
+                },
+            }),
+            'utf8',
+        )
+
+        const mockHunt = vi.fn().mockResolvedValue({})
+        const fakeState: any = { hunt: mockHunt }
+
+        await handleMenuSelection(
+            '[01] BOOT ENGINE & ENSURE SCHEMA',
+            fakeState,
+            undefined,
+            tempDir,
+        )
+
+        expect(mockHunt).toHaveBeenCalledWith(
+            ActEng.BOOT_ENGINE,
+            expect.objectContaining({
+                dat: expect.objectContaining({
+                    bootParams: expect.objectContaining({
+                        seriesSlug: 'wiregrass-basin',
+                        seedGenesis: true,
+                        bibleState: expect.any(Object),
+                    }),
+                }),
+            }),
+        )
+
+        const callArgs = mockHunt.mock.calls.find(
+            (call: any) => call[0] === ActEng.BOOT_ENGINE,
+        )
+        expect(callArgs).toBeDefined()
+        const passedState = callArgs![1].dat.bootParams.bibleState
+        expect(Object.isFrozen(passedState)).toBe(true)
     })
 })

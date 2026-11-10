@@ -43,6 +43,8 @@ export interface BootEngineParams {
     readonly seriesSlug?: string
     readonly seedGenesis?: boolean
     readonly timestampMs?: number
+    readonly databasePath?: string
+    readonly bibleState?: Readonly<Record<string, any>>
 }
 
 export default interface Engine {

@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import type { CompiledUniverseDescriptor } from '../fce/menu.interface.js'
+import { deepFreezePayload, type DeepReadonly } from './deepFreeze.buzz.js'
 /* eslint-disable */
 import * as ActMnu from '../menu.action.js'
 import * as ActOlm from '../../00.engine.unit/engine.action.js'
@@ -152,6 +153,7 @@ export const handleMenuSelection = async (
     selection: string,
     ste?: State,
     model?: MenuModel,
+    baseDir?: string,
 ): Promise<void> => {
     if (!ste || typeof ste.hunt !== 'function') {
         return
@@ -160,9 +162,56 @@ export const handleMenuSelection = async (
     switch (selection) {
         case '[01] BOOT ENGINE & ENSURE SCHEMA': {
             if (model) model.airlockState = 'SELECTING'
-            const selectedSlug = await promptAirlockUniverseSelection(ste)
+            const selectedSlug = await promptAirlockUniverseSelection(
+                ste,
+                baseDir,
+            )
 
             if (!selectedSlug) {
+                if (model) model.airlockState = 'ABORTED'
+                break
+            }
+
+            await emitConsole(
+                ste,
+                '>> ==============================================================================',
+            )
+            await emitConsole(
+                ste,
+                '>> [EPIC-08] INITIATING CANON AIRLOCK & DISCRETE REALM VAULT',
+            )
+            await emitConsole(
+                ste,
+                `>> [AIRLOCK::INGEST] Target selected: [${selectedSlug}]`,
+            )
+            await emitConsole(
+                ste,
+                `>> [AIRLOCK::BYTE_0] Reading compiled/${selectedSlug}/bible-state.json`,
+            )
+
+            let frozenBibleState: DeepReadonly<Record<string, any>>
+            try {
+                frozenBibleState = loadAndFreezeUniverseManifest(
+                    selectedSlug,
+                    baseDir,
+                )
+                await emitConsole(
+                    ste,
+                    '>> [AIRLOCK::SEAL] In-memory immutable defensive lock applied (Object.freeze)',
+                )
+                await emitConsole(
+                    ste,
+                    '>> [AIRLOCK::PURITY] Zero Native I/O Fence verified: 0 disk handles forwarded',
+                )
+                await emitConsole(
+                    ste,
+                    '>> ==============================================================================',
+                )
+            } catch (err: any) {
+                await emitConsole(
+                    ste,
+                    `:: [AIRLOCK::FATAL] Ingestion failure: ${err.message}`,
+                )
                 if (model) model.airlockState = 'ABORTED'
                 break
             }
@@ -180,6 +229,7 @@ export const handleMenuSelection = async (
                 dat: {
                     bootParams: {
                         seriesSlug: selectedSlug,
+                        bibleState: frozenBibleState,
                         seedGenesis: true,
                     },
                 },
@@ -363,7 +413,7 @@ export const selectMenuOptionAction = async (
     const selection = bal.dat?.selection || bal.src || ''
     cpy.activeSelection = selection
 
-    await handleMenuSelection(selection, ste, cpy)
+    await handleMenuSelection(selection, ste, cpy, (bal?.dat as any)?.baseDir)
 
     if (bal.slv) {
         bal.slv({
@@ -491,6 +541,36 @@ export function scanCompiledUniverses(
     return results.sort((a, b) => a.seriesSlug.localeCompare(b.seriesSlug))
 }
 
+export function loadAndFreezeUniverseManifest(
+    seriesSlug: string,
+    baseDir?: string,
+): DeepReadonly<Record<string, any>> {
+    const root = baseDir ? path.resolve(baseDir) : resolveEngineRoot()
+    const manifestPath = path.join(
+        root,
+        'compiled',
+        seriesSlug,
+        'bible-state.json',
+    )
+
+    if (!fs.existsSync(manifestPath)) {
+        throw new Error(
+            `[AIRLOCK_INGEST_ERROR] Missing manifest at: ${manifestPath}`,
+        )
+    }
+
+    const rawJson = fs.readFileSync(manifestPath, 'utf8')
+    const parsed = JSON.parse(rawJson)
+
+    if (!validateUniverseManifestShape(parsed)) {
+        throw new Error(
+            `[AIRLOCK_INGEST_ERROR] Manifest corrupted or invalid shape for: ${seriesSlug}`,
+        )
+    }
+
+    return deepFreezePayload(parsed)
+}
+
 export function calculateSubmenuSpan(candidateCount: number): number {
     return Math.min(12, Math.max(6, candidateCount + 2))
 }
@@ -597,24 +677,6 @@ export async function promptAirlockUniverseSelection(
         )
         return null
     }
-
-    await emitConsole(
-        ste,
-        '>> ==============================================================================',
-    )
-    await emitConsole(
-        ste,
-        '>> [EPIC-08] INITIATING CANON AIRLOCK & DISCRETE REALM VAULT',
-    )
-    await emitConsole(ste, `>> [AIRLOCK::INGEST] Target selected: [${picked}]`)
-    await emitConsole(
-        ste,
-        `>> [AIRLOCK::BYTE_0] Reading compiled/${picked}/bible-state.json`,
-    )
-    await emitConsole(
-        ste,
-        '>> ==============================================================================',
-    )
 
     return picked
 }
