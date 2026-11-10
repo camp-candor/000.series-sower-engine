@@ -105,3 +105,24 @@ export type Actions =
     | AddSceneDependency
     | QueryWhyDirty
     | GetCentralityTelemetry
+    | MountRealmDatabase
+    | CloseDatabase
+    | ExecDatabase
+
+export const MOUNT_REALM_DATABASE = '[Database action] Mount Realm Database'
+export class MountRealmDatabase implements Action {
+    readonly type = MOUNT_REALM_DATABASE
+    constructor(public bale?: DatabaseBit) {}
+}
+
+export const CLOSE_DATABASE = '[Database action] Close Database'
+export class CloseDatabase implements Action {
+    readonly type = CLOSE_DATABASE
+    constructor(public bale?: DatabaseBit) {}
+}
+
+export const EXEC_DATABASE = '[Database action] Exec Database'
+export class ExecDatabase implements Action {
+    readonly type = EXEC_DATABASE
+    constructor(public bale?: DatabaseBit) {}
+}

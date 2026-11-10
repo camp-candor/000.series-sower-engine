@@ -1,3 +1,4 @@
+import Database from 'better-sqlite3'
 /**
  * 02.database.unit - Database Buzz Business Logic
  * Pure zero-IO in-memory table operations, immutability guards, and flat continuity invalidations.
@@ -1041,5 +1042,116 @@ export const inspectContinuityDatabase = async (
             },
         })
     }
+    return cpy
+}
+
+export const closeDatabaseConnection = (cpy: DatabaseModel): void => {
+    if (cpy.connection) {
+        try {
+            if (typeof cpy.connection.close === 'function') {
+                cpy.connection.close()
+            }
+        } catch {
+            // Ignore already closed handles
+        }
+        cpy.connection = null
+    }
+    if (cpy.activeMetadata) {
+        cpy.activeMetadata.isOpen = false
+    }
+}
+
+export const mountRealmDatabase = async (
+    cpy: DatabaseModel,
+    bal?: DatabaseBit,
+    ste?: State,
+): Promise<DatabaseModel> => {
+    const seriesSlug = bal?.dat?.seriesSlug || 'default-realm'
+    const targetPath = bal?.dat?.storageTarget || ':memory:'
+
+    // If already connected to the identical target, skip reconnecting
+    if (
+        cpy.connection &&
+        cpy.activeMetadata &&
+        cpy.activeMetadata.seriesSlug === seriesSlug &&
+        cpy.activeMetadata.storageTarget === targetPath &&
+        cpy.activeMetadata.isOpen
+    ) {
+        await emitConsole(
+            ste,
+            `>> [DB:MOUNT] Retaining active connection for: [${seriesSlug}]`,
+        )
+        if (bal?.slv) {
+            bal.slv({
+                dbsBit: {
+                    idx: 'mount-realm-database-pass',
+                    val: 1,
+                    src: seriesSlug,
+                    dat: { metadata: cpy.activeMetadata },
+                },
+            })
+        }
+        return cpy
+    }
+
+    // Cleanly close prior connection
+    if (cpy.connection) {
+        await emitConsole(
+            ste,
+            `>> [DB:SWITCH] Unmounting previous connection [${cpy.activeMetadata?.seriesSlug || 'unknown'}]...`,
+        )
+        closeDatabaseConnection(cpy)
+    }
+
+    await emitConsole(
+        ste,
+        `>> [DB:MOUNT] Opening discrete realm storage at [${targetPath}]...`,
+    )
+
+    // Open SQLite database instance
+    const db = new (Database as any)(targetPath)
+
+    // Arm SQLite Performance & Integrity Pragmas
+    db.pragma('foreign_keys = ON')
+    if (targetPath !== ':memory:') {
+        db.pragma('journal_mode = WAL')
+        db.pragma('synchronous = NORMAL')
+    }
+
+    const fkPragma = db.pragma('foreign_keys', { simple: true })
+    const walPragma =
+        targetPath === ':memory:'
+            ? 'memory'
+            : db.pragma('journal_mode', { simple: true })
+
+    const metadata: import('../fce/database.interface.js').DatabaseConnectionMetadata =
+        {
+            seriesSlug,
+            storageTarget: targetPath,
+            isOpen: true,
+            walEnabled: String(walPragma).toLowerCase() === 'wal',
+            foreignKeysEnabled: Boolean(fkPragma === 1 || fkPragma === true),
+            mountedAtMs: Date.now(),
+        }
+
+    cpy.connection = db
+    cpy.activeMetadata = metadata
+
+    await emitConsole(
+        ste,
+        `>> [DB:PRAGMA] foreign_keys=${metadata.foreignKeysEnabled} journal_mode=${walPragma} [OK]`,
+    )
+
+    if (bal?.slv) {
+        bal.slv({
+            dbsBit: {
+                idx: 'mount-realm-database-pass',
+                val: 1,
+                src: seriesSlug,
+                dat: { metadata },
+            },
+        })
+    }
+
     return cpy
 }

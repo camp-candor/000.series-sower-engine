@@ -15,4 +15,20 @@ export class UpdateSeries implements Action {
     constructor(public bale: SeriesBit) {}
 }
 
-export type Actions = InitSeries | UpdateSeries
+export type Actions =
+    | InitSeries
+    | UpdateSeries
+    | ResolveSeriesStorage
+    | GetActiveSeries
+
+export const RESOLVE_SERIES_STORAGE = '[Series action] Resolve Series Storage'
+export class ResolveSeriesStorage implements Action {
+    readonly type = RESOLVE_SERIES_STORAGE
+    constructor(public bale: SeriesBit) {}
+}
+
+export const GET_ACTIVE_SERIES = '[Series action] Get Active Series'
+export class GetActiveSeries implements Action {
+    readonly type = GET_ACTIVE_SERIES
+    constructor(public bale: SeriesBit) {}
+}

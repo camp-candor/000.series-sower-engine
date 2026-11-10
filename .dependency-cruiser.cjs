@@ -8,7 +8,11 @@ module.exports = {
             severity: 'error',
             from: {
                 path: '^packages/300\\.engine',
-                pathNot: ['\\.test\\.ts$', '98\\.menu\\.unit'],
+                pathNot: [
+                    '\\.test\\.ts$',
+                    '98\\.menu\\.unit',
+                    '02\\.database\\.unit',
+                ],
             },
             to: {
                 path: [

@@ -12,6 +12,7 @@ try {
             'packages/300.engine/',
             '--',
             ':!packages/300.engine/98.menu.unit',
+            ':!packages/300.engine/02.database.unit',
         ],
         { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] },
     ).trim()

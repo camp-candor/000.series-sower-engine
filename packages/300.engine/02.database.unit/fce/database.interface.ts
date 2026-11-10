@@ -177,7 +177,18 @@ export interface DatabaseStateReport {
     readonly timestamp_ms: number
 }
 
+export interface DatabaseConnectionMetadata {
+    seriesSlug: string
+    storageTarget: string
+    isOpen: boolean
+    walEnabled: boolean
+    foreignKeysEnabled: boolean
+    mountedAtMs: number
+}
+
 export default interface Database {
+    connection?: any
+    activeMetadata?: DatabaseConnectionMetadata
     idx: string
     isInitialized: boolean
     tables: {
