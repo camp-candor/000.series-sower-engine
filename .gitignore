@@ -173,6 +173,7 @@ dist
 !packages/types/
 # Un-ignore src/types/ subdirectories (source code, not declarations)
 !packages/*/src/types/
+!apps/*/src/types/
 
 #Husky
 .husky/_

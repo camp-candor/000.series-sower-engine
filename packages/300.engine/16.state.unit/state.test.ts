@@ -17,6 +17,7 @@ describe('16.state.unit - Deterministic State Fold Execution Battery', () => {
 
     const createInitialState = (): LedgerWorkingState => {
         const unhashed = {
+            schemaVersion: '1.0.0' as const,
             reducerVersion: 'v1.0.0',
             seriesSlug: 'series_sower_test',
             tick: 1,
@@ -48,6 +49,7 @@ describe('16.state.unit - Deterministic State Fold Execution Battery', () => {
             grievances: Object.freeze({}),
             clocks: Object.freeze({}),
             beliefs: Object.freeze({}),
+            details: Object.freeze({}),
             unratifiedDetails: Object.freeze({}),
         }
         const stateHash = computeWorkingStateHash(unhashed)
@@ -195,5 +197,85 @@ describe('16.state.unit - Deterministic State Fold Execution Battery', () => {
 
         expect(result).toBeInstanceOf(StateModel)
         expect(slv).toHaveBeenCalled()
+    })
+
+    it('computes deterministic RFC 8785 state hash regardless of key insertion order', async () => {
+        const { computeWorkingStateHash } = await import('./buz/state.buzz.js')
+        const stateA = {
+            schemaVersion: '1.0.0' as const,
+            seriesSlug: 'wiregrass-basin',
+            tick: 0,
+            entities: { b: { id: 'b' }, a: { id: 'a' } },
+            strings: {},
+            grievances: {},
+            clocks: {},
+            beliefs: {},
+            details: {},
+        }
+        const stateB = {
+            seriesSlug: 'wiregrass-basin',
+            tick: 0,
+            schemaVersion: '1.0.0' as const,
+            details: {},
+            beliefs: {},
+            clocks: {},
+            grievances: {},
+            strings: {},
+            entities: { a: { id: 'a' }, b: { id: 'b' } },
+        }
+        const hashA = computeWorkingStateHash(stateA)
+        const hashB = computeWorkingStateHash(stateB)
+        expect(hashA).toMatch(/^[a-f0-9]{64}$/)
+        expect(hashA).toBe(hashB)
+    })
+
+    it('enforces recursive deep-freeze immutability and throws TypeError on mutation', async () => {
+        const { recursiveDeepFreeze } = await import('./buz/state.buzz.js')
+        const sample = {
+            schemaVersion: '1.0.0',
+            seriesSlug: 'wiregrass-basin',
+            tick: 0,
+            entities: {
+                char_bog: {
+                    locationId: 'loc_hub',
+                    heldItems: ['item_token'],
+                },
+            },
+        }
+        const frozen = recursiveDeepFreeze(sample)
+        expect(() => {
+            ;(frozen as any).seriesSlug = 'corrupted'
+        }).toThrow(TypeError)
+        expect(() => {
+            ;(frozen.entities.char_bog as any).locationId = 'loc_void'
+        }).toThrow(TypeError)
+        expect(() => {
+            ;(frozen.entities.char_bog.heldItems as any).push('item_illegal')
+        }).toThrow(TypeError)
+    })
+
+    it('throws [CANON_DESYNCHRONIZED] on expectedHash divergence in hydrateState', async () => {
+        const { hydrateState } = await import('./buz/state.buzz.js')
+        const fakeModel: any = {
+            activeSeriesSlug: 'test-realm',
+            activeStateHash: '',
+            workingState: null,
+        }
+        const fakeState: any = {
+            hunt: () => Promise.resolve({ databaseBit: { dat: { rows: [] } } }),
+        }
+
+        await expect(
+            hydrateState(
+                fakeModel,
+                {
+                    dat: {
+                        seriesSlug: 'test-realm',
+                        expectedHash: '0'.repeat(64),
+                    },
+                } as any,
+                fakeState,
+            ),
+        ).rejects.toThrow('[CANON_DESYNCHRONIZED]')
     })
 })

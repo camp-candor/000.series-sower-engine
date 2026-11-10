@@ -53,6 +53,8 @@ export default interface Engine {
     booted: boolean
     seriesSlug: string
     lastBootMs: number
+    headSequence?: number
+    activeSeriesSlug?: string
     lastStateHash: string
     lastAuditReceipt?: EngineAuditReceipt
     lastStatusReport?: EngineStatusReport

@@ -42,27 +42,92 @@ async function emitConsole(ste: State | undefined, src: string): Promise<void> {
 /**
  * Recursively applies Object.freeze to deep-freeze all nested objects and arrays.
  */
-export function deepFreeze<T>(obj: T): Readonly<T> {
+export function recursiveDeepFreeze<T>(
+    obj: T,
+    visited = new WeakSet<object>(),
+): Readonly<T> {
     if (obj === null || typeof obj !== 'object') {
         return obj as Readonly<T>
     }
-    Object.freeze(obj)
-    for (const key of Object.keys(obj)) {
-        const val = (obj as any)[key]
-        if (val !== null && typeof val === 'object' && !Object.isFrozen(val)) {
-            deepFreeze(val)
+    if (visited.has(obj as object)) {
+        return obj as Readonly<T>
+    }
+    visited.add(obj as object)
+
+    if (Array.isArray(obj)) {
+        for (let i = 0; i < obj.length; i++) {
+            const val = obj[i]
+            if (
+                val !== null &&
+                (typeof val === 'object' || typeof val === 'function')
+            ) {
+                recursiveDeepFreeze(val, visited)
+            }
+        }
+        return Object.freeze(obj) as Readonly<T>
+    }
+
+    if (!Object.isFrozen(obj)) {
+        for (const key of Object.getOwnPropertyNames(obj)) {
+            const desc = Object.getOwnPropertyDescriptor(obj, key)
+            if (desc && desc.configurable && 'value' in desc) {
+                let currentVal = desc.value
+                if (
+                    currentVal !== null &&
+                    (typeof currentVal === 'object' ||
+                        typeof currentVal === 'function')
+                ) {
+                    currentVal = recursiveDeepFreeze(currentVal, visited)
+                }
+                Object.defineProperty(obj, key, {
+                    get() {
+                        return currentVal
+                    },
+                    set() {
+                        throw new TypeError(
+                            `Cannot assign to read only property '${key}' of object`,
+                        )
+                    },
+                    enumerable: desc.enumerable,
+                    configurable: false,
+                })
+            }
+        }
+    } else {
+        for (const key of Object.getOwnPropertyNames(obj)) {
+            const val = (obj as any)[key]
+            if (
+                val !== null &&
+                (typeof val === 'object' || typeof val === 'function')
+            ) {
+                recursiveDeepFreeze(val, visited)
+            }
         }
     }
-    return obj as Readonly<T>
+    return Object.freeze(obj) as Readonly<T>
 }
+
+export const deepFreeze = recursiveDeepFreeze
 
 /**
  * Computes deterministic SHA-256 state hash using RFC 8785 canonical JSON sorting.
  */
 export function computeWorkingStateHash(
-    stateWithoutHash: Omit<LedgerWorkingState, 'stateHash'>,
+    state: Omit<LedgerWorkingState, 'stateHash'> | Record<string, any>,
 ): string {
-    const canonicalString = canonicalizeJson(stateWithoutHash)
+    const hashPayload = {
+        beliefs: (state as any).beliefs || {},
+        clocks: (state as any).clocks || {},
+        details:
+            (state as any).details || (state as any).unratifiedDetails || {},
+        entities: (state as any).entities || {},
+        grievances: (state as any).grievances || {},
+        schemaVersion: (state as any).schemaVersion || '1.0.0',
+        seriesSlug: (state as any).seriesSlug,
+        strings: (state as any).strings || {},
+        tick: (state as any).tick ?? 0,
+    }
+    const canonicalString = canonicalizeJson(hashPayload)
     return sha256Hex(canonicalString)
 }
 
@@ -74,7 +139,7 @@ export function reduceLedgerState(
     event: any,
 ): LedgerWorkingState {
     const nextTick = Math.max(prevState.tick, event.tick ?? prevState.tick + 1)
-    const nextSeq = prevState.lastSequenceNumber + 1
+    const nextSeq = (prevState.lastSequenceNumber ?? 0) + 1
 
     const entities: Record<string, CompositeEntityLiveRecord> = {
         ...prevState.entities,
@@ -220,6 +285,8 @@ export function reduceLedgerState(
     }
 
     const unhashed = {
+        schemaVersion: '1.0.0' as const,
+        details: Object.freeze(unratifiedDetails) as any,
         reducerVersion: 'v1.0.0',
         seriesSlug: prevState.seriesSlug,
         tick: nextTick,
@@ -342,145 +409,309 @@ export const updateState = (
     return cpy
 }
 
-export const hydrateStateAction = async (
+function parseJsonSafe(val: any, fallback: any): any {
+    if (typeof val !== 'string') return val ?? fallback
+    try {
+        return JSON.parse(val)
+    } catch {
+        return fallback
+    }
+}
+
+export const hydrateState = async (
     cpy: StateModel,
-    bal: StateBit,
+    bal?: StateBit,
     ste?: State,
 ): Promise<StateModel> => {
-    const params = bal.dat?.hydrateParams
-    const seriesSlug = params?.seriesSlug || 'series_sower_test'
-    const tick = params?.tick || 0
-
-    const entities: Record<string, CompositeEntityLiveRecord> = {}
-    const strings: Record<string, StringsLedgerRecord> = {}
-    const grievances: Record<string, GrievanceStatusRecord> = {}
-    const clocks: Record<string, ParanoiaClockRecord> = {}
-    const beliefs: Record<string, ActorBeliefRecord> = {}
-    const unratifiedDetails: Record<string, UnratifiedDetailRecord> = {}
-
-    if (ste && typeof ste.hunt === 'function') {
-        // Query entities_live
-        const entRes: any = await ste.hunt(ActDbs.QUERY_DATABASE, {
-            dat: { table: 'entities_live' },
-        })
-        if (entRes?.databaseBit?.dat?.records) {
-            for (const r of entRes.databaseBit.dat.records) {
-                entities[r.entity_id] = {
-                    entity_id: r.entity_id,
-                    location_id: r.location_id || 'loc_the_warm_pipe',
-                    q: r.q || 0,
-                    r: r.r || 0,
-                    arms_available: r.arms_available ?? 2,
-                    legs_available: r.legs_available ?? 2,
-                    locomotion_tier: r.locomotion_tier || 'UNRESTRICTED',
-                    concussion_level: r.concussion_level || 0,
-                    fatigue_bps: r.fatigue_bps || 0,
-                    pain_bps: r.pain_bps || 0,
-                    refusal_strain_bps: r.refusal_strain_bps || 0,
-                    open_wounds: Object.freeze(
-                        JSON.parse(r.open_wounds_json || '[]'),
-                    ),
-                    banned_kinetic_verbs: Object.freeze(
-                        JSON.parse(r.banned_kinetic_verbs_json || '[]'),
-                    ),
-                    held_items: Object.freeze(
-                        JSON.parse(r.held_items_json || '[]'),
-                    ),
-                    worn_gear: Object.freeze(
-                        JSON.parse(r.worn_gear_json || '{}'),
-                    ),
-                    slung_items: Object.freeze(
-                        JSON.parse(r.slung_items_json || '[]'),
-                    ),
-                    cached_items: Object.freeze(
-                        JSON.parse(r.cached_items_json || '[]'),
-                    ),
-                    updated_at_ms: r.updated_at_ms || 1700000000000,
-                }
-            }
-        }
-
-        // Query strings_ledger
-        const strRes: any = await ste.hunt(ActDbs.QUERY_DATABASE, {
-            dat: { table: 'strings_ledger' },
-        })
-        if (strRes?.databaseBit?.dat?.records) {
-            for (const r of strRes.databaseBit.dat.records) {
-                strings[r.relation_id] = r
-            }
-        }
-
-        // Query grievance_status
-        const grvRes: any = await ste.hunt(ActDbs.QUERY_DATABASE, {
-            dat: { table: 'grievance_status' },
-        })
-        if (grvRes?.databaseBit?.dat?.records) {
-            for (const r of grvRes.databaseBit.dat.records) {
-                grievances[r.grievance_id] = r
-            }
-        }
-
-        // Query paranoia_clocks
-        const clkRes: any = await ste.hunt(ActDbs.QUERY_DATABASE, {
-            dat: { table: 'paranoia_clocks' },
-        })
-        if (clkRes?.databaseBit?.dat?.records) {
-            for (const r of clkRes.databaseBit.dat.records) {
-                clocks[r.clock_id] = r
-            }
-        }
-
-        // Query unratified_details
-        const detRes: any = await ste.hunt(ActDbs.QUERY_DATABASE, {
-            dat: { table: 'unratified_details' },
-        })
-        if (detRes?.databaseBit?.dat?.records) {
-            for (const r of detRes.databaseBit.dat.records) {
-                unratifiedDetails[r.detail_id] = r
-            }
-        }
-    }
-
-    const stateWithoutHash = {
-        reducerVersion: 'v1.0.0',
-        seriesSlug,
-        tick,
-        lastSequenceNumber: 0,
-        lastEventHash: 'genesis_seed',
-        entities: Object.freeze(entities),
-        strings: Object.freeze(strings),
-        grievances: Object.freeze(grievances),
-        clocks: Object.freeze(clocks),
-        beliefs: Object.freeze(beliefs),
-        unratifiedDetails: Object.freeze(unratifiedDetails),
-    }
-
-    const stateHash = computeWorkingStateHash(stateWithoutHash)
-
-    const sealedSnapshot: LedgerWorkingState = deepFreeze({
-        ...stateWithoutHash,
-        stateHash,
-    })
-
-    cpy.activeSnapshot = sealedSnapshot
+    const seriesSlug =
+        bal?.dat?.seriesSlug ||
+        bal?.dat?.hydrateParams?.seriesSlug ||
+        cpy.activeSeriesSlug ||
+        'wiregrass-basin'
+    const tick = bal?.dat?.tick ?? bal?.dat?.hydrateParams?.tick ?? 0
+    const expectedHash =
+        bal?.dat?.expectedHash || (bal?.dat?.hydrateParams as any)?.expectedHash
 
     await emitConsole(
         ste,
-        `>> [STATE:HYDRATE] [OK] Deep-frozen snapshot materialized. StateHash: ${stateHash.slice(0, 16)}...`,
+        `>> [STATE:HYDRATE] Aggregating 4-vector working tables for [${seriesSlug}]...`,
     )
 
-    if (bal.slv) {
+    const entities: Record<string, any> = {}
+    const strings: Record<string, any> = {}
+    const grievances: Record<string, any> = {}
+    const clocks: Record<string, any> = {}
+    const beliefs: Record<string, any> = {}
+    const details: Record<string, any> = {}
+
+    if (ste && typeof ste.hunt === 'function') {
+        // 1. Entities live
+        const entRes: any = await ste.hunt(ActDbs.QUERY_DATABASE, {
+            dat: {
+                query: 'SELECT * FROM entities_live ORDER BY entity_id ASC',
+                table: 'entities_live',
+            },
+        })
+        const entRows =
+            entRes?.databaseBit?.dat?.rows ||
+            entRes?.databaseBit?.dat?.records ||
+            []
+        for (const r of entRows) {
+            const entId = r.entity_id || r.entityId
+            entities[entId] = {
+                entityId: entId,
+                locationId: r.location_id || r.locationId || 'loc_origin_hub',
+                q: Number(r.q ?? 0),
+                r: Number(r.r ?? 0),
+                armsAvailable: Number(r.arms_available ?? r.armsAvailable ?? 2),
+                legsAvailable: Number(r.legs_available ?? r.legsAvailable ?? 2),
+                locomotionTier:
+                    r.locomotion_tier || r.locomotionTier || 'UNRESTRICTED',
+                concussionLevel: Number(
+                    r.concussion_level ?? r.concussionLevel ?? 0,
+                ),
+                wounds: parseJsonSafe(r.wounds_json ?? r.wounds, []),
+                heldItems: parseJsonSafe(r.held_items_json ?? r.heldItems, []),
+                wornGear: parseJsonSafe(r.worn_gear_json ?? r.wornGear, []),
+                slungItems: parseJsonSafe(
+                    r.slung_items_json ?? r.slungItems,
+                    [],
+                ),
+                updatedAtMs: Number(r.updated_at_ms ?? r.updatedAtMs ?? 0),
+            }
+        }
+
+        // 2. Strings ledger
+        const strRes: any = await ste.hunt(ActDbs.QUERY_DATABASE, {
+            dat: {
+                query: 'SELECT * FROM strings_ledger ORDER BY string_id ASC',
+                table: 'strings_ledger',
+            },
+        })
+        const strRows =
+            strRes?.databaseBit?.dat?.rows ||
+            strRes?.databaseBit?.dat?.records ||
+            []
+        for (const r of strRows) {
+            const strId = r.string_id || r.relation_id || r.stringId
+            strings[strId] = {
+                stringId: strId,
+                holderId: r.holder_id || r.holderId,
+                debtorId: r.debtor_id || r.debtorId,
+                weightBps: Number(r.weight_bps ?? r.weightBps ?? 0),
+                createdAtMs: Number(r.created_at_ms ?? r.createdAtMs ?? 0),
+                updatedAtMs: Number(r.updated_at_ms ?? r.updatedAtMs ?? 0),
+            }
+        }
+
+        // 3. Grievances status
+        const grvRes: any = await ste.hunt(ActDbs.QUERY_DATABASE, {
+            dat: {
+                query: 'SELECT * FROM grievance_status ORDER BY grievance_id ASC',
+                table: 'grievance_status',
+            },
+        })
+        const grvRows =
+            grvRes?.databaseBit?.dat?.rows ||
+            grvRes?.databaseBit?.dat?.records ||
+            []
+        for (const r of grvRows) {
+            const grvId = r.grievance_id || r.grievanceId
+            grievances[grvId] = {
+                grievanceId: grvId,
+                initiatorId:
+                    r.initiator_id || r.instigator_id || r.initiatorId || '',
+                targetId: r.target_id || r.victim_id || r.targetId || '',
+                escalationStage: Number(
+                    r.escalation_stage ?? r.escalationDepth ?? 0,
+                ),
+                cooldownCycles: Number(
+                    r.cooldown_cycles ?? r.cooldownCycles ?? 0,
+                ),
+                intensityBps: Number(r.intensity_bps ?? r.intensityBps ?? 0),
+                status: r.status || 'DORMANT',
+                updatedAtMs: Number(r.updated_at_ms ?? r.updatedAtMs ?? 0),
+            }
+        }
+
+        // 4. Paranoia clocks
+        const clkRes: any = await ste.hunt(ActDbs.QUERY_DATABASE, {
+            dat: {
+                query: 'SELECT * FROM paranoia_clocks ORDER BY clock_id ASC',
+                table: 'paranoia_clocks',
+            },
+        })
+        const clkRows =
+            clkRes?.databaseBit?.dat?.rows ||
+            clkRes?.databaseBit?.dat?.records ||
+            []
+        for (const r of clkRows) {
+            const clkId = r.clock_id || r.clockId
+            clocks[clkId] = {
+                clockId: clkId,
+                entityId: r.entity_id || r.entityId || null,
+                valueBps: Number(r.value_bps ?? r.valueBps ?? 0),
+                thresholdBps: Number(r.threshold_bps ?? r.thresholdBps ?? 0),
+                decayRateBps: Number(r.decay_rate_bps ?? r.decayRateBps ?? 0),
+                updatedAtMs: Number(r.updated_at_ms ?? r.updatedAtMs ?? 0),
+            }
+        }
+
+        // 5. Actor beliefs
+        const blfRes: any = await ste.hunt(ActDbs.QUERY_DATABASE, {
+            dat: {
+                query: 'SELECT * FROM actor_beliefs ORDER BY belief_id ASC',
+                table: 'actor_beliefs',
+            },
+        })
+        const blfRows =
+            blfRes?.databaseBit?.dat?.rows ||
+            blfRes?.databaseBit?.dat?.records ||
+            []
+        for (const r of blfRows) {
+            const blfId = r.belief_id || r.beliefId
+            beliefs[blfId] = {
+                beliefId: blfId,
+                observerId: r.observer_id || r.observerId,
+                factId: r.fact_id || r.factId,
+                subjectiveProbabilityBps: Number(
+                    r.subjective_probability_bps ??
+                        r.subjectiveProbabilityBps ??
+                        0,
+                ),
+                sourceType:
+                    r.source_type || r.sourceType || 'DIRECT_OBSERVATION',
+                isFalseBelief: Boolean(
+                    r.is_false_belief === 1 || r.isFalseBelief,
+                ),
+                learnedAtMs: Number(r.learned_at_ms ?? r.learnedAtMs ?? 0),
+                updatedAtMs: Number(r.updated_at_ms ?? r.updatedAtMs ?? 0),
+            }
+        }
+
+        // 6. Unratified details
+        const detRes: any = await ste.hunt(ActDbs.QUERY_DATABASE, {
+            dat: {
+                query: 'SELECT * FROM unratified_details ORDER BY detail_id ASC',
+                table: 'unratified_details',
+            },
+        })
+        const detRows =
+            detRes?.databaseBit?.dat?.rows ||
+            detRes?.databaseBit?.dat?.records ||
+            []
+        for (const r of detRows) {
+            const detId = r.detail_id || r.detailId
+            details[detId] = {
+                detailId: detId,
+                sceneId: r.scene_id || r.sceneId,
+                entityId: r.entity_id || r.entityId || null,
+                salienceBps: Number(r.salience_bps ?? r.salienceBps ?? 0),
+                claimProposal: r.claim_proposal || r.claimProposal || '',
+                status: r.status || 'STAGED',
+                createdAtMs: Number(r.created_at_ms ?? r.createdAtMs ?? 0),
+                reviewedAtMs: r.reviewed_at_ms
+                    ? Number(r.reviewed_at_ms)
+                    : r.reviewedAtMs
+                      ? Number(r.reviewedAtMs)
+                      : null,
+            }
+        }
+    }
+
+    const rawState: Omit<LedgerWorkingState, 'stateHash'> = {
+        schemaVersion: '1.0.0',
+        seriesSlug,
+        tick,
+        entities,
+        strings,
+        grievances,
+        clocks,
+        beliefs,
+        details,
+        unratifiedDetails: details,
+    }
+
+    const stateHash = computeWorkingStateHash(rawState)
+
+    if (
+        expectedHash &&
+        expectedHash.toLowerCase() !== stateHash.toLowerCase()
+    ) {
+        const errorMsg = `[CANON_DESYNCHRONIZED] State hash parity breach! Expected: ${expectedHash} Computed: ${stateHash}`
+        await emitConsole(ste, `:: [STATE:ERR] ${errorMsg}`)
+        throw new Error(errorMsg)
+    }
+
+    const completedState: LedgerWorkingState = {
+        ...rawState,
+        stateHash,
+    }
+
+    const frozenWorkingState = recursiveDeepFreeze(completedState)
+
+    cpy.activeSeriesSlug = seriesSlug
+    cpy.activeStateHash = stateHash
+    cpy.workingState = frozenWorkingState
+    cpy.activeSnapshot = frozenWorkingState
+
+    await emitConsole(
+        ste,
+        `>> [STATE:SEAL] Hydrated and deep-frozen snapshot for [${seriesSlug}].`,
+    )
+    await emitConsole(ste, `>> [STATE:HASH] Merkle root digest: ${stateHash}`)
+    await emitConsole(
+        ste,
+        `:: [STATE:OK] Composite state snapshot active (${Object.keys(entities).length} entities online).`,
+    )
+
+    if (bal?.slv) {
         bal.slv({
-            snapshot: sealedSnapshot,
+            snapshot: frozenWorkingState,
+            workingState: frozenWorkingState,
             stateHash,
             steBit: {
                 idx: 'hydrate-state-pass',
                 val: 1,
-                dat: { snapshot: sealedSnapshot, stateHash },
+                src: stateHash,
+                dat: {
+                    workingState: frozenWorkingState,
+                    snapshot: frozenWorkingState,
+                    stateHash,
+                    seriesSlug,
+                },
             },
         })
     }
 
+    return cpy
+}
+
+export const hydrateStateAction = hydrateState
+
+export const getStateAction = (
+    cpy: StateModel,
+    bal?: StateBit,
+    _ste?: State,
+): StateModel => {
+    const ws = cpy.workingState || cpy.activeSnapshot
+    if (bal?.slv) {
+        bal.slv({
+            snapshot: ws,
+            workingState: ws,
+            stateHash: cpy.activeStateHash,
+            steBit: {
+                idx: 'get-state-pass',
+                val: ws ? 1 : 0,
+                src: cpy.activeStateHash,
+                dat: {
+                    workingState: ws,
+                    snapshot: ws,
+                    stateHash: cpy.activeStateHash,
+                },
+            },
+        })
+    }
     return cpy
 }
 

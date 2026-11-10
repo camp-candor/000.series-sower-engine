@@ -2,12 +2,89 @@
  * 16.state.unit - Composite Working State Snapshot Contract
  * Strict Invariant: Deep-frozen, immutable representation of the four-vector world truth.
  */
+import type StateBit from './state.bit.js'
 import type { LocomotionTier } from '../../18.trauma.unit/fce/trauma.interface.js'
 import type { GrievanceStatus } from '../../06.grievance.unit/fce/grievance.interface.js'
 import type {
     BeliefSourceType,
     DetailStatus,
 } from '../../01.actor.unit/fce/actor.interface.js'
+
+export interface SomaticEntitySnapshot {
+    readonly entityId: string
+    readonly locationId: string
+    readonly q: number
+    readonly r: number
+    readonly armsAvailable: number
+    readonly legsAvailable: number
+    readonly locomotionTier: 'UNRESTRICTED' | 'LIMPING' | 'IMMOBILIZED'
+    readonly concussionLevel: number
+    readonly wounds: readonly string[]
+    readonly heldItems: readonly string[]
+    readonly wornGear: readonly string[]
+    readonly slungItems: readonly string[]
+    readonly updatedAtMs: number
+}
+
+export interface StringDebtSnapshot {
+    readonly stringId: string
+    readonly holderId: string
+    readonly debtorId: string
+    readonly weightBps: number
+    readonly createdAtMs: number
+    readonly updatedAtMs: number
+}
+
+export interface GrievanceSnapshot {
+    readonly grievanceId: string
+    readonly initiatorId: string
+    readonly targetId: string
+    readonly escalationStage: number
+    readonly cooldownCycles: number
+    readonly intensityBps: number
+    readonly status:
+        | 'DORMANT'
+        | 'ACTIVE'
+        | 'RESOLVED'
+        | 'ABANDONED'
+        | GrievanceStatus
+    readonly updatedAtMs: number
+}
+
+export interface ParanoiaClockSnapshot {
+    readonly clockId: string
+    readonly entityId: string | null
+    readonly valueBps: number
+    readonly thresholdBps: number
+    readonly decayRateBps: number
+    readonly updatedAtMs: number
+}
+
+export interface ActorBeliefSnapshot {
+    readonly beliefId: string
+    readonly observerId: string
+    readonly factId: string
+    readonly subjectiveProbabilityBps: number
+    readonly sourceType:
+        | 'INFERENCE'
+        | 'TESTIMONY'
+        | 'DIRECT_OBSERVATION'
+        | BeliefSourceType
+    readonly isFalseBelief: boolean
+    readonly learnedAtMs: number
+    readonly updatedAtMs: number
+}
+
+export interface UnratifiedDetailSnapshot {
+    readonly detailId: string
+    readonly sceneId: string
+    readonly entityId: string | null
+    readonly salienceBps: number
+    readonly claimProposal: string
+    readonly status: 'STAGED' | 'DISCARDED' | 'RATIFIED' | DetailStatus
+    readonly createdAtMs: number
+    readonly reviewedAtMs: number | null
+}
 
 export interface SomaticLiveState {
     readonly entity_id: string
@@ -98,18 +175,34 @@ export interface UnratifiedDetailRecord {
 }
 
 export interface LedgerWorkingState {
-    readonly reducerVersion: string
+    readonly schemaVersion: '1.0.0'
     readonly seriesSlug: string
     readonly tick: number
-    readonly lastSequenceNumber: number
-    readonly lastEventHash: string
-    readonly entities: Readonly<Record<string, CompositeEntityLiveRecord>>
-    readonly strings: Readonly<Record<string, StringsLedgerRecord>>
-    readonly grievances: Readonly<Record<string, GrievanceStatusRecord>>
-    readonly clocks: Readonly<Record<string, ParanoiaClockRecord>>
-    readonly beliefs: Readonly<Record<string, ActorBeliefRecord>>
-    readonly unratifiedDetails: Readonly<Record<string, UnratifiedDetailRecord>>
     readonly stateHash: string
+    readonly entities: Readonly<
+        Record<string, SomaticEntitySnapshot | CompositeEntityLiveRecord | any>
+    >
+    readonly strings: Readonly<
+        Record<string, StringDebtSnapshot | StringsLedgerRecord | any>
+    >
+    readonly grievances: Readonly<
+        Record<string, GrievanceSnapshot | GrievanceStatusRecord | any>
+    >
+    readonly clocks: Readonly<
+        Record<string, ParanoiaClockSnapshot | ParanoiaClockRecord | any>
+    >
+    readonly beliefs: Readonly<
+        Record<string, ActorBeliefSnapshot | ActorBeliefRecord | any>
+    >
+    readonly details: Readonly<
+        Record<string, UnratifiedDetailSnapshot | UnratifiedDetailRecord | any>
+    >
+    readonly unratifiedDetails?: Readonly<
+        Record<string, UnratifiedDetailSnapshot | UnratifiedDetailRecord | any>
+    >
+    readonly reducerVersion?: string
+    readonly lastSequenceNumber?: number
+    readonly lastEventHash?: string
 }
 
 export interface WhyDirtyPathNode {
@@ -140,6 +233,7 @@ export interface HydrateStateParams {
     readonly seriesSlug?: string
     readonly tick?: number
     readonly timestampMs?: number
+    readonly expectedHash?: string
 }
 
 export interface FoldEventsParams {
@@ -155,7 +249,11 @@ export interface WhyDirtyParams {
     >
 }
 
-export default interface StateSnapshot {
+export default interface StateSnapshotModel {
     idx: string
-    activeSnapshot: LedgerWorkingState | null
+    activeSeriesSlug: string
+    activeStateHash: string
+    workingState: LedgerWorkingState | null
+    stateBits?: Record<string, StateBit>
+    activeSnapshot?: LedgerWorkingState | null
 }

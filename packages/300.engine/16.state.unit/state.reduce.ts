@@ -20,7 +20,7 @@ export function reducer(
             return Buzz.updateState(clone(model), act.bale, state)
 
         case Act.HYDRATE_STATE:
-            return Buzz.hydrateStateAction(clone(model), act.bale as any, state)
+            return Buzz.hydrateState(clone(model), act.bale as any, state)
 
         case Act.COMPUTE_HASH_STATE:
             return Buzz.computeHashStateAction(
