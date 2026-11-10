@@ -19,6 +19,13 @@ export function reducer(
         case Act.UPDATE_MENU:
             return Buzz.updateMenu(clone(model), act.bale, state)
 
+        case Act.SWITCH_FLIGHT_DECK_MODE:
+            return Buzz.switchFlightDeckMode(
+                clone(model),
+                act.bale as any,
+                state,
+            )
+
         case Act.SELECT_MENU_OPTION:
             return Buzz.selectMenuOptionAction(
                 clone(model),

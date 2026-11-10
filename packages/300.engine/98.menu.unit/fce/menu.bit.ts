@@ -1,32 +1,32 @@
-import type { CompiledUniverseDescriptor } from './menu.interface.js'
-/**
- * 98.menu.unit - Menu Bit Payload Contracts
- */
 import type {
+    CompiledUniverseDescriptor,
+    FlightDeckMode,
     MenuFlightDeckState,
     MenuOptionDescriptor,
 } from './menu.interface.js'
 
 export interface MenuPayload {
     readonly selection?: string
+    readonly flightDeckMode?: FlightDeckMode
+    readonly seriesSlug?: string
     readonly flightDeckState?: MenuFlightDeckState
     readonly options?: readonly MenuOptionDescriptor[]
     readonly timestampMs?: number
     readonly error?: string
 }
 
-export default interface MenuBit {
+export default interface MenuBit<TDat = MenuPayload, TLst = string> {
     idx: string
     src?: string
     val?: number
     dat?:
-        | MenuPayload
+        | TDat
         | {
               discovered?: CompiledUniverseDescriptor[]
               selectedSlug?: string
               targetPath?: string
               [key: string]: any
           }
-    lst?: readonly string[] | any
-    slv?: Function
+    lst?: readonly TLst[] | any
+    slv?: (result: { mnuBit: Partial<MenuBit<TDat, TLst>> } | any) => void
 }

@@ -1,5 +1,7 @@
 import type MenuBit from './menu.bit.js'
 
+export type FlightDeckMode = 'BOOT' | 'RUNTIME'
+
 export interface CompiledUniverseDescriptor {
     seriesSlug: string
     manifestPath: string
@@ -24,6 +26,7 @@ export interface MenuOptionDescriptor {
 export interface MenuFlightDeckState {
     readonly isHeadless: boolean
     readonly activeSelection: string
+    readonly flightDeckMode?: FlightDeckMode
     readonly totalOptionsCount: number
     readonly lastActionTimestamp: number
 }
@@ -32,6 +35,8 @@ export default interface Menu {
     idx: string
     discoveredUniverses?: CompiledUniverseDescriptor[]
     activeUniverseSlug?: string
+    flightDeckMode?: FlightDeckMode
+    activeSeriesSlug?: string
     airlockState?: AirlockState
     activeSelection?: string
     lastActionTimestamp?: number

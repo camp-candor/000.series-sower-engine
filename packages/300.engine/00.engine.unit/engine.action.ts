@@ -83,6 +83,12 @@ export class StepTick implements Action {
     constructor(public bale: EngineBit) {}
 }
 
+export const ADVANCE_TICK = '[Tick action] Advance Tick'
+export class AdvanceTick implements Action {
+    readonly type = ADVANCE_TICK
+    constructor(public bale: EngineBit) {}
+}
+
 export const FAST_FORWARD_TICKS = '[Tick action] Fast Forward 100 Ticks'
 export class FastForwardTicks implements Action {
     readonly type = FAST_FORWARD_TICKS
@@ -181,6 +187,7 @@ export type Actions =
     | AuditBoundary
     | ProfileBudget
     | StepTick
+    | AdvanceTick
     | FastForwardTicks
     | ArithmeticAudit
     | BankersRoundingSuite

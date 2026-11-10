@@ -395,18 +395,32 @@ export const formatTickReceipt = (
 
 export const stepTick = (cpy: EngineModel, bal: EngineBit, ste?: State) => {
     void ste
+    const ticksToAdvance = Math.max(1, bal?.val || (bal?.dat as any)?.val || 1)
     const fromTick: number = demoTickState.tick
     const start = process.hrtime.bigint()
-    demoTickState = reduceTickStep(demoTickState)
+    for (let i = 0; i < ticksToAdvance; i++) {
+        demoTickState = reduceTickStep(demoTickState)
+    }
     const end = process.hrtime.bigint()
     const elapsedMs = Number(end - start) / 1_000_000
     const toTick: number = demoTickState.tick
-    if (bal.slv != null) {
+    if (bal?.slv != null) {
         bal.slv({
             fenBit: {
                 idx: 'step-tick-ok',
-                src: formatTickReceipt(1, fromTick, toTick, elapsedMs),
-                dat: { ok: true, advanced: 1, fromTick, toTick, elapsedMs },
+                src: formatTickReceipt(
+                    ticksToAdvance,
+                    fromTick,
+                    toTick,
+                    elapsedMs,
+                ),
+                dat: {
+                    ok: true,
+                    advanced: ticksToAdvance,
+                    fromTick,
+                    toTick,
+                    elapsedMs,
+                },
             },
         })
     }

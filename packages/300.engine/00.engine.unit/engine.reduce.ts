@@ -39,6 +39,7 @@ export function reducer(
             return Buzz.profileBudget(clone(model), act.bale, state as State)
 
         case Act.STEP_TICK:
+        case Act.ADVANCE_TICK:
             return Buzz.stepTick(clone(model), act.bale, state as State)
 
         case Act.FAST_FORWARD_TICKS:

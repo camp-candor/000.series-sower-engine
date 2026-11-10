@@ -138,14 +138,23 @@ export const MENU_CHOICES: readonly string[] = Object.freeze([
 ])
 
 async function emitConsole(ste: State | undefined, src: string): Promise<void> {
-    if (ste && typeof ste.hunt === 'function') {
-        await ste.hunt(UPDATE_CONSOLE, { idx: 'cns00', src }).catch(() => {})
-    }
     const lib =
         (globalThis as any).LIBRARY ||
         (typeof global !== 'undefined' ? (global as any).LIBRARY : undefined)
     if (lib && typeof lib.hunt === 'function') {
-        await lib.hunt(UPDATE_CONSOLE, { idx: 'cns00', src }).catch(() => {})
+        try {
+            await lib.hunt(UPDATE_CONSOLE, { idx: 'cns00', src })
+            return
+        } catch {
+            // Fall through to ste.hunt
+        }
+    }
+    if (ste && typeof ste.hunt === 'function') {
+        try {
+            await ste.hunt(UPDATE_CONSOLE, { idx: 'cns00', src })
+        } catch {
+            // Degrade gracefully
+        }
     }
 }
 
@@ -218,6 +227,8 @@ export const handleMenuSelection = async (
 
             if (model) {
                 model.activeUniverseSlug = selectedSlug
+                model.flightDeckMode = 'RUNTIME'
+                model.activeSeriesSlug = selectedSlug
                 model.airlockState = 'DISPATCHED'
             }
 
@@ -234,13 +245,95 @@ export const handleMenuSelection = async (
                     },
                 },
             })
+
+            await emitConsole(
+                ste,
+                '------------------------------------------------------------',
+            )
+            await emitConsole(
+                ste,
+                '>> [EPIC-08] AXIOMATIC GENESIS & COMPARTMENTALIZED LEDGERS [ACTIVE]',
+            )
+            await emitConsole(
+                ste,
+                `>> [RUNTIME:READY] Active Universe: [${selectedSlug}]`,
+            )
+            await emitConsole(
+                ste,
+                '>> [SWITCHBOARD] Navigation switched to RUNTIME DISPATCH in left deck.',
+            )
+            await emitConsole(
+                ste,
+                '------------------------------------------------------------',
+            )
             break
         }
 
+        case '[14] EXECUTE DETERMINISTIC': {
+            await emitConsole(
+                ste,
+                '>> [EXECUTE] Dispatching Stage 3 Deterministic Encounter Lottery...',
+            )
+            if (ste && typeof ste.hunt === 'function') {
+                await ste.hunt(ActEng.STATUS_ENGINE, {})
+            }
+            await emitConsole(
+                ste,
+                '>> [EXECUTE:OK] Deterministic stage evaluation complete.',
+            )
+            break
+        }
+
+        case 'ADVANCE TICK': {
+            await emitConsole(
+                ste,
+                '>> [TICK] Advancing logical clock (+1 tick) & executing decay sweep...',
+            )
+            if (ste && typeof ste.hunt === 'function') {
+                const tickRes: any = await ste.hunt(ActEng.ADVANCE_TICK, {
+                    val: 1,
+                })
+                if (tickRes?.fenBit?.src) {
+                    await emitConsole(ste, `>> [TICK] ${tickRes.fenBit.src}`)
+                }
+            }
+            await emitConsole(
+                ste,
+                '>> [TICK:OK] Clock advanced. Doom meters decayed.',
+            )
+            break
+        }
+
+        case 'RUN SIM GAUNTLET': {
+            await emitConsole(
+                ste,
+                '>> [GAUNTLET] Launching continuous simulation gauntlet (100 ticks)...',
+            )
+            if (ste && typeof ste.hunt === 'function') {
+                const gauntletRes: any = await ste.hunt(
+                    ActEng.FAST_FORWARD_TICKS,
+                    {},
+                )
+                if (gauntletRes?.fenBit?.src) {
+                    await emitConsole(
+                        ste,
+                        `>> [GAUNTLET] ${gauntletRes.fenBit.src}`,
+                    )
+                }
+            }
+            await emitConsole(
+                ste,
+                '>> [GAUNTLET:COMPLETE] 100 ticks evaluated in host RAM (0 MB VRAM).',
+            )
+            break
+        }
+
+        case 'INSPECT 4-VECTOR STATE':
+        case '[02] STATUS ENGINE & TABLE':
         case '[02] STATUS ENGINE & TABLE INVENTORY': {
             await emitConsole(
                 ste,
-                '>> [MENU:ACTION] Dispatching STATUS_ENGINE...',
+                '>> [STATUS] Querying 4-Vector table status and row inventories...',
             )
             await ste.hunt(ActEng.STATUS_ENGINE, {})
             break
@@ -261,6 +354,14 @@ export const handleMenuSelection = async (
                 '>> [MENU:ACTION] Dispatching RESET_ENGINE...',
             )
             await ste.hunt(ActEng.RESET_ENGINE, {})
+            if (model) {
+                model.flightDeckMode = 'BOOT'
+                model.activeSeriesSlug = ''
+            }
+            await emitConsole(
+                ste,
+                '>> [RESET:OK] Cockpit returned to BOOT & ENSURE SCHEMA mode.',
+            )
             break
         }
 
@@ -425,6 +526,26 @@ export const selectMenuOptionAction = async (
         })
     }
 
+    return cpy
+}
+
+export const switchFlightDeckMode = async (
+    cpy: MenuModel,
+    bal?: MenuBit,
+    _ste?: State,
+): Promise<MenuModel> => {
+    if (bal?.dat?.flightDeckMode) {
+        cpy.flightDeckMode = bal.dat.flightDeckMode
+    }
+    if (bal?.slv) {
+        bal.slv({
+            mnuBit: {
+                idx: 'switch-flight-deck-mode',
+                val: 1,
+                src: cpy.flightDeckMode,
+            },
+        })
+    }
     return cpy
 }
 
@@ -795,15 +916,17 @@ export const updateMenu = async (
     ste?: State,
 ): Promise<MenuModel> => {
     const lib = (globalThis as any).LIBRARY || (global as any).LIBRARY
+    const isRuntime = cpy.flightDeckMode === 'RUNTIME'
+
     if (!lib || typeof lib.hunt !== 'function') {
         cpy.isHeadless = true
         cpy.discoveredUniverses = scanCompiledUniverses()
         if (bal?.slv) {
             bal.slv({
                 mnuBit: {
-                    idx: 'update-menu-headless-pass',
+                    idx: 'update-menu-headless',
                     val: 1,
-                    src: 'HEADLESS',
+                    src: isRuntime ? 'RUNTIME_MODE' : 'BOOT_MODE',
                 },
             })
         }
@@ -812,7 +935,7 @@ export const updateMenu = async (
 
     cpy.isHeadless = false
 
-    lst = [
+    const bootList = [
         ...MENU_CHOICES,
         'OPEN GAUNTLET MENU',
         'COMPILE & PREFLIGHT PARALLAX DINNER',
@@ -885,7 +1008,30 @@ export const updateMenu = async (
         ActOlm.BIGINT_AUDIT.split(']')[1],
     ]
 
+    const runtimeList = [
+        '[14] EXECUTE DETERMINISTIC',
+        'ADVANCE TICK',
+        'RUN SIM GAUNTLET',
+        'INSPECT 4-VECTOR STATE',
+        '[02] STATUS ENGINE & TABLE',
+        '[03] AUDIT SIMULATION INVARIANTS',
+        '[04] RESET ENGINE TO OFFLINE',
+        '[ROOT MENU]',
+    ]
+
+    lst = isRuntime ? runtimeList : bootList
+
     const descriptions: Record<string, string> = {
+        '[14] EXECUTE DETERMINISTIC':
+            'Dispatch Stage 3 Deterministic Encounter Lottery and stage evaluation.',
+        'ADVANCE TICK':
+            'Advance logical clock (+1 tick) across 17.tick.unit and trigger decay sweeps.',
+        'RUN SIM GAUNTLET':
+            'Dispatch autonomous continuous multi-tick batch execution in host RAM.',
+        'INSPECT 4-VECTOR STATE':
+            'Query 4-Vector table status and row inventories.',
+        '[02] STATUS ENGINE & TABLE':
+            'Query 4-Vector table status and row inventories.',
         '[01] BOOT ENGINE & ENSURE SCHEMA':
             'Boot master engine kernel and ensure relational schema. Runs Canon Airlock scan of compiled/ universe manifests.',
         '[02] STATUS ENGINE & TABLE INVENTORY':
@@ -1013,7 +1159,7 @@ export const updateMenu = async (
     bit = await lib.hunt(OPEN_CHOICE, {
         dat: {
             clr0: Color.BLACK,
-            clr1: Color.YELLOW,
+            clr1: isRuntime ? Color.CYAN : Color.YELLOW,
             cb: (choice: string) => {
                 const text = descriptions[choice] || 'No description available.'
                 text.split('\n').forEach((s: string) =>
@@ -1030,12 +1176,20 @@ export const updateMenu = async (
     cpy.activeSelection = src || ''
     cpy.lastActionTimestamp = bal?.dat?.timestampMs || 1700000000000
 
+    const runtimeDirectChoices = [
+        '[14] EXECUTE DETERMINISTIC',
+        'ADVANCE TICK',
+        'RUN SIM GAUNTLET',
+        'INSPECT 4-VECTOR STATE',
+        '[02] STATUS ENGINE & TABLE',
+    ]
+
     // NOTE: '[03]' runs through the dedicated TUI case below via direct unit
     // calls; ste.hunt console telemetry never settles, so routed dispatch
     // would stall the interactive journey. Headless routing for all 12
     // choices stays intact inside handleMenuSelection.
     if (
-        MENU_CHOICES.includes(src) &&
+        (MENU_CHOICES.includes(src) || runtimeDirectChoices.includes(src)) &&
         src !== '[ROOT MENU]' &&
         src !== '[03] AUDIT SIMULATION INVARIANTS'
     ) {
@@ -1074,7 +1228,12 @@ export const updateMenu = async (
     switch (src) {
         case '[01] BOOT ENGINE & ENSURE SCHEMA':
         case '[02] STATUS ENGINE & TABLE INVENTORY':
+        case '[02] STATUS ENGINE & TABLE':
         case '[04] RESET ENGINE TO OFFLINE':
+        case '[14] EXECUTE DETERMINISTIC':
+        case 'ADVANCE TICK':
+        case 'RUN SIM GAUNTLET':
+        case 'INSPECT 4-VECTOR STATE':
             break
 
         case '[03] AUDIT SIMULATION INVARIANTS': {

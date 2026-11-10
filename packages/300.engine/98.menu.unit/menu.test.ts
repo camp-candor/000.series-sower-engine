@@ -17,8 +17,10 @@ import {
 } from './buz/00.menu.buzz.js'
 import { deepFreezePayload } from './buz/deepFreeze.buzz.js'
 import * as ActEng from '../00.engine.unit/engine.action.js'
+import * as ActMnu from './menu.action.js'
 import { SELECT_MENU_OPTION } from './menu.action.js'
 import { reducer } from './menu.reduce.js'
+import sim from '../hunt.js'
 
 describe('98.menu.unit - Blessed Terminal Flight Deck Switchboard Battery', () => {
     let model: MenuModel
@@ -752,5 +754,66 @@ describe('98.menu.unit :: Deep Freeze Defensive Ingestion Boundary (Phase 3)', (
         expect(callArgs).toBeDefined()
         const passedState = callArgs![1].dat.bootParams.bibleState
         expect(Object.isFrozen(passedState)).toBe(true)
+    })
+})
+
+describe('packages/300.engine 98.menu.unit - Runtime Dispatch Switchboard', () => {
+    beforeEach(async () => {
+        // Reset to BOOT mode before each assertion
+        await sim.hunt!(ActMnu.SWITCH_FLIGHT_DECK_MODE, {
+            dat: { flightDeckMode: 'BOOT' },
+        })
+    })
+
+    it('initializes menu in BOOT mode by default in headless runner', async () => {
+        const res: any = await sim.hunt!(ActMnu.INIT_MENU, {})
+        expect(res).toBeDefined()
+        expect(res.mnuBit.src).toBe('HEADLESS')
+    })
+
+    it('renders BOOT_MODE options when flightDeckMode is BOOT', async () => {
+        const res: any = await sim.hunt!(ActMnu.UPDATE_MENU, {})
+        expect(res).toBeDefined()
+        expect(res.mnuBit.src).toBe('BOOT_MODE')
+    })
+
+    it('switches to RUNTIME mode and serves runtime dispatch options', async () => {
+        const switchRes: any = await sim.hunt!(ActMnu.SWITCH_FLIGHT_DECK_MODE, {
+            dat: { flightDeckMode: 'RUNTIME' },
+        })
+        expect(switchRes.mnuBit.src).toBe('RUNTIME')
+
+        const updateRes: any = await sim.hunt!(ActMnu.UPDATE_MENU, {})
+        expect(updateRes.mnuBit.src).toBe('RUNTIME_MODE')
+    })
+
+    it('reverts back to BOOT_MODE when reset is commanded', async () => {
+        await sim.hunt!(ActMnu.SWITCH_FLIGHT_DECK_MODE, {
+            dat: { flightDeckMode: 'RUNTIME' },
+        })
+
+        const resetRes: any = await sim.hunt!(ActMnu.SWITCH_FLIGHT_DECK_MODE, {
+            dat: { flightDeckMode: 'BOOT' },
+        })
+        expect(resetRes.mnuBit.src).toBe('BOOT')
+
+        const updateRes: any = await sim.hunt!(ActMnu.UPDATE_MENU, {})
+        expect(updateRes.mnuBit.src).toBe('BOOT_MODE')
+    })
+
+    it('dispatches ADVANCE_TICK without stalling when ADVANCE TICK is selected', async () => {
+        const selectRes: any = await sim.hunt!(ActMnu.SELECT_MENU_OPTION, {
+            dat: { selection: 'ADVANCE TICK' },
+        })
+        expect(selectRes).toBeDefined()
+        expect(selectRes.mnuBit.src).toBe('ADVANCE TICK')
+    })
+
+    it('dispatches FAST_FORWARD_TICKS without stalling when RUN SIM GAUNTLET is selected', async () => {
+        const selectRes: any = await sim.hunt!(ActMnu.SELECT_MENU_OPTION, {
+            dat: { selection: 'RUN SIM GAUNTLET' },
+        })
+        expect(selectRes).toBeDefined()
+        expect(selectRes.mnuBit.src).toBe('RUN SIM GAUNTLET')
     })
 })

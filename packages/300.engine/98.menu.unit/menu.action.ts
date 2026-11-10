@@ -22,6 +22,12 @@ export class SelectMenuOption implements Action {
     constructor(public bale?: MenuBit) {}
 }
 
+export const SWITCH_FLIGHT_DECK_MODE = '[Menu action] Switch Flight Deck Mode'
+export class SwitchFlightDeckMode implements Action {
+    readonly type = SWITCH_FLIGHT_DECK_MODE
+    constructor(public bale?: MenuBit) {}
+}
+
 export const ROUTE_MENU = '[Menu action] Route Menu'
 export const OPEN_ARITHMETIC_MENU = '[Menu action] Open Arithmetic Menu'
 export const EXECUTE_ARITHMETIC_AUDIT = '[Menu action] Execute Arithmetic Audit'
@@ -206,6 +212,7 @@ export class GraphicsmagicMenu implements Action {
 export type Actions =
     | InitMenu
     | UpdateMenu
+    | SwitchFlightDeckMode
     | SelectMenuOption
     | ClickupMenu
     | TestMenu
