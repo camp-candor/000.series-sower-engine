@@ -55,6 +55,9 @@ export interface DatabasePayload {
 
     readonly table?: DatabaseTableName
     readonly key?: string
+    readonly query?: string
+    readonly row?: any
+    readonly rows?: readonly any[]
     readonly record?: DatabaseRecordUnion
     readonly records?: readonly DatabaseRecordUnion[]
     readonly operations?: readonly DatabaseOperation[]

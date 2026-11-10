@@ -234,6 +234,7 @@ export const seedPrimordialAction = async (
             operations.push({
                 table: 'entities_live',
                 action: 'INSERT',
+                key: locId,
                 record: {
                     entity_id: locId,
                     location_id: locId,
@@ -243,6 +244,9 @@ export const seedPrimordialAction = async (
                     legs_available: 0,
                     locomotion_tier: 'IMMOBILIZED',
                     concussion_level: 0,
+                    fatigue_bps: 0,
+                    pain_bps: 0,
+                    refusal_strain_bps: 0,
                     wounds_json: '[]',
                     held_items_json: '[]',
                     worn_gear_json: '[]',
@@ -258,6 +262,7 @@ export const seedPrimordialAction = async (
             operations.push({
                 table: 'entities_live',
                 action: 'INSERT',
+                key: charId,
                 record: {
                     entity_id: charId,
                     location_id:
@@ -277,6 +282,13 @@ export const seedPrimordialAction = async (
                     concussion_level:
                         charData.concussionLevel ??
                         charData.concussion_level ??
+                        0,
+                    fatigue_bps:
+                        charData.fatigueBps ?? charData.fatigue_bps ?? 0,
+                    pain_bps: charData.painBps ?? charData.pain_bps ?? 0,
+                    refusal_strain_bps:
+                        charData.refusalStrainBps ??
+                        charData.refusal_strain_bps ??
                         0,
                     wounds_json: canonicalizeJson(
                         charData.openWounds || charData.wounds || [],
@@ -299,21 +311,26 @@ export const seedPrimordialAction = async (
         // 4. Unpack Grievances into grievance_status
         for (const [grvId, grvData] of Object.entries<any>(grievances)) {
             grievanceCount++
+            const initiator =
+                grvData.initiatorId ||
+                grvData.instigatorId ||
+                grvData.initiator_id ||
+                'char_wart'
+            const target =
+                grvData.targetId ||
+                grvData.victimId ||
+                grvData.target_id ||
+                'char_bog'
             operations.push({
                 table: 'grievance_status',
                 action: 'INSERT',
+                key: grvId,
                 record: {
                     grievance_id: grvId,
-                    initiator_id:
-                        grvData.initiatorId ||
-                        grvData.instigatorId ||
-                        grvData.initiator_id ||
-                        'char_wart',
-                    target_id:
-                        grvData.targetId ||
-                        grvData.victimId ||
-                        grvData.target_id ||
-                        'char_bog',
+                    initiator_id: initiator,
+                    target_id: target,
+                    instigator_id: initiator,
+                    victim_id: target,
                     escalation_stage:
                         grvData.escalationStage ?? grvData.escalationDepth ?? 0,
                     cooldown_cycles: grvData.cooldownCycles ?? 0,
@@ -331,6 +348,7 @@ export const seedPrimordialAction = async (
             operations.push({
                 table: 'paranoia_clocks',
                 action: 'INSERT',
+                key: clkId,
                 record: {
                     clock_id: clkId,
                     entity_id: clkData.entityId || clkData.entity_id || null,
@@ -377,6 +395,7 @@ export const seedPrimordialAction = async (
         operations.push({
             table: 'event_log',
             action: 'INSERT',
+            key: genesisEnvelope.eventId,
             record: {
                 sequence_number: 1,
                 event_id: genesisEnvelope.eventId,

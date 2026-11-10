@@ -1,31 +1,45 @@
+/**
+ * 13.primordial.unit - Primordial Reducer Router
+ */
 import clone from 'clone-deep'
 import * as Act from './primordial.action.js'
 import { PrimordialModel } from './primordial.model.js'
 import * as Buzz from './primordial.buzzer.js'
-import type PrimordialBit from './fce/primordial.bit.js'
 import type State from '../99.core/state.js'
 
-export const reducePrimordial = async (
+export function reducer(
     model: PrimordialModel = new PrimordialModel(),
-    action: string,
-    bit: PrimordialBit,
-    ste: State,
-): Promise<PrimordialModel> => {
-    const cpy = clone(model)
-    switch (action) {
+    act: Act.Actions,
+    state?: State,
+): PrimordialModel | Promise<PrimordialModel> {
+    switch (act.type) {
         case Act.INIT_PRIMORDIAL:
-            return await Buzz.initPrimordial(cpy, bit, ste)
+            return Buzz.initPrimordial(clone(model), act.bale, state)
         case Act.UPDATE_PRIMORDIAL:
-            return await Buzz.updatePrimordial(cpy, bit, ste)
+            return Buzz.updatePrimordial(clone(model), act.bale, state)
         case Act.COMPUTE_HROOT_PRIMORDIAL:
-            return Buzz.computeHrootPrimordialAction(cpy, bit, ste)
+            return Buzz.computeHrootPrimordialAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
         case Act.SEED_PRIMORDIAL:
-            return await Buzz.seedPrimordialAction(cpy, bit, ste)
+        case Act.SEED_GENESIS:
+            return Buzz.seedPrimordialAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
         case Act.VERIFY_GENESIS_PRIMORDIAL:
-            return await Buzz.verifyGenesisPrimordialAction(cpy, bit, ste)
+            return Buzz.verifyGenesisPrimordialAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
         default:
-            return cpy
+            return model
     }
 }
 
-export default reducePrimordial
+export const reducePrimordial = reducer
+export default reducer

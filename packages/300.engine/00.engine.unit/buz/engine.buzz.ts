@@ -1146,7 +1146,7 @@ export const bootEngine = async (
             // Phase 2: Primordial seeding (if requested or needed)
             if (params?.seedGenesis) {
                 await ste
-                    .hunt(ActPrm.SEED_PRIMORDIAL, {
+                    .hunt(ActPrm.SEED_GENESIS, {
                         dat: { seriesSlug, timestampMs: nowMs, bibleState },
                     })
                     .catch(() => {})

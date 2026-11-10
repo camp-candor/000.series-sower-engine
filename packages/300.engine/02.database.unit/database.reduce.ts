@@ -26,6 +26,7 @@ export function reducer(
             return Buzz.queryDatabase(clone(model), act.bale as any, state)
 
         case Act.EXEC_BATCH_DATABASE:
+        case Act.EXEC_DATABASE:
             return Buzz.execBatchDatabase(clone(model), act.bale as any, state)
 
         case Act.CHECK_INTEGRITY_DATABASE:

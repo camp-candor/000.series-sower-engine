@@ -72,6 +72,7 @@ export interface FactCentralityTelemetry {
 
 export interface EventLogRecord {
     readonly sequence_id: number
+    readonly sequence_number?: number
     readonly event_id: string
     readonly stream_id: string
     readonly tick: number

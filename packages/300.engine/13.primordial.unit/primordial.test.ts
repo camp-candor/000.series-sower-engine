@@ -161,4 +161,36 @@ describe('13.primordial.unit :: Genesis State Minting (Phase 6)', () => {
         expect(idempotentPass).toBe(true)
         expect(model.genesisSeeded).toBe(true)
     })
+
+    it('reducer routes SEED_GENESIS identically to SEED_PRIMORDIAL and exports callable reducer', async () => {
+        const { reducer } = await import('./primordial.reduce.js')
+        const Act = await import('./primordial.action.js')
+
+        expect(typeof reducer).toBe('function')
+        expect(Act.SEED_GENESIS).toBe('[Primordial action] Seed Genesis')
+        expect(new Act.SeedGenesis()).toBeDefined()
+        expect(new Act.SeedPrimordial()).toBeDefined()
+
+        const mockState: any = {
+            hunt: vi.fn().mockResolvedValue({
+                databaseBit: { dat: { row: { sequence_number: 1 } } },
+            }),
+        }
+
+        let resolved = false
+        const actInstance = new Act.SeedGenesis({
+            idx: 'seed-genesis-test',
+            dat: {
+                seriesSlug: 'wiregrass-basin',
+                bibleState: sampleBibleState,
+            },
+            slv: () => {
+                resolved = true
+            },
+        } as any)
+
+        const nextModel = await reducer(model, actInstance, mockState)
+        expect(nextModel.genesisSeeded).toBe(true)
+        expect(resolved).toBe(true)
+    })
 })
