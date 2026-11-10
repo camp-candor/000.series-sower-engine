@@ -447,7 +447,7 @@ export function validateUniverseManifestShape(candidate: any): boolean {
         return false
     }
 
-    const slug = candidate.seriesSlug || candidate.slug
+    const slug = candidate.seriesSlug || candidate.slug || candidate.series_slug
     if (typeof slug !== 'string' || slug.trim().length === 0) {
         return false
     }
@@ -455,7 +455,8 @@ export function validateUniverseManifestShape(candidate: any): boolean {
     const hash =
         candidate.merkleRootHex ||
         candidate.stateHash ||
-        candidate._meta?.corpusHash
+        candidate._meta?.corpusHash ||
+        candidate.root_merkle_hash
     if (typeof hash !== 'string' || !/^[a-f0-9]{64}$/i.test(hash)) {
         return false
     }
@@ -463,17 +464,36 @@ export function validateUniverseManifestShape(candidate: any): boolean {
     // Ensure collections exist either at root or nested under entities
     const entities = candidate.entities || candidate
     const hasCharacters = Boolean(
-        entities.characters && typeof entities.characters === 'object',
+        (entities.characters && typeof entities.characters === 'object') ||
+            Object.values(entities).some(
+                (v: any) =>
+                    v && typeof v === 'object' && v.entity_type === 'character',
+            ),
     )
     const hasLocations = Boolean(
-        entities.locations && typeof entities.locations === 'object',
+        (entities.locations && typeof entities.locations === 'object') ||
+            Object.values(entities).some(
+                (v: any) =>
+                    v && typeof v === 'object' && v.entity_type === 'location',
+            ),
     )
     const hasPossessions = Boolean(
-        (entities.possessions || entities.items) &&
-            typeof (entities.possessions || entities.items) === 'object',
+        ((entities.possessions || entities.items) &&
+            typeof (entities.possessions || entities.items) === 'object') ||
+            Object.values(entities).some(
+                (v: any) =>
+                    v &&
+                    typeof v === 'object' &&
+                    (v.entity_type === 'possession' ||
+                        v.entity_type === 'item'),
+            ),
     )
     const hasGrievances = Boolean(
-        entities.grievances && typeof entities.grievances === 'object',
+        (entities.grievances && typeof entities.grievances === 'object') ||
+            Object.values(entities).some(
+                (v: any) =>
+                    v && typeof v === 'object' && v.entity_type === 'grievance',
+            ),
     )
 
     return hasCharacters && hasLocations && hasPossessions && hasGrievances
@@ -523,6 +543,7 @@ export function scanCompiledUniverses(
                 parsed.merkleRootHex ||
                 parsed.stateHash ||
                 parsed._meta?.corpusHash ||
+                parsed.root_merkle_hash ||
                 ''
 
             results.push({
