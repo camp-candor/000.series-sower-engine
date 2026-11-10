@@ -5,7 +5,7 @@ import * as Buzz from './primordial.buzzer.js'
 import type PrimordialBit from './fce/primordial.bit.js'
 import type State from '../99.core/state.js'
 
-export const reducePrimordial = async (
+export const reducer = async (
     model: PrimordialModel = new PrimordialModel(),
     action: string,
     bit: PrimordialBit,
@@ -28,4 +28,4 @@ export const reducePrimordial = async (
     }
 }
 
-export default reducePrimordial
+export default reducer

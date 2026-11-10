@@ -1,36 +1,20 @@
-/**
- * 16.state.unit - State Buzzer Barrel Export
- */
 export {
-    initState,
-    updateState,
-    hydrateStateAction,
-    computeHashStateAction,
-    freezeStateAction,
-    foldEventsStateAction,
-    whyDirtyStateAction,
-    deepFreeze,
-    computeWorkingStateHash,
-    reduceLedgerState,
-    foldLedgerEvents,
-    whyDirtyEntity,
-} from './buz/state.buzz.js'
+  initState,
+  updateState,
+  hydrateState,
+  getStateAction,
+  freezeStateAction,
+  whyDirtyStateAction,
+  recursiveDeepFreeze,
+  computeWorkingStateHash,
+} from './buz/state.buzz.js';
+
 export type {
-    SomaticLiveState,
-    LogisticalLiveState,
-    SpatialLiveState,
-    CompositeEntityLiveRecord,
-    StringsLedgerRecord,
-    GrievanceStatusRecord,
-    ParanoiaClockRecord,
-    ActorBeliefRecord,
-    UnratifiedDetailRecord,
-    LedgerWorkingState,
-    WhyDirtyPathNode,
-    WhyDirtyResult,
-    StateFoldReceipt,
-    HydrateStateParams,
-    FoldEventsParams,
-    WhyDirtyParams,
-} from './fce/state.interface.js'
-export type { StatePayload } from './fce/state.bit.js'
+  LedgerWorkingState,
+  SomaticEntitySnapshot,
+  StringDebtSnapshot,
+  GrievanceSnapshot,
+  ParanoiaClockSnapshot,
+  ActorBeliefSnapshot,
+  UnratifiedDetailSnapshot,
+} from './fce/state.interface.js';

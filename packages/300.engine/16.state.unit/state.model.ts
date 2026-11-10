@@ -1,12 +1,13 @@
-/**
- * 16.state.unit - State Snapshot Model Container
- */
-import type StateSnapshot from './fce/state.interface.js'
-import type { LedgerWorkingState } from './fce/state.interface.js'
+import type StateSnapshotModel from './fce/state.interface.js';
+import type { LedgerWorkingState } from './fce/state.interface.js';
+import type StateBit from './fce/state.bit.js';
 
-export class StateModel implements StateSnapshot {
-    idx: string = '16.state'
-    activeSnapshot: LedgerWorkingState | null = null
+export class StateModel implements StateSnapshotModel {
+  idx = '16.state';
+  activeSeriesSlug = 'wiregrass-basin';
+  activeStateHash = '';
+  workingState: LedgerWorkingState | null = null;
+  stateBits: Record<string, StateBit> = {};
 }
 
-export default StateModel
+export default StateModel;

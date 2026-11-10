@@ -59,6 +59,7 @@ describe('00.engine.unit - Engine Master Lifecycle Orchestrator Battery', () => 
                         seriesSlug: 'test-series',
                         seedGenesis: true,
                         timestampMs: 1000,
+                        bibleState: { entities: {} }
                     },
                 },
                 slv,
@@ -73,12 +74,8 @@ describe('00.engine.unit - Engine Master Lifecycle Orchestrator Battery', () => 
         expect(model.lastBootMs).toBe(1000)
 
         // Verify the 3-phase boot dispatches occurred
-        expect(dispatchedActions.some((a) => a.includes('Init Database'))).toBe(
-            true,
-        )
-        expect(dispatchedActions.some((a) => a.includes('Seed Genesis'))).toBe(
-            true,
-        )
+        expect(dispatchedActions.some((a) => a.includes('Mount Realm Database'))).toBe(true)
+        expect(dispatchedActions.some((a) => a.includes('Seed Primordial'))).toBe(true)
         expect(dispatchedActions.some((a) => a.includes('Hydrate State'))).toBe(
             true,
         )
@@ -131,7 +128,7 @@ describe('00.engine.unit - Engine Master Lifecycle Orchestrator Battery', () => 
                 type: BOOT_ENGINE,
                 bale: {
                     idx: 'reducer-boot',
-                    dat: { bootParams: { seriesSlug: 'reducer-test' } },
+                    dat: { bootParams: { seriesSlug: 'reducer-test', bibleState: { entities: {} } } },
                     slv,
                 } as any,
             },
