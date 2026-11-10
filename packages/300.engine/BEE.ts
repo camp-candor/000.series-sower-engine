@@ -145,7 +145,7 @@ export const reducer: any = {
     location: reduceFromLocation.reducer,
     movement: reduceFromMovement.reducer,
     paranoia: reduceFromParanoia.reducer,
-    primordial: reduceFromPrimordial.reducer,
+    primordial: reduceFromPrimordial,
     sequence: reduceFromSequence.reducer,
     series: reduceFromSeries.reducer,
     state: reduceFromState.reducer,
