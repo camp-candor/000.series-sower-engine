@@ -1,47 +1,31 @@
-/**
- * 13.primordial.unit - Primordial Reducer Router
- */
 import clone from 'clone-deep'
 import * as Act from './primordial.action.js'
 import { PrimordialModel } from './primordial.model.js'
 import * as Buzz from './primordial.buzzer.js'
+import type PrimordialBit from './fce/primordial.bit.js'
 import type State from '../99.core/state.js'
 
-export function reducer(
+export const reducePrimordial = async (
     model: PrimordialModel = new PrimordialModel(),
-    act: Act.Actions,
-    state?: State,
-): PrimordialModel | Promise<PrimordialModel> {
-    switch (act.type) {
+    action: string,
+    bit: PrimordialBit,
+    ste: State,
+): Promise<PrimordialModel> => {
+    const cpy = clone(model)
+    switch (action) {
         case Act.INIT_PRIMORDIAL:
-            return Buzz.initPrimordial(clone(model), act.bale, state)
-
+            return await Buzz.initPrimordial(cpy, bit, ste)
         case Act.UPDATE_PRIMORDIAL:
-            return Buzz.updatePrimordial(clone(model), act.bale, state)
-
+            return await Buzz.updatePrimordial(cpy, bit, ste)
         case Act.COMPUTE_HROOT_PRIMORDIAL:
-            return Buzz.computeHrootPrimordialAction(
-                clone(model),
-                act.bale as any,
-                state,
-            )
-
+            return Buzz.computeHrootPrimordialAction(cpy, bit, ste)
         case Act.SEED_PRIMORDIAL:
-        case Act.SEED_GENESIS:
-            return Buzz.seedPrimordialAction(
-                clone(model),
-                act.bale as any,
-                state,
-            )
-
+            return await Buzz.seedPrimordialAction(cpy, bit, ste)
         case Act.VERIFY_GENESIS_PRIMORDIAL:
-            return Buzz.verifyGenesisPrimordialAction(
-                clone(model),
-                act.bale as any,
-                state,
-            )
-
+            return await Buzz.verifyGenesisPrimordialAction(cpy, bit, ste)
         default:
-            return model
+            return cpy
     }
 }
+
+export default reducePrimordial

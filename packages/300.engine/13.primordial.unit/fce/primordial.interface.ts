@@ -1,8 +1,3 @@
-/**
- * 13.primordial.unit - Primordial Genesis Interface Contracts
- * Byte-0 universe baseline payloads, Genesis state seeding, and Merkle root locks.
- */
-
 export interface PrimordialEntitySeed {
     readonly entityId: string
     readonly locationId: string
@@ -42,15 +37,6 @@ export interface PrimordialClockSeed {
     readonly decayRateBps: number // [0, 10000]
 }
 
-export interface PrimordialBaselinePayload {
-    readonly seriesSlug: string
-    readonly founderTokenId: string
-    readonly originLocationId: string
-    readonly entities: readonly PrimordialEntitySeed[]
-    readonly grievances: readonly PrimordialGrievanceSeed[]
-    readonly clocks: readonly PrimordialClockSeed[]
-}
-
 export interface GenesisSeedingResult {
     readonly seeded: boolean
     readonly seriesSlug: string
@@ -66,5 +52,5 @@ export default interface Primordial {
     idx: string
     hRoot: string
     genesisSeeded: boolean
-    baseline: PrimordialBaselinePayload
+    activeSeriesSlug: string
 }
