@@ -11,6 +11,7 @@ import InventoryUnit from './07.inventory.unit/inventory.unit.js'
 import LedgerUnit from './08.ledger.unit/ledger.unit.js'
 import LeverageUnit from './09.leverage.unit/leverage.unit.js'
 import LocationUnit from './10.location.unit/location.unit.js'
+import BeliefUnit from './11.belief.unit/belief.unit.js'
 import MovementUnit from './11.movement.unit/movement.unit.js'
 import ParanoiaUnit from './12.paranoia.unit/paranoia.unit.js'
 import PrimordialUnit from './13.primordial.unit/primordial.unit.js'
@@ -48,6 +49,8 @@ import Leverage from './09.leverage.unit/fce/leverage.interface.js'
 import { LeverageModel } from './09.leverage.unit/leverage.model.js'
 import Location from './10.location.unit/fce/location.interface.js'
 import { LocationModel } from './10.location.unit/location.model.js'
+import Belief from './11.belief.unit/fce/belief.interface.js'
+import { BeliefModel } from './11.belief.unit/belief.model.js'
 import Movement from './11.movement.unit/fce/movement.interface.js'
 import { MovementModel } from './11.movement.unit/movement.model.js'
 import Paranoia from './12.paranoia.unit/fce/paranoia.interface.js'
@@ -89,6 +92,7 @@ export const list: Array<any> = [
     LedgerUnit,
     LeverageUnit,
     LocationUnit,
+    BeliefUnit,
     MovementUnit,
     ParanoiaUnit,
     PrimordialUnit,
@@ -116,6 +120,7 @@ import * as reduceFromInventory from './07.inventory.unit/inventory.reduce.js'
 import * as reduceFromLedger from './08.ledger.unit/ledger.reduce.js'
 import * as reduceFromLeverage from './09.leverage.unit/leverage.reduce.js'
 import * as reduceFromLocation from './10.location.unit/location.reduce.js'
+import * as reduceFromBelief from './11.belief.unit/belief.reduce.js'
 import * as reduceFromMovement from './11.movement.unit/movement.reduce.js'
 import * as reduceFromParanoia from './12.paranoia.unit/paranoia.reduce.js'
 import * as reduceFromPrimordial from './13.primordial.unit/primordial.reduce.js'
@@ -143,6 +148,7 @@ export const reducer: any = {
     ledger: reduceFromLedger.reducer,
     leverage: reduceFromLeverage.reducer,
     location: reduceFromLocation.reducer,
+    belief: reduceFromBelief.reducer,
     movement: reduceFromMovement.reducer,
     paranoia: reduceFromParanoia.reducer,
     primordial: reduceFromPrimordial.reducer,
@@ -171,6 +177,7 @@ export default class UnitData implements Model {
     ledger: Ledger = new LedgerModel()
     leverage: Leverage = new LeverageModel()
     location: Location = new LocationModel()
+    belief: Belief = new BeliefModel()
     movement: Movement = new MovementModel()
     paranoia: Paranoia = new ParanoiaModel()
     primordial: Primordial = new PrimordialModel()
