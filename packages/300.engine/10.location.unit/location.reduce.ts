@@ -78,6 +78,67 @@ export function reducer(
                 state,
             )
 
+        case Act.SANITIZE_PATH_QUERY: {
+            const result = Buzz.sanitizePathQuery(
+                (act.bale?.dat as any)?.rawQuery,
+            )
+            if (act.bale?.slv) {
+                act.bale.slv({
+                    locBit: {
+                        idx: result.ok
+                            ? 'sanitize-path-success'
+                            : 'sanitize-path-fail',
+                        val: result.ok ? 1 : 0,
+                        dat: {
+                            error: result.error,
+                            pathReceipt: result as any,
+                        },
+                    },
+                })
+            }
+            return model
+        }
+
+        case Act.SANITIZE_PERCEPTION_QUERY: {
+            const result = Buzz.sanitizePerceptionQuery(
+                (act.bale?.dat as any)?.rawQuery,
+            )
+            if (act.bale?.slv) {
+                act.bale.slv({
+                    locBit: {
+                        idx: result.ok
+                            ? 'sanitize-perception-success'
+                            : 'sanitize-perception-fail',
+                        val: result.ok ? 1 : 0,
+                        dat: {
+                            error: result.error,
+                            perceptCandidate: result as any,
+                        },
+                    },
+                })
+            }
+            return model
+        }
+
+        case Act.BUILD_SPATIAL_OVERLAY: {
+            const snapshot = Buzz.buildSpatialOverlaySnapshot(
+                model.portals,
+                (act.bale?.dat as any)?.dynamicObstacles || [],
+                (act.bale?.dat as any)?.costOverrides,
+                (act.bale?.dat as any)?.acousticOverrides,
+            )
+            if (act.bale?.slv) {
+                act.bale.slv({
+                    locBit: {
+                        idx: 'build-spatial-overlay-success',
+                        src: snapshot.overlayHash,
+                        dat: { overlaySnapshot: snapshot },
+                    },
+                })
+            }
+            return model
+        }
+
         default:
             return model
     }
