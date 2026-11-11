@@ -48,6 +48,8 @@ export class HydrateAllEntities implements Action {
 }
 
 export type Actions =
+    | DeriveSomaticBudget
+    | ValidateHandCapacity
     | InitEntity
     | UpdateEntity
     | AssembleEntity
@@ -55,3 +57,15 @@ export type Actions =
     | GetEntityLive
     | ListEntitiesByLocation
     | HydrateAllEntities
+
+export const DERIVE_SOMATIC_BUDGET = '[Entity action] Derive Somatic Budget'
+export class DeriveSomaticBudget implements Action {
+    readonly type = DERIVE_SOMATIC_BUDGET
+    constructor(public bale?: EntityBit) {}
+}
+
+export const VALIDATE_HAND_CAPACITY = '[Entity action] Validate Hand Capacity'
+export class ValidateHandCapacity implements Action {
+    readonly type = VALIDATE_HAND_CAPACITY
+    constructor(public bale?: EntityBit) {}
+}

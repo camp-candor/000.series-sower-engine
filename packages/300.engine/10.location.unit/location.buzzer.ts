@@ -24,6 +24,10 @@ export {
     sanitizePerceptionQuery,
 } from './buz/sanitizer.buzz.js'
 export { buildSpatialOverlaySnapshot } from './buz/overlay-builder.buzz.js'
+export {
+    verifyTraversalBudget,
+    type BudgetGuardResult,
+} from './buz/budget-guard.buzz.js'
 
 export { BASELINE_TOPOLOGY_LOCATIONS } from './location.model.js'
 
