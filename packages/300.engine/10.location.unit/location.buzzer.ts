@@ -1,5 +1,5 @@
 /**
- * 10.location.unit - Location Buzzer Barrel Export
+ * 10.location.unit - Location Buzzer Barrel Re-Exports
  */
 export {
     initLocation,
@@ -17,6 +17,13 @@ export {
     evaluateSpatialPathAction,
     evaluateSpatialPerceptionAction,
 } from './buz/location.buzz.js'
+
+export { packAxial, unpackAxial } from './buz/axial-pack.buzz.js'
+export {
+    sanitizePathQuery,
+    sanitizePerceptionQuery,
+} from './buz/sanitizer.buzz.js'
+export { buildSpatialOverlaySnapshot } from './buz/overlay-builder.buzz.js'
 
 export { BASELINE_TOPOLOGY_LOCATIONS } from './location.model.js'
 
@@ -46,3 +53,10 @@ export type {
     PerceptCandidate,
     DisplacementResult,
 } from './fce/spatial-port.interface.js'
+
+export type {
+    ScrubbedPathQuery,
+    ScrubbedPerceptionQuery,
+    QuerySanitizationResult,
+    RawSpatialQueryInput,
+} from './fce/sanitizer.interface.js'
