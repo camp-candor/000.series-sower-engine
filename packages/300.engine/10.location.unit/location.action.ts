@@ -71,6 +71,25 @@ export class EvaluateSpatialPerception implements Action<LocationBit> {
     constructor(public bale?: LocationBit) {}
 }
 
+export const SANITIZE_PATH_QUERY = '[Location action] Sanitize Path Query'
+export class SanitizePathQuery implements Action<LocationBit> {
+    readonly type = SANITIZE_PATH_QUERY
+    constructor(public bale?: LocationBit) {}
+}
+
+export const SANITIZE_PERCEPTION_QUERY =
+    '[Location action] Sanitize Perception Query'
+export class SanitizePerceptionQuery implements Action<LocationBit> {
+    readonly type = SANITIZE_PERCEPTION_QUERY
+    constructor(public bale?: LocationBit) {}
+}
+
+export const BUILD_SPATIAL_OVERLAY = '[Location action] Build Spatial Overlay'
+export class BuildSpatialOverlay implements Action<LocationBit> {
+    readonly type = BUILD_SPATIAL_OVERLAY
+    constructor(public bale?: LocationBit) {}
+}
+
 export type Actions =
     | InitLocation
     | UpdateLocation
@@ -83,3 +102,6 @@ export type Actions =
     | BindSpatialPort
     | EvaluateSpatialPath
     | EvaluateSpatialPerception
+    | SanitizePathQuery
+    | SanitizePerceptionQuery
+    | BuildSpatialOverlay
