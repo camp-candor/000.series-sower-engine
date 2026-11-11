@@ -47,6 +47,18 @@ export class HydrateAllEntities implements Action {
     constructor(public bale?: EntityBit) {}
 }
 
+export const DERIVE_SOMATIC_BUDGET = '[Entity action] Derive Somatic Budget'
+export class DeriveSomaticBudget implements Action {
+    readonly type = DERIVE_SOMATIC_BUDGET
+    constructor(public bale?: EntityBit) {}
+}
+
+export const VALIDATE_HAND_CAPACITY = '[Entity action] Validate Hand Capacity'
+export class ValidateHandCapacity implements Action {
+    readonly type = VALIDATE_HAND_CAPACITY
+    constructor(public bale?: EntityBit) {}
+}
+
 export type Actions =
     | InitEntity
     | UpdateEntity
@@ -55,3 +67,5 @@ export type Actions =
     | GetEntityLive
     | ListEntitiesByLocation
     | HydrateAllEntities
+    | DeriveSomaticBudget
+    | ValidateHandCapacity

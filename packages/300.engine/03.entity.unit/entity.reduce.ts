@@ -54,6 +54,51 @@ export function reducer(
                 state,
             )
 
+        case Act.DERIVE_SOMATIC_BUDGET: {
+            try {
+                const somatic = Buzz.extractSomaticState(act.bale?.dat)
+                const receipt = Buzz.deriveSomaticBudget(somatic)
+                if (act.bale?.slv) {
+                    act.bale.slv({
+                        entBit: {
+                            idx: 'derive-somatic-budget-success',
+                            val: receipt.movementBudgetCostUnits,
+                            dat: receipt as any,
+                        },
+                    })
+                }
+            } catch (err: any) {
+                if (act.bale?.slv) {
+                    act.bale.slv({
+                        entBit: {
+                            idx: 'derive-somatic-budget-fail',
+                            val: -1,
+                            dat: { error: err.message } as any,
+                        },
+                    })
+                }
+            }
+            return model
+        }
+
+        case Act.VALIDATE_HAND_CAPACITY: {
+            const arms = (act.bale?.dat as any)?.availableArms ?? 2
+            const items = (act.bale?.dat as any)?.heldItems ?? []
+            const evaluation = Buzz.validateHandCapacity(arms, items)
+            if (act.bale?.slv) {
+                act.bale.slv({
+                    entBit: {
+                        idx: evaluation.valid
+                            ? 'validate-hand-capacity-success'
+                            : 'validate-hand-capacity-fail',
+                        val: evaluation.valid ? 1 : 0,
+                        dat: evaluation as any,
+                    },
+                })
+            }
+            return model
+        }
+
         default:
             return model
     }
