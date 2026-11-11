@@ -8,9 +8,16 @@ export {
     selectMenuOptionAction,
     handleMenuSelection,
     MENU_CHOICES,
+    openSpatialProbeMenuBuzz,
+    dispatchSpatialProbeBuzz,
+    testSpatialWorkCeilingBuzz,
 } from './buz/00.menu.buzz.js'
 export { updateArithmeticMenu } from './buz/arithmetic-menu.buzz.js'
+export { MAIN_MENU_CHOICES, SPATIAL_PROBE_CHOICES } from './menu.model.js'
 export type {
+    MenuMode,
+    SpatialProbeTelemetry,
+    MenuModelDescriptor,
     FlightDeckMode,
     MenuOptionDescriptor,
     MenuFlightDeckState,

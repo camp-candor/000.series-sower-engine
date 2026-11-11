@@ -209,6 +209,25 @@ export class GraphicsmagicMenu implements Action {
     constructor(public bale?: MenuBit) {}
 }
 
+export const OPEN_SPATIAL_PROBE_MENU = '[Menu action] Open Spatial Probe Menu'
+export class OpenSpatialProbeMenu implements Action {
+    readonly type = OPEN_SPATIAL_PROBE_MENU
+    constructor(public bale?: MenuBit) {}
+}
+
+export const DISPATCH_SPATIAL_PROBE = '[Menu action] Dispatch Spatial Probe'
+export class DispatchSpatialProbe implements Action {
+    readonly type = DISPATCH_SPATIAL_PROBE
+    constructor(public bale?: MenuBit) {}
+}
+
+export const TEST_SPATIAL_WORK_CEILING =
+    '[Menu action] Test Spatial Work Ceiling'
+export class TestSpatialWorkCeiling implements Action {
+    readonly type = TEST_SPATIAL_WORK_CEILING
+    constructor(public bale?: MenuBit) {}
+}
+
 export type Actions =
     | InitMenu
     | UpdateMenu
@@ -240,3 +259,6 @@ export type Actions =
     | GraphicsmagicMenu
     | OpenArithmeticMenuAction
     | ExecuteArithmeticAuditAction
+    | OpenSpatialProbeMenu
+    | DispatchSpatialProbe
+    | TestSpatialWorkCeiling

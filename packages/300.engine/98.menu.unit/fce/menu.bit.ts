@@ -1,11 +1,24 @@
+/**
+ * 98.menu.unit - Menu Bit Payload Contracts
+ */
 import type {
     CompiledUniverseDescriptor,
     FlightDeckMode,
     MenuFlightDeckState,
     MenuOptionDescriptor,
+    MenuMode,
+    SpatialProbeTelemetry,
 } from './menu.interface.js'
 
 export interface MenuPayload {
+    readonly mode?: MenuMode
+    readonly choice?: string
+    readonly probeTelemetry?: SpatialProbeTelemetry
+    readonly originPacked?: number
+    readonly destinationPacked?: number
+    readonly maxBudgetCostUnits?: number
+    readonly workEnvelopeLimit?: number
+    readonly message?: string
     readonly selection?: string
     readonly flightDeckMode?: FlightDeckMode
     readonly seriesSlug?: string

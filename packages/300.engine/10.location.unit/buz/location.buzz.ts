@@ -374,7 +374,7 @@ export const auditTopologyAction = (
 export const bindSpatialPortAction = (
     cpy: LocationModel,
     bal?: LocationBit,
-    _ste?: State,
+    ste?: State,
 ): LocationModel => {
     const port = bal?.dat?.spatialPort
     const manifest = bal?.dat?.topologyManifest
@@ -397,6 +397,12 @@ export const bindSpatialPortAction = (
     if (manifest) {
         cpy.topologyManifest = manifest
     }
+
+    // Fire-and-forget cns00 telemetry; the synchronous bind receipt stays pure.
+    void emitConsole(
+        ste,
+        '>> [SPATIAL:PORT] Synchronous SpatialPort bound in 10.location.unit.',
+    )
 
     if (bal?.slv) {
         bal.slv({

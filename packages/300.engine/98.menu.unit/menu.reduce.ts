@@ -40,6 +40,19 @@ export function reducer(
                 state,
             )
 
+        case Act.OPEN_SPATIAL_PROBE_MENU:
+            return Buzz.openSpatialProbeMenuBuzz(clone(model), act.bale, state)
+
+        case Act.DISPATCH_SPATIAL_PROBE:
+            return Buzz.dispatchSpatialProbeBuzz(clone(model), act.bale, state)
+
+        case Act.TEST_SPATIAL_WORK_CEILING:
+            return Buzz.testSpatialWorkCeilingBuzz(
+                clone(model),
+                act.bale,
+                state,
+            )
+
         default:
             return model
     }

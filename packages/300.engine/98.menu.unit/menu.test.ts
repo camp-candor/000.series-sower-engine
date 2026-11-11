@@ -2,7 +2,11 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
-import { MenuModel } from './menu.model.js'
+import {
+    MenuModel,
+    MAIN_MENU_CHOICES,
+    SPATIAL_PROBE_CHOICES,
+} from './menu.model.js'
 import {
     initMenu,
     updateMenu,
@@ -14,6 +18,9 @@ import {
     validateUniverseManifestShape,
     loadAndFreezeUniverseManifest,
     handleMenuSelection,
+    openSpatialProbeMenuBuzz,
+    dispatchSpatialProbeBuzz,
+    testSpatialWorkCeilingBuzz,
 } from './buz/00.menu.buzz.js'
 import { deepFreezePayload } from './buz/deepFreeze.buzz.js'
 import * as ActEng from '../00.engine.unit/engine.action.js'
@@ -21,6 +28,8 @@ import * as ActMnu from './menu.action.js'
 import { SELECT_MENU_OPTION } from './menu.action.js'
 import { reducer } from './menu.reduce.js'
 import sim from '../hunt.js'
+import { reducer as locationReducer } from '../10.location.unit/location.reduce.js'
+import { LocationModel } from '../10.location.unit/location.model.js'
 
 describe('98.menu.unit - Blessed Terminal Flight Deck Switchboard Battery', () => {
     let model: MenuModel
@@ -815,5 +824,322 @@ describe('packages/300.engine 98.menu.unit - Runtime Dispatch Switchboard', () =
         })
         expect(selectRes).toBeDefined()
         expect(selectRes.mnuBit.src).toBe('RUN SIM GAUNTLET')
+    })
+})
+
+describe('98.menu.unit :: Phase 1 Synchronous SpatialPort Cockpit Binding (031.ag-test)', () => {
+    let model: MenuModel
+    let tempDir: string
+    let huntedActions: string[]
+    let libraryLines: string[]
+
+    const mountCnsLibrary = (airlockPick = 'wiregrass-basin') => {
+        ;(globalThis as any).LIBRARY = {
+            hunt: vi.fn(async (actionType: string, payload: any) => {
+                if (actionType.includes('Update Grid')) {
+                    return { grdBit: { dat: { grid: true } } }
+                }
+                if (actionType.includes('Open Choice')) {
+                    return { chcBit: { src: airlockPick } }
+                }
+                if (actionType.includes('Update Console')) {
+                    libraryLines.push(payload?.src)
+                }
+                return {}
+            }),
+        }
+    }
+
+    const makeLocationRoutedState = () => {
+        let locCurrent: any = new LocationModel()
+        return {
+            hunt: vi.fn(async (actionType: string, bale: any = {}) => {
+                huntedActions.push(actionType)
+                if (
+                    typeof actionType === 'string' &&
+                    actionType.startsWith('[Location action]')
+                ) {
+                    const next = await locationReducer(
+                        locCurrent,
+                        { type: actionType, bale } as any,
+                        undefined,
+                    )
+                    if (next && typeof next === 'object') locCurrent = next
+                }
+                return {}
+            }),
+        }
+    }
+
+    beforeEach(() => {
+        model = new MenuModel()
+        huntedActions = []
+        libraryLines = []
+        tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sower-spatial-031-'))
+        const slugDir = path.join(tempDir, 'compiled', 'wiregrass-basin')
+        fs.mkdirSync(slugDir, { recursive: true })
+        fs.writeFileSync(
+            path.join(slugDir, 'bible-state.json'),
+            JSON.stringify({
+                seriesSlug: 'wiregrass-basin',
+                schemaVersion: '1.0.0',
+                merkleRootHex: 'd'.repeat(64),
+                entities: {
+                    characters: {},
+                    locations: {},
+                    possessions: {},
+                    grievances: {},
+                },
+            }),
+            'utf8',
+        )
+        vi.spyOn(process, 'cwd').mockReturnValue(tempDir)
+    })
+
+    afterEach(() => {
+        vi.unstubAllGlobals()
+        vi.restoreAllMocks()
+        delete (global as any).LIBRARY
+        delete (globalThis as any).LIBRARY
+        fs.rmSync(tempDir, { recursive: true, force: true })
+    })
+
+    it('[01] boot binds the synchronous SpatialPort and streams L4.4 init telemetry', async () => {
+        mountCnsLibrary('wiregrass-basin')
+        const routedState = makeLocationRoutedState()
+
+        await handleMenuSelection(
+            '[01] BOOT ENGINE & ENSURE SCHEMA',
+            routedState as any,
+            model,
+        )
+
+        expect(huntedActions.some((a) => a.includes('Init Location'))).toBe(
+            true,
+        )
+        expect(huntedActions.some((a) => a.includes('Bind Spatial Port'))).toBe(
+            true,
+        )
+        expect(libraryLines).toContain(
+            '>> [LOCATION:INIT] [OK] Baseline topology mesh synchronized.',
+        )
+        expect(libraryLines).toContain(
+            '>> [SPATIAL:PORT] Synchronous SpatialPort bound in 10.location.unit.',
+        )
+        expect(libraryLines).toContain(
+            '>> [RUNTIME:READY] Active Universe: [wiregrass-basin]',
+        )
+        expect(model.flightDeckMode).toBe('RUNTIME')
+    })
+
+    it('[17] probe streams a synchronous CostUnits receipt with zero failure lines', async () => {
+        mountCnsLibrary()
+        const routedState = makeLocationRoutedState()
+
+        await handleMenuSelection(
+            '[17] SPATIAL FEASIBILITY PROBE',
+            routedState as any,
+            model,
+        )
+
+        expect(libraryLines).toContain(
+            '>> [SPATIAL:PORT] Checking SpatialPort binding in 10.location.unit... [OK]',
+        )
+        expect(
+            libraryLines.some((l) =>
+                l.includes(
+                    '[SPATIAL:KERNEL] Kernel Version: 1.0.0-inproc-hardened | Mode: SYNCHRONOUS_IN_PROCESS',
+                ),
+            ),
+        ).toBe(true)
+        expect(libraryLines).toContain(
+            '>> [SPATIAL:PROBE] Querying path: Origin (0,0) -> Dest (2,-1) [Budget: 500]',
+        )
+        const receipt = libraryLines.find((l) =>
+            l.includes('[SPATIAL:RECEIPT]'),
+        )
+        expect(receipt).toBeDefined()
+        const costMatch =
+            /Feasible: TRUE \| Cost: (\d+) units \| Hops: (\d+)/.exec(
+                receipt ?? '',
+            )
+        expect(costMatch).not.toBeNull()
+        expect(Number.isInteger(Number(costMatch?.[1]))).toBe(true)
+        expect(
+            libraryLines.some((l) =>
+                /\[SPATIAL:PROOF\] Topology: e3b0\.\.\. \| Overlay: f4c2\.\.\. \| Receipt: [0-9a-f]{64}/.test(
+                    l,
+                ),
+            ),
+        ).toBe(true)
+        expect(libraryLines).toContain(
+            '>> [SPATIAL:STATUS] Synchronous client binding verified at T_0 = $0.00.',
+        )
+        expect(libraryLines.some((l) => l.includes('LATENCY'))).toBe(false)
+        expect(libraryLines.some((l) => l.startsWith(':: [SPATIAL'))).toBe(
+            false,
+        )
+    })
+
+    it('routes [17] through the runtime switchboard without stalling', async () => {
+        model.flightDeckMode = 'RUNTIME'
+        const choiceLists: any[] = []
+        ;(globalThis as any).LIBRARY = {
+            hunt: vi.fn(async (actionType: string, payload: any) => {
+                if (actionType.includes('Update Grid')) {
+                    return { grdBit: { dat: { grid: true } } }
+                }
+                if (actionType.includes('Open Choice')) {
+                    choiceLists.push(payload?.lst)
+                    return {
+                        chcBit: { src: '[17] SPATIAL FEASIBILITY PROBE' },
+                    }
+                }
+                if (actionType.includes('Update Console')) {
+                    libraryLines.push(payload?.src)
+                }
+                return {}
+            }),
+        }
+        const routedState = makeLocationRoutedState()
+
+        const slv = vi.fn()
+        await updateMenu(model, { idx: 'update-17', slv }, routedState as any)
+
+        expect(choiceLists[0]).toContain('[17] SPATIAL FEASIBILITY PROBE')
+        expect(model.activeSelection).toBe('[17] SPATIAL FEASIBILITY PROBE')
+        expect(libraryLines.some((l) => l.includes('[SPATIAL:RECEIPT]'))).toBe(
+            true,
+        )
+    })
+
+    it('ADVANCE TICK streams live Phase 3 somatic budget derivation receipts', async () => {
+        mountCnsLibrary()
+        const routedState = makeLocationRoutedState()
+
+        await handleMenuSelection('ADVANCE TICK', routedState as any, model)
+
+        expect(libraryLines).toContain(
+            '>> [SOMATIC:STATE] Ingested entity somatic profile: char_skulk',
+        )
+        expect(libraryLines).toContain(
+            '>> [SOMATIC:BUDGET] Locomotion: LIMP | Fatigue: 5000 bps | Budget: 225 units',
+        )
+        expect(libraryLines).toContain(
+            '>> [SOMATIC:VERBS] 2 kinetic verbs masked: [LEAP, SPRINT]',
+        )
+        expect(libraryLines).toContain(
+            '>> [HANDS:SAT] Capacity check: 1/1 hands occupied [PASS]',
+        )
+        expect(libraryLines).toContain(
+            '>> [BUDGET:GUARD] Traversal cost 150 <= allowed 225 [PERMITTED]',
+        )
+    })
+
+    it('[17] probe dispatches a live 2-query batch and trips the 512-cell governor', async () => {
+        mountCnsLibrary()
+        const routedState = makeLocationRoutedState()
+
+        await handleMenuSelection(
+            '[17] SPATIAL FEASIBILITY PROBE',
+            routedState as any,
+            model,
+        )
+
+        expect(libraryLines).toContain(
+            '>> [ADAPTER:SYNC] InProcessSpatialAdapter active (Kernel: 1.0.0-inproc-hardened)',
+        )
+        expect(libraryLines).toContain(
+            '>> [BATCH:PATH] Evaluating 2 scrubbed path queries in local V8 heap...',
+        )
+        expect(libraryLines).toContain(
+            '>> [PATH:RESULT] Route 1: 3 hops | Cost: 200 units | Expanded: 4 cells [OK]',
+        )
+        expect(libraryLines).toContain(
+            '>> [CEILING:GUARD] Route 2: Expanded: 512 cells | Status: BUDGET_EXCEEDED [TRIPPED]',
+        )
+        expect(
+            libraryLines.some((l) =>
+                />> \[BATCH:SEAL\] BatchQueryHash: [0-9a-f]{4}\.\.\. \| BatchReceiptHash: [0-9a-f]{4}\.\.\. \[SEALED\]/.test(
+                    l,
+                ),
+            ),
+        ).toBe(true)
+    })
+})
+
+describe('98.menu.unit - Blessed Terminal Spatial Probe Switchboard Battery', () => {
+    let model: MenuModel
+
+    beforeEach(() => {
+        model = new MenuModel()
+    })
+
+    it('declares [17] SPATIAL FEASIBILITY PROBE in the primary choice catalog', () => {
+        expect(MAIN_MENU_CHOICES).toContain('[17] SPATIAL FEASIBILITY PROBE')
+    })
+
+    it('initializes menu into ROOT mode cleanly without curses handles', async () => {
+        let resolved = false
+        await initMenu(model, {
+            idx: 'init-test',
+            slv: (res: any) => {
+                resolved = !!res.mnuBit
+            },
+        })
+
+        expect(resolved).toBe(true)
+        expect(model.activeMenuMode).toBe('ROOT')
+    })
+
+    it('mounts SPATIAL_PROBE sub-menu and tracks choices in headless mode', async () => {
+        let openPass = false
+        await openSpatialProbeMenuBuzz(model, {
+            idx: 'open-probe',
+            slv: (res: any) => {
+                openPass = res.mnuBit.val === 1
+            },
+        })
+
+        expect(openPass).toBe(true)
+        expect(model.activeMenuMode).toBe('SPATIAL_PROBE')
+        expect(model.spatialProbeActive).toBe(true)
+        expect(SPATIAL_PROBE_CHOICES.length).toBeGreaterThanOrEqual(4)
+    })
+
+    it('dispatches spatial probe and captures 7-bit telemetry in headless fallback', async () => {
+        let telemetryResult: any = null
+        await dispatchSpatialProbeBuzz(model, {
+            idx: 'probe-dispatch',
+            dat: {
+                originPacked: 100,
+                destinationPacked: 200,
+                maxBudgetCostUnits: 500,
+            },
+            slv: (res: any) => {
+                telemetryResult = res.mnuBit.dat?.probeTelemetry
+            },
+        })
+
+        expect(telemetryResult).toBeDefined()
+        expect(telemetryResult.feasible).toBe(true)
+        expect(telemetryResult.traversalCostUnits).toBe(200)
+        expect(telemetryResult.cellsExpanded).toBe(6)
+        expect(telemetryResult.queryHash).toBeDefined()
+        expect(telemetryResult.receiptHash).toBeDefined()
+        expect(model.totalProbesDispatched).toBe(1)
+    })
+
+    it('verifies work ceiling governor tripwire and records fail-closed pass', async () => {
+        let ceilingPass = false
+        await testSpatialWorkCeilingBuzz(model, {
+            idx: 'ceiling-test',
+            slv: (res: any) => {
+                ceilingPass = res.mnuBit.val === 1
+            },
+        })
+
+        expect(ceilingPass).toBe(true)
+        expect(model.totalProbesDispatched).toBe(1)
     })
 })
