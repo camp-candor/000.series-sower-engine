@@ -50,6 +50,10 @@ export interface DatabaseOperation {
 }
 
 export interface DatabasePayload {
+    appendEvent?: import('./database.interface.js').AppendSpatialEventPayload
+    migrationApplied?: boolean
+    committedRecord?: import('./database.interface.js').EventLogRecord
+    databasePath?: string
     seriesSlug?: string
     storageTarget?: string
 

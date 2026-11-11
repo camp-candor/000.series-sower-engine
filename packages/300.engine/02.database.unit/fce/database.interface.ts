@@ -213,3 +213,22 @@ export default interface Database {
         scene_fact_dependencies: Map<string, SceneFactDependencyRecord>
     }
 }
+
+export interface SpatialProofQuadruple {
+    topologyHash: string
+    overlayHash: string
+    queryHash: string
+    receiptHash: string
+}
+
+export interface AppendSpatialEventPayload {
+    eventId: string
+    tick: number
+    eventType: string
+    actorId?: string
+    payloadJson: string
+    prevEventHash: string
+    eventHash: string
+    spatialProof?: SpatialProofQuadruple
+    timestampMs?: number
+}

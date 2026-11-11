@@ -6,12 +6,17 @@ CREATE TABLE IF NOT EXISTS event_log (
   sequence_number INTEGER PRIMARY KEY,
   event_id TEXT NOT NULL UNIQUE,
   event_type TEXT NOT NULL,
+  actor_id TEXT,
   tick INTEGER NOT NULL DEFAULT 0,
   payload_json TEXT NOT NULL,
   state_hash TEXT NOT NULL,
   prev_hash TEXT NOT NULL,
   seed TEXT NOT NULL,
-  timestamp_ms INTEGER NOT NULL
+  timestamp_ms INTEGER NOT NULL,
+  topology_hash TEXT,
+  overlay_hash TEXT,
+  query_hash TEXT,
+  receipt_hash TEXT
 );
 
 -- ==============================================================================
