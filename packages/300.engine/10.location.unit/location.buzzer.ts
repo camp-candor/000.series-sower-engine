@@ -24,11 +24,15 @@ export {
     sanitizePerceptionQuery,
 } from './buz/sanitizer.buzz.js'
 export { buildSpatialOverlaySnapshot } from './buz/overlay-builder.buzz.js'
-
 export {
     verifyTraversalBudget,
     type BudgetGuardResult,
 } from './buz/budget-guard.buzz.js'
+export {
+    InProcessSpatialAdapter,
+    HARD_WORK_ENVELOPE_CEILING,
+} from './buz/in-process-adapter.buzz.js'
+export { executeBatchPath } from './buz/batch-path.buzz.js'
 
 export { BASELINE_TOPOLOGY_LOCATIONS } from './location.model.js'
 
@@ -65,3 +69,8 @@ export type {
     QuerySanitizationResult,
     RawSpatialQueryInput,
 } from './fce/sanitizer.interface.js'
+
+export type {
+    BatchPathQuery,
+    BatchPathReceipt,
+} from './fce/adapter.interface.js'
