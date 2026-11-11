@@ -92,8 +92,14 @@ export class BuildSpatialOverlay implements Action<LocationBit> {
 
 export const VERIFY_TRAVERSAL_BUDGET =
     '[Location action] Verify Traversal Budget'
-export class VerifyTraversalBudget implements Action {
+export class VerifyTraversalBudget implements Action<LocationBit> {
     readonly type = VERIFY_TRAVERSAL_BUDGET
+    constructor(public bale?: LocationBit) {}
+}
+
+export const EXECUTE_BATCH_PATH = '[Location action] Execute Batch Path'
+export class ExecuteBatchPath implements Action<LocationBit> {
+    readonly type = EXECUTE_BATCH_PATH
     constructor(public bale?: LocationBit) {}
 }
 
@@ -113,3 +119,4 @@ export type Actions =
     | SanitizePerceptionQuery
     | BuildSpatialOverlay
     | VerifyTraversalBudget
+    | ExecuteBatchPath
