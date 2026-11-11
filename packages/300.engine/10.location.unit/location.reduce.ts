@@ -139,6 +139,24 @@ export function reducer(
             return model
         }
 
+        case Act.VERIFY_TRAVERSAL_BUDGET: {
+            const cost = (act.bale?.dat as any)?.traversalCostUnits ?? 0
+            const budget = (act.bale?.dat as any)?.allowedBudgetUnits ?? 0
+            const result = Buzz.verifyTraversalBudget(cost, budget)
+            if (act.bale?.slv) {
+                act.bale.slv({
+                    locBit: {
+                        idx: result.permitted
+                            ? 'verify-budget-success'
+                            : 'verify-budget-fail',
+                        val: result.permitted ? 1 : 0,
+                        dat: result as any,
+                    },
+                })
+            }
+            return model
+        }
+
         default:
             return model
     }

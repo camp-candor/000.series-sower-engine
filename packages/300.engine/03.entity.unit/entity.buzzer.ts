@@ -20,3 +20,18 @@ export type {
     EntityQueryFilter,
 } from './fce/entity.interface.js'
 export type { EntityPayload } from './fce/entity.bit.js'
+
+export { extractSomaticState } from './buz/somatic-query.buzz.js'
+export {
+    BASE_MOVEMENT_UNIT_COST,
+    deriveSomaticBudget,
+    validateHandCapacity,
+} from './buz/budget-calculator.buzz.js'
+
+export type {
+    LocomotionTier,
+    SomaticState,
+    SomaticBudgetReceipt,
+    HeldItemDescriptor,
+    HandLoadEvaluation,
+} from './fce/somatic-budget.interface.js'
