@@ -1,12 +1,16 @@
 import re
+import os
 
-with open('data/directive/day-002/060.phase-24.jules.md', 'r', encoding='utf-8') as f:
+with open('data/directive/day-003/032.phase-two.jules.md', 'r') as f:
     content = f.read()
 
-matches = re.finditer(r'#### \d+\.\s+(packages/.*?)\s+\*\((NEW|UPDATE)\)\*[\s\S]*?```(?:typescript)?\n([\s\S]*?)```', content)
-for match in matches:
-    filepath = match.group(1).strip()
-    code = match.group(3)
-    mode = match.group(2)
+# Pattern to find headers like "#### 1. `path/to/file`" followed by a code block
+pattern = r'#### \d+\.\s+`(.*?)`\s*\n\s*```(?:typescript|ts)?\n(.*?)```'
+matches = re.findall(pattern, content, re.DOTALL)
 
-    print(f"File: {filepath} ({mode})")
+for filepath, code in matches:
+    print(f"File: {filepath}")
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    with open(filepath, 'w') as f:
+        f.write(code)
+print("Done parsing.")
