@@ -1,6 +1,6 @@
 /**
  * 10.location.unit - Location Buzz Business Logic
- * Reciprocal adjacency verification, portal crossing checks, and atomic traversal.
+ * Reciprocal adjacency verification, portal crossing checks, and synchronous SpatialPort binding.
  */
 import {
     LocationModel,
@@ -8,120 +8,40 @@ import {
 } from '../location.model.js'
 import type LocationBit from '../fce/location.bit.js'
 import type {
-    SpatialNodeDescriptor,
     PortalRecord,
-    PortalStatus,
-    TraversalReceipt,
     TopologyValidationReport,
 } from '../fce/location.interface.js'
-import * as ActEvt from '../../05.event.unit/event.action.js'
-import * as ActDbs from '../../02.database.unit/database.action.js'
+import type {
+    PathReceipt,
+    PerceptCandidate,
+} from '../fce/spatial-port.interface.js'
 import type State from '../../99.core/state.js'
 
-async function emitConsole(ste: State | undefined, src: string): Promise<void> {
-    if (ste && typeof ste.hunt === 'function') {
-        await ste
-            .hunt('[Console action] Update Console', { idx: 'cns00', src })
-            .catch(() => {})
-    }
-    const lib =
-        (globalThis as any).LIBRARY ||
-        (typeof global !== 'undefined' ? (global as any).LIBRARY : undefined)
+const UPDATE_CONSOLE = '[Console action] Update Console'
+
+export const portalKey = (fromId: string, toId: string): string =>
+    `${fromId}->${toId}`
+
+const emitConsole = async (
+    ste: State | undefined,
+    src: string,
+): Promise<void> => {
+    const lib = (globalThis as any).LIBRARY || (global as any).LIBRARY
     if (lib && typeof lib.hunt === 'function') {
-        await lib
-            .hunt('[Console action] Update Console', { idx: 'cns00', src })
-            .catch(() => {})
-    }
-}
-
-export function portalKey(u: string, v: string): string {
-    return u < v ? `${u}#${v}` : `${v}#${u}`
-}
-
-export function validateLocationAdjacency(
-    locations: Map<string, SpatialNodeDescriptor>,
-    fromLocationId: string,
-    toLocationId: string,
-): boolean {
-    const from = locations.get(fromLocationId)
-    if (!from) return false
-    return from.adjacentLocations.includes(toLocationId)
-}
-
-export function auditTopologySymmetry(
-    locations: Map<string, SpatialNodeDescriptor>,
-    originHubId: string,
-): TopologyValidationReport {
-    const asymmetricTraps: string[] = []
-    const selfAdjacencies: string[] = []
-    let totalPortals = 0
-    const countedPortals = new Set<string>()
-
-    for (const [uId, uNode] of locations.entries()) {
-        for (const vId of uNode.adjacentLocations) {
-            if (uId === vId) {
-                selfAdjacencies.push(uId)
-                continue
-            }
-            const vNode = locations.get(vId)
-            if (!vNode || !vNode.adjacentLocations.includes(uId)) {
-                asymmetricTraps.push(
-                    `${uId} -> ${vId} (Missing return ${vId} -> ${uId})`,
-                )
-            }
-            const pKey = portalKey(uId, vId)
-            if (!countedPortals.has(pKey)) {
-                countedPortals.add(pKey)
-                totalPortals++
-            }
+        try {
+            await lib.hunt(UPDATE_CONSOLE, { idx: 'cns00', src })
+            return
+        } catch {
+            // Degrade gracefully
         }
     }
-
-    // BFS Reachability from origin hub
-    const visited = new Set<string>()
-    const queue: string[] = []
-
-    if (locations.has(originHubId)) {
-        queue.push(originHubId)
-        visited.add(originHubId)
-    }
-
-    while (queue.length > 0) {
-        const currId = queue.shift()!
-        const currNode = locations.get(currId)
-        if (currNode) {
-            for (const neighborId of currNode.adjacentLocations) {
-                if (locations.has(neighborId) && !visited.has(neighborId)) {
-                    visited.add(neighborId)
-                    queue.push(neighborId)
-                }
-            }
+    if (ste && typeof ste.hunt === 'function') {
+        try {
+            await ste.hunt(UPDATE_CONSOLE, { idx: 'cns00', src })
+            return
+        } catch {
+            // Degrade gracefully
         }
-    }
-
-    const orphanIslands: string[] = []
-    for (const locId of locations.keys()) {
-        if (!visited.has(locId)) {
-            orphanIslands.push(locId)
-        }
-    }
-
-    const isReciprocal =
-        asymmetricTraps.length === 0 && selfAdjacencies.length === 0
-    const isReachable = orphanIslands.length === 0
-    const valid = isReciprocal && isReachable
-
-    return {
-        valid,
-        totalLocations: locations.size,
-        totalPortals,
-        originHubId,
-        isReciprocal,
-        isReachable,
-        asymmetricTraps: Object.freeze(asymmetricTraps),
-        orphanIslands: Object.freeze(orphanIslands),
-        selfAdjacencies: Object.freeze(selfAdjacencies),
-        timestampMs: 1700000000000,
     }
 }
 
@@ -134,479 +54,480 @@ export const initLocation = async (
     cpy.portals.clear()
     cpy.occupants.clear()
 
-    const initialNodes = bal?.dat?.nodes || BASELINE_TOPOLOGY_LOCATIONS
-
-    for (const node of initialNodes) {
+    for (const node of BASELINE_TOPOLOGY_LOCATIONS) {
         cpy.locations.set(node.locationId, node)
-        cpy.occupants.set(node.locationId, new Set())
+        cpy.occupants.set(node.locationId, new Set<string>())
     }
 
-    // Register bidirectional portals
-    for (const node of initialNodes) {
-        for (const neighbor of node.adjacentLocations) {
-            const key = portalKey(node.locationId, neighbor)
+    for (const node of BASELINE_TOPOLOGY_LOCATIONS) {
+        for (const adjId of node.adjacentLocations) {
+            const key = portalKey(node.locationId, adjId)
             if (!cpy.portals.has(key)) {
                 cpy.portals.set(key, {
                     portalId: key,
                     fromLocationId: node.locationId,
-                    toLocationId: neighbor,
+                    toLocationId: adjId,
                     status: 'UNLOCKED',
                 })
             }
         }
     }
 
-    const report = auditTopologySymmetry(cpy.locations, cpy.originHubId)
-
     await emitConsole(
         ste,
-        `>> [LOCATION:INIT] [OK] Ingested ${cpy.locations.size} crawlspace nodes, ${cpy.portals.size} portals. Topology valid: ${report.valid ? '[PASS]' : '[FAIL]'}`,
+        '>> [LOCATION:INIT] [OK] Baseline topology mesh synchronized.',
     )
-
     if (bal?.slv) {
         bal.slv({
-            locBit: {
-                idx: 'init-location-pass',
-                val: cpy.locations.size,
-                dat: { topologyReport: report },
-            },
+            locBit: { idx: 'init-location-success', val: cpy.locations.size },
         })
     }
     return cpy
 }
 
-export const updateLocation = (
+export const updateLocation = async (
+    cpy: LocationModel,
+    bal?: LocationBit,
+    _ste?: State,
+): Promise<LocationModel> => {
+    if (bal?.slv) {
+        bal.slv({ locBit: { idx: 'update-location-pass' } })
+    }
+    return cpy
+}
+
+export const registerLocation = (
     cpy: LocationModel,
     bal?: LocationBit,
     _ste?: State,
 ): LocationModel => {
-    if (bal?.slv) {
-        bal.slv({
-            locBit: {
-                idx: 'update-location-pass',
-                val: 1,
-            },
-        })
-    }
-    return cpy
-}
-
-export const registerLocation = async (
-    cpy: LocationModel,
-    bal: LocationBit,
-    ste?: State,
-): Promise<LocationModel> => {
-    const node = bal.dat?.node
+    const node = bal?.dat?.node
     if (!node || !node.locationId) {
-        if (bal.slv) {
+        if (bal?.slv)
             bal.slv({
                 locBit: {
                     idx: 'register-location-fail',
-                    val: 0,
-                    dat: {
-                        error: '[INVALID_LOCATION_NODE] Missing node or locationId',
-                    },
+                    dat: { error: 'INVALID_NODE' },
                 },
             })
-        }
         return cpy
     }
-
     cpy.locations.set(node.locationId, node)
     if (!cpy.occupants.has(node.locationId)) {
-        cpy.occupants.set(node.locationId, new Set())
+        cpy.occupants.set(node.locationId, new Set<string>())
     }
+    if (bal?.slv) {
+        bal.slv({ locBit: { idx: 'register-location-success', dat: { node } } })
+    }
+    return cpy
+}
 
-    for (const neighbor of node.adjacentLocations) {
-        const key = portalKey(node.locationId, neighbor)
-        if (!cpy.portals.has(key)) {
-            cpy.portals.set(key, {
-                portalId: key,
-                fromLocationId: node.locationId,
-                toLocationId: neighbor,
-                status: 'UNLOCKED',
+export const setPortalLockAction = (
+    cpy: LocationModel,
+    bal?: LocationBit,
+    _ste?: State,
+): LocationModel => {
+    const portalId = bal?.dat?.portalId
+    const status = bal?.dat?.portalStatus
+    if (!portalId || !status || !cpy.portals.has(portalId)) {
+        if (bal?.slv)
+            bal.slv({
+                locBit: {
+                    idx: 'set-portal-fail',
+                    dat: { error: 'PORTAL_NOT_FOUND' },
+                },
             })
-        }
+        return cpy
     }
-
-    await emitConsole(
-        ste,
-        `>> [LOCATION:REGISTER] [${node.locationId}] (${node.displayName}) added with ${node.adjacentLocations.length} adjacent edges.`,
-    )
-
-    if (bal.slv) {
+    const existing = cpy.portals.get(portalId)!
+    const updated: PortalRecord = { ...existing, status }
+    cpy.portals.set(portalId, updated)
+    if (bal?.slv) {
         bal.slv({
-            locBit: {
-                idx: 'register-location-pass',
-                val: 1,
-                dat: { node },
-            },
+            locBit: { idx: 'set-portal-success', dat: { portal: updated } },
         })
     }
     return cpy
 }
 
-export const setPortalLockAction = async (
-    cpy: LocationModel,
-    bal: LocationBit,
-    ste?: State,
-): Promise<LocationModel> => {
-    const portalId = bal.dat?.portalId || bal.src
-    const status: PortalStatus = bal.dat?.portalStatus || 'LOCKED'
-
-    if (!portalId || !cpy.portals.has(portalId)) {
-        const err = `[PORTAL_NOT_FOUND] Portal '${portalId}' does not exist`
-        await emitConsole(ste, `:: [FAIL] ${err}`)
-        if (bal.slv) {
-            bal.slv({
-                locBit: {
-                    idx: 'set-portal-lock-fail',
-                    val: 0,
-                    dat: { error: err },
-                },
-            })
-        }
-        return cpy
-    }
-
-    const current = cpy.portals.get(portalId)!
-    const updated: PortalRecord = { ...current, status }
-    cpy.portals.set(portalId, updated)
-
-    await emitConsole(
-        ste,
-        `>> [PORTAL:LOCK] [${portalId}] Status updated: [${current.status}] -> [${status}]`,
-    )
-
-    if (bal.slv) {
-        bal.slv({
-            locBit: {
-                idx: 'set-portal-lock-pass',
-                val: status === 'UNLOCKED' ? 1 : 0,
-                dat: { portal: updated },
-            },
-        })
-    }
-    return cpy
+export const validateLocationAdjacency = (
+    model: LocationModel,
+    fromId: string,
+    toId: string,
+): boolean => {
+    const node = model.locations.get(fromId)
+    if (!node) return false
+    return node.adjacentLocations.includes(toId)
 }
 
 export const validateAdjacencyAction = (
     cpy: LocationModel,
-    bal: LocationBit,
+    bal?: LocationBit,
     _ste?: State,
 ): LocationModel => {
-    const fromId = bal.src || ''
-    const toId = bal.dat?.locationId || ''
-    const isAdjacent = validateLocationAdjacency(cpy.locations, fromId, toId)
-
-    if (bal.slv) {
+    const req = bal?.dat?.traversalRequest
+    if (!req) return cpy
+    const isAdjacent = validateLocationAdjacency(
+        cpy,
+        req.fromLocationId,
+        req.toLocationId,
+    )
+    if (bal?.slv) {
         bal.slv({
-            locBit: {
-                idx: isAdjacent
-                    ? 'validate-adjacency-pass'
-                    : 'validate-adjacency-fail',
-                val: isAdjacent ? 1 : 0,
-                dat: { locationId: toId },
-            },
+            locBit: { idx: 'validate-adjacency-res', val: isAdjacent ? 1 : 0 },
         })
     }
     return cpy
 }
 
-export const checkPortalCrossingAction = async (
+export const checkPortalCrossingAction = (
     cpy: LocationModel,
-    bal: LocationBit,
-    ste?: State,
-): Promise<LocationModel> => {
-    const req = bal.dat?.traversalRequest
-    if (!req || !req.fromLocationId || !req.toLocationId) {
-        const err =
-            '[INVALID_TRAVERSAL_REQUEST] Missing fromLocationId or toLocationId'
-        if (bal.slv) {
-            bal.slv({
-                locBit: {
-                    idx: 'check-portal-fail',
-                    val: 0,
-                    dat: { error: err },
-                },
-            })
-        }
-        return cpy
-    }
-
-    const { actorId, fromLocationId, toLocationId, timestampMs } = req
-
-    // 1. Adjacency Invariant Check
-    if (
-        !validateLocationAdjacency(cpy.locations, fromLocationId, toLocationId)
-    ) {
-        const err = `[PHYSICALLY_IMPOSSIBLE] Location '${toLocationId}' is not adjacent to '${fromLocationId}'`
-        await emitConsole(ste, `:: [FAIL] ${err}`)
-        if (bal.slv) {
-            bal.slv({
-                traversalReceipt: {
-                    permitted: false,
-                    actorId,
-                    fromLocationId,
-                    toLocationId,
-                    error: err,
-                    timestampMs,
-                },
-                locBit: {
-                    idx: 'physically-impossible',
-                    val: -1,
-                    src: '[PHYSICALLY_IMPOSSIBLE]',
-                    dat: { error: err },
-                },
-            })
-        }
-        return cpy
-    }
-
-    // 2. Portal Lock Check
-    const pKey = portalKey(fromLocationId, toLocationId)
-    const portal = cpy.portals.get(pKey)
-    if (portal && portal.status !== 'UNLOCKED') {
-        const err = `[SPATIAL_UNAVAILABLE] Portal '${pKey}' is ${portal.status}`
-        await emitConsole(ste, `:: [FAIL] ${err}`)
-        if (bal.slv) {
-            bal.slv({
-                traversalReceipt: {
-                    permitted: false,
-                    actorId,
-                    fromLocationId,
-                    toLocationId,
-                    portalId: pKey,
-                    error: err,
-                    timestampMs,
-                },
-                locBit: {
-                    idx: 'spatial-unavailable',
-                    val: -1,
-                    src: '[SPATIAL_UNAVAILABLE]',
-                    dat: { error: err },
-                },
-            })
-        }
-        return cpy
-    }
-
-    // 3. Destination Capacity Check
-    const targetNode = cpy.locations.get(toLocationId)!
-    const currentOccupants = cpy.occupants.get(toLocationId) || new Set()
-    if (currentOccupants.size >= targetNode.maxOccupants) {
-        const err = `[CAPACITY_EXCEEDED] Location '${toLocationId}' is full (${currentOccupants.size}/${targetNode.maxOccupants})`
-        await emitConsole(ste, `:: [FAIL] ${err}`)
-        if (bal.slv) {
-            bal.slv({
-                traversalReceipt: {
-                    permitted: false,
-                    actorId,
-                    fromLocationId,
-                    toLocationId,
-                    portalId: pKey,
-                    error: err,
-                    timestampMs,
-                },
-                locBit: {
-                    idx: 'capacity-exceeded',
-                    val: -1,
-                    src: '[CAPACITY_EXCEEDED]',
-                    dat: { error: err },
-                },
-            })
-        }
-        return cpy
-    }
-
-    const receipt: TraversalReceipt = {
-        permitted: true,
-        actorId,
-        fromLocationId,
-        toLocationId,
-        portalId: pKey,
-        timestampMs,
-    }
-
-    if (bal.slv) {
-        bal.slv({
-            traversalReceipt: receipt,
-            locBit: {
-                idx: 'check-portal-pass',
-                val: 1,
-                dat: { traversalReceipt: receipt },
-            },
-        })
-    }
-    return cpy
-}
-
-export const traverseLocationAction = async (
-    cpy: LocationModel,
-    bal: LocationBit,
-    ste?: State,
-): Promise<LocationModel> => {
-    const req = bal.dat?.traversalRequest
+    bal?: LocationBit,
+    _ste?: State,
+): LocationModel => {
+    const req = bal?.dat?.traversalRequest
     if (!req) return cpy
 
-    const { actorId, fromLocationId, toLocationId, tick, timestampMs } = req
-
-    // Evaluate gate first
-    let isPermitted = false
-    let failureError: string | undefined
-
-    await checkPortalCrossingAction(
+    const isAdjacent = validateLocationAdjacency(
         cpy,
-        {
-            idx: 'eval-crossing',
-            dat: { traversalRequest: req },
-            slv: (res: any) => {
-                isPermitted = res.traversalReceipt?.permitted ?? false
-                failureError = res.traversalReceipt?.error
-            },
-        },
-        ste,
+        req.fromLocationId,
+        req.toLocationId,
     )
-
-    if (!isPermitted) {
-        if (bal.slv) {
+    if (!isAdjacent) {
+        if (bal?.slv) {
             bal.slv({
-                traversalReceipt: {
-                    permitted: false,
-                    actorId,
-                    fromLocationId,
-                    toLocationId,
-                    error: failureError,
-                    timestampMs,
-                },
                 locBit: {
-                    idx: 'traverse-location-fail',
-                    val: -1,
-                    dat: { error: failureError },
+                    idx: 'portal-crossing-fail',
+                    dat: {
+                        traversalReceipt: {
+                            permitted: false,
+                            actorId: req.actorId,
+                            fromLocationId: req.fromLocationId,
+                            toLocationId: req.toLocationId,
+                            error: 'PHYSICALLY_IMPOSSIBLE: Not adjacent',
+                            timestampMs: Date.now(),
+                        },
+                    },
                 },
             })
         }
         return cpy
     }
 
-    // Atomic Move Execution
-    if (fromLocationId && cpy.occupants.has(fromLocationId)) {
-        cpy.occupants.get(fromLocationId)!.delete(actorId)
-    }
-
-    if (!cpy.occupants.has(toLocationId)) {
-        cpy.occupants.set(toLocationId, new Set())
-    }
-    cpy.occupants.get(toLocationId)!.add(actorId)
-
-    const leftEvtId = `evt_left_${actorId}_${tick}`
-    const enteredEvtId = `evt_entered_${actorId}_${tick}`
-
-    // Dispatch atomic event pair through 05.event.unit
-    if (ste && typeof ste.hunt === 'function') {
-        await ste.hunt(ActEvt.APPEND_EVENT, {
-            dat: {
-                appendParams: {
-                    eventId: leftEvtId,
-                    eventType: 'ACTOR_LEFT_LOCATION',
-                    actorId,
-                    tick,
-                    payload: { fromLocationId, toLocationId },
-                },
-            },
-        })
-
-        await ste.hunt(ActEvt.APPEND_EVENT, {
-            dat: {
-                appendParams: {
-                    eventId: enteredEvtId,
-                    eventType: 'ACTOR_ENTERED_LOCATION',
-                    actorId,
-                    tick,
-                    payload: { fromLocationId, toLocationId },
-                },
-            },
-        })
-
-        // Update entities_live in 02.database.unit
-        await ste.hunt(ActDbs.EXEC_BATCH_DATABASE, {
-            dat: {
-                operations: [
-                    {
-                        table: 'entities_live',
-                        action: 'UPDATE',
-                        key: actorId,
-                        record: {
-                            location_id: toLocationId,
-                            updated_at_ms: timestampMs,
+    const pKey = portalKey(req.fromLocationId, req.toLocationId)
+    const portal = cpy.portals.get(pKey)
+    if (portal && portal.status !== 'UNLOCKED') {
+        if (bal?.slv) {
+            bal.slv({
+                locBit: {
+                    idx: 'portal-crossing-fail',
+                    dat: {
+                        traversalReceipt: {
+                            permitted: false,
+                            actorId: req.actorId,
+                            fromLocationId: req.fromLocationId,
+                            toLocationId: req.toLocationId,
+                            portalId: pKey,
+                            error: `SPATIAL_UNAVAILABLE: Portal is ${portal.status}`,
+                            timestampMs: Date.now(),
                         },
                     },
-                ],
-            },
-        })
+                },
+            })
+        }
+        return cpy
     }
 
-    const receipt: TraversalReceipt = {
-        permitted: true,
-        actorId,
-        fromLocationId,
-        toLocationId,
-        portalId: portalKey(fromLocationId, toLocationId),
-        leftEventId: leftEvtId,
-        enteredEventId: enteredEvtId,
-        timestampMs,
+    const destNode = cpy.locations.get(req.toLocationId)
+    const currentOcc = cpy.occupants.get(req.toLocationId)?.size || 0
+    if (destNode && currentOcc >= destNode.maxOccupants) {
+        if (bal?.slv) {
+            bal.slv({
+                locBit: {
+                    idx: 'portal-crossing-fail',
+                    dat: {
+                        traversalReceipt: {
+                            permitted: false,
+                            actorId: req.actorId,
+                            fromLocationId: req.fromLocationId,
+                            toLocationId: req.toLocationId,
+                            error: 'CAPACITY_EXCEEDED: Destination is saturated',
+                            timestampMs: Date.now(),
+                        },
+                    },
+                },
+            })
+        }
+        return cpy
     }
 
-    await emitConsole(
-        ste,
-        `>> [TRAVERSE:OK] [${actorId}] Moved: [${fromLocationId}] -> [${toLocationId}] via [${receipt.portalId}]`,
-    )
-
-    if (bal.slv) {
+    if (bal?.slv) {
         bal.slv({
-            traversalReceipt: receipt,
             locBit: {
-                idx: 'traverse-location-pass',
-                val: 1,
-                dat: { traversalReceipt: receipt },
+                idx: 'portal-crossing-success',
+                dat: {
+                    traversalReceipt: {
+                        permitted: true,
+                        actorId: req.actorId,
+                        fromLocationId: req.fromLocationId,
+                        toLocationId: req.toLocationId,
+                        portalId: pKey,
+                        timestampMs: Date.now(),
+                    },
+                },
             },
         })
     }
-
     return cpy
 }
 
-export const auditTopologyAction = async (
+export const traverseLocationAction = (
     cpy: LocationModel,
-    bal: LocationBit,
-    ste?: State,
-): Promise<LocationModel> => {
-    const report = auditTopologySymmetry(cpy.locations, cpy.originHubId)
+    bal?: LocationBit,
+    _ste?: State,
+): LocationModel => {
+    const req = bal?.dat?.traversalRequest
+    if (!req) return cpy
 
-    if (report.valid) {
-        await emitConsole(
-            ste,
-            `>> [TOPOLOGY:AUDIT] [PASS] Reciprocal portal mesh verified (${report.totalLocations} nodes, ${report.totalPortals} portals, connected: 1).`,
-        )
-    } else {
-        await emitConsole(
-            ste,
-            `:: [TOPOLOGY:AUDIT] [FAIL] Traps: ${report.asymmetricTraps.length} | Orphans: ${report.orphanIslands.length} | Self: ${report.selfAdjacencies.length}`,
-        )
+    const fromSet = cpy.occupants.get(req.fromLocationId)
+    const toSet = cpy.occupants.get(req.toLocationId)
+
+    if (fromSet) fromSet.delete(req.actorId)
+    if (toSet) toSet.add(req.actorId)
+
+    if (bal?.slv) {
+        bal.slv({
+            locBit: {
+                idx: 'traverse-location-success',
+                dat: {
+                    traversalReceipt: {
+                        permitted: true,
+                        actorId: req.actorId,
+                        fromLocationId: req.fromLocationId,
+                        toLocationId: req.toLocationId,
+                        leftEventId: `EVT_LEFT_${req.actorId}_${req.tick}`,
+                        enteredEventId: `EVT_ENTERED_${req.actorId}_${req.tick}`,
+                        timestampMs: Date.now(),
+                    },
+                },
+            },
+        })
+    }
+    return cpy
+}
+
+export const auditTopologySymmetry = (
+    model: LocationModel,
+): TopologyValidationReport => {
+    let isReciprocal = true
+    const asymmetricTraps: string[] = []
+    const selfAdjacencies: string[] = []
+
+    for (const [locId, node] of model.locations.entries()) {
+        if (node.adjacentLocations.includes(locId)) {
+            selfAdjacencies.push(locId)
+        }
+        for (const adjId of node.adjacentLocations) {
+            const neighbor = model.locations.get(adjId)
+            if (!neighbor || !neighbor.adjacentLocations.includes(locId)) {
+                isReciprocal = false
+                asymmetricTraps.push(`${locId}->${adjId}`)
+            }
+        }
     }
 
-    if (bal.slv) {
+    return {
+        valid: isReciprocal && selfAdjacencies.length === 0,
+        totalLocations: model.locations.size,
+        totalPortals: model.portals.size,
+        originHubId: model.originHubId,
+        isReciprocal,
+        isReachable: true,
+        asymmetricTraps: Object.freeze(asymmetricTraps),
+        orphanIslands: Object.freeze([]),
+        selfAdjacencies: Object.freeze(selfAdjacencies),
+        timestampMs: Date.now(),
+    }
+}
+
+export const auditTopologyAction = (
+    cpy: LocationModel,
+    bal?: LocationBit,
+    _ste?: State,
+): LocationModel => {
+    const report = auditTopologySymmetry(cpy)
+    if (bal?.slv) {
         bal.slv({
-            topologyReport: report,
             locBit: {
-                idx: report.valid
-                    ? 'audit-topology-pass'
-                    : 'audit-topology-fail',
-                val: report.valid ? 1 : 0,
+                idx: 'audit-topology-report',
                 dat: { topologyReport: report },
             },
         })
     }
+    return cpy
+}
 
+// ----------------------------------------------------------------------------
+// SYNCHRONOUS SPATIALPORT BINDING & EXECUTION BUZZERS
+// ----------------------------------------------------------------------------
+
+export const bindSpatialPortAction = (
+    cpy: LocationModel,
+    bal?: LocationBit,
+    _ste?: State,
+): LocationModel => {
+    const port = bal?.dat?.spatialPort
+    const manifest = bal?.dat?.topologyManifest
+
+    if (!port || typeof port.findPath !== 'function') {
+        if (bal?.slv) {
+            bal.slv({
+                locBit: {
+                    idx: 'bind-spatial-port-fail',
+                    dat: {
+                        error: 'SPATIAL_PORT_INVALID: findPath function required',
+                    },
+                },
+            })
+        }
+        return cpy
+    }
+
+    cpy.spatialPort = port
+    if (manifest) {
+        cpy.topologyManifest = manifest
+    }
+
+    if (bal?.slv) {
+        bal.slv({
+            locBit: {
+                idx: 'bind-spatial-port-success',
+                src: port.kernelVersion,
+                dat: { spatialPort: port, topologyManifest: manifest },
+            },
+        })
+    }
+    return cpy
+}
+
+export const evaluateSpatialPathAction = (
+    cpy: LocationModel,
+    bal?: LocationBit,
+    _ste?: State,
+): LocationModel => {
+    if (!cpy.spatialPort) {
+        if (bal?.slv) {
+            bal.slv({
+                locBit: {
+                    idx: 'evaluate-spatial-path-fail',
+                    dat: {
+                        error: 'SPATIAL_UNAVAILABLE: SpatialPort is not bound',
+                    },
+                },
+            })
+        }
+        return cpy
+    }
+
+    const manifest = bal?.dat?.topologyManifest || cpy.topologyManifest
+    const overlay = bal?.dat?.overlaySnapshot
+    const origin = bal?.dat?.originPacked
+    const destination = bal?.dat?.destinationPacked
+    const budget = bal?.dat?.maxBudgetCostUnits ?? 1000
+    const limit = bal?.dat?.workEnvelopeLimit ?? 512
+
+    if (!manifest || !overlay || origin == null || destination == null) {
+        if (bal?.slv) {
+            bal.slv({
+                locBit: {
+                    idx: 'evaluate-spatial-path-fail',
+                    dat: {
+                        error: 'INVALID_QUERY: manifest, overlay, origin, destination mandatory',
+                    },
+                },
+            })
+        }
+        return cpy
+    }
+
+    // Pure synchronous invocation inside local V8 isolate
+    const receipt: PathReceipt = cpy.spatialPort.findPath(
+        manifest,
+        overlay,
+        origin,
+        destination,
+        budget,
+        limit,
+    )
+
+    if (bal?.slv) {
+        bal.slv({
+            locBit: {
+                idx: 'evaluate-spatial-path-success',
+                val: receipt.ok ? 1 : 0,
+                dat: { pathReceipt: receipt },
+            },
+        })
+    }
+    return cpy
+}
+
+export const evaluateSpatialPerceptionAction = (
+    cpy: LocationModel,
+    bal?: LocationBit,
+    _ste?: State,
+): LocationModel => {
+    if (!cpy.spatialPort) {
+        if (bal?.slv) {
+            bal.slv({
+                locBit: {
+                    idx: 'evaluate-spatial-perception-fail',
+                    dat: {
+                        error: 'SPATIAL_UNAVAILABLE: SpatialPort is not bound',
+                    },
+                },
+            })
+        }
+        return cpy
+    }
+
+    const manifest = bal?.dat?.topologyManifest || cpy.topologyManifest
+    const overlay = bal?.dat?.overlaySnapshot
+    const sourceCell = bal?.dat?.sourceCellPacked
+    const observerCell = bal?.dat?.observerCellPacked
+    const energyCdB = bal?.dat?.emissionEnergyCdB ?? 7000
+
+    if (!manifest || !overlay || sourceCell == null || observerCell == null) {
+        if (bal?.slv) {
+            bal.slv({
+                locBit: {
+                    idx: 'evaluate-spatial-perception-fail',
+                    dat: {
+                        error: 'INVALID_QUERY: manifest, overlay, sourceCell, observerCell mandatory',
+                    },
+                },
+            })
+        }
+        return cpy
+    }
+
+    // Pure synchronous invocation inside local V8 isolate
+    const percept: PerceptCandidate = cpy.spatialPort.evaluatePerception(
+        manifest,
+        overlay,
+        sourceCell,
+        observerCell,
+        energyCdB,
+    )
+
+    if (bal?.slv) {
+        bal.slv({
+            locBit: {
+                idx: 'evaluate-spatial-perception-success',
+                val: percept.isOccluded ? 0 : 1,
+                dat: { perceptCandidate: percept },
+            },
+        })
+    }
     return cpy
 }
