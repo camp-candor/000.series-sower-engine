@@ -157,6 +157,47 @@ export function reducer(
             return model
         }
 
+        case Act.EXECUTE_BATCH_PATH: {
+            const port = model.spatialPort
+            const manifest =
+                model.topologyManifest ||
+                (act.bale?.dat as any)?.topologyManifest
+            const overlay = (act.bale?.dat as any)?.overlaySnapshot
+            const queries = (act.bale?.dat as any)?.queries || []
+
+            if (!port || !manifest || !overlay) {
+                if (act.bale?.slv) {
+                    act.bale.slv({
+                        locBit: {
+                            idx: 'execute-batch-path-fail',
+                            dat: {
+                                error: 'SPATIAL_UNAVAILABLE: port, manifest, and overlay required',
+                            },
+                        },
+                    })
+                }
+                return model
+            }
+
+            const batchReceipt = Buzz.executeBatchPath(
+                port,
+                manifest,
+                overlay,
+                queries,
+            )
+            if (act.bale?.slv) {
+                act.bale.slv({
+                    locBit: {
+                        idx: 'execute-batch-path-success',
+                        val: batchReceipt.ok ? 1 : 0,
+                        src: batchReceipt.batchReceiptHash,
+                        dat: { batchReceipt } as any,
+                    },
+                })
+            }
+            return model
+        }
+
         default:
             return model
     }
