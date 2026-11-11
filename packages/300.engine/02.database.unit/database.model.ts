@@ -18,6 +18,8 @@ import type {
 } from './fce/database.interface.js'
 
 export class DatabaseModel implements Database {
+    hasSpatialSchema: boolean = false
+    totalEventsCommitted: number = 0
     idx: string = '02.database'
     connection?: any
     activeMetadata?: import('./fce/database.interface.js').DatabaseConnectionMetadata

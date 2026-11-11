@@ -1446,3 +1446,154 @@ export const mountRealmDatabase = async (
 
     return cpy
 }
+
+export const migrateSpatialProofSchema = (
+    cpy: DatabaseModel,
+): DatabaseModel => {
+    if (!cpy.connection) return cpy
+
+    const columns = cpy.connection.pragma('table_info(event_log)') as Array<{
+        name: string
+        type: string
+    }>
+    const columnNames = columns.map((c) => c.name)
+
+    if (!columnNames.includes('topology_hash')) {
+        cpy.connection
+            .prepare(`ALTER TABLE event_log ADD COLUMN topology_hash TEXT;`)
+            .run()
+    }
+    if (!columnNames.includes('overlay_hash')) {
+        cpy.connection
+            .prepare(`ALTER TABLE event_log ADD COLUMN overlay_hash TEXT;`)
+            .run()
+    }
+    if (!columnNames.includes('query_hash')) {
+        cpy.connection
+            .prepare(`ALTER TABLE event_log ADD COLUMN query_hash TEXT;`)
+            .run()
+    }
+    if (!columnNames.includes('receipt_hash')) {
+        cpy.connection
+            .prepare(`ALTER TABLE event_log ADD COLUMN receipt_hash TEXT;`)
+            .run()
+    }
+
+    cpy.hasSpatialSchema = true
+    return cpy
+}
+
+export const migrateSpatialProofSchemaAction = async (
+    cpy: DatabaseModel,
+    bal: DatabaseBit,
+    _ste?: State,
+): Promise<DatabaseModel> => {
+    migrateSpatialProofSchema(cpy)
+    if (bal.slv) {
+        bal.slv({
+            datBit: {
+                idx: 'migration-complete',
+                dat: { migrationApplied: true },
+            },
+        })
+    }
+    return cpy
+}
+
+export const appendEventLogWithProof = async (
+    cpy: DatabaseModel,
+    bal?: DatabaseBit,
+    _ste?: State,
+): Promise<DatabaseModel> => {
+    if (!cpy.connection) {
+        throw new Error(
+            '[DATABASE_ERROR] Active database handle required to append event',
+        )
+    }
+
+    const payload:
+        | import('../fce/database.interface.js').AppendSpatialEventPayload
+        | undefined = bal?.dat?.appendEvent
+    if (!payload) {
+        if (bal?.slv) {
+            bal.slv({
+                datBit: {
+                    idx: 'append-event-fail',
+                    dat: { error: 'PAYLOAD_MANDATORY' },
+                },
+            })
+        }
+        return cpy
+    }
+
+    const topologyHash = payload.spatialProof?.topologyHash || ''
+    const overlayHash = payload.spatialProof?.overlayHash || ''
+    const queryHash = payload.spatialProof?.queryHash || ''
+    const receiptHash = payload.spatialProof?.receiptHash || ''
+    const timestampMs = payload.timestampMs ?? Date.now()
+
+    const stmt = cpy.connection.prepare(`
+    INSERT INTO event_log (
+      event_id, tick, event_type, actor_id, payload_json,
+      prev_hash, state_hash, seed, timestamp_ms,
+      topology_hash, overlay_hash, query_hash, receipt_hash
+    ) VALUES (
+      ?, ?, ?, ?, ?,
+      ?, ?, ?, ?,
+      ?, ?, ?, ?
+    )
+  `)
+
+    const info = stmt.run(
+        payload.eventId,
+        payload.tick,
+        payload.eventType,
+        payload.actorId || null,
+        payload.payloadJson,
+        payload.prevEventHash,
+        payload.eventHash,
+        'default_seed',
+        timestampMs,
+        topologyHash,
+        overlayHash,
+        queryHash,
+        receiptHash,
+    )
+
+    const seq = Number(info.lastInsertRowid)
+    cpy.totalEventsCommitted = seq
+
+    const committedRecord = Object.freeze({
+        sequence_number: seq,
+        sequence_id: seq,
+        event_id: payload.eventId,
+        stream_id: 'default-stream',
+        version: 1,
+        type: payload.eventType,
+        seed: 'default-seed',
+        tick: payload.tick,
+        event_type: payload.eventType,
+        actor_id: payload.actorId,
+        payload_json: payload.payloadJson,
+        prev_event_hash: payload.prevEventHash,
+        prev_hash: payload.prevEventHash,
+        state_hash: payload.eventHash,
+        event_hash: payload.eventHash,
+        topology_hash: topologyHash,
+        overlay_hash: overlayHash,
+        query_hash: queryHash,
+        receipt_hash: receiptHash,
+        timestamp_ms: timestampMs,
+    })
+
+    if (bal?.slv) {
+        bal.slv({
+            datBit: {
+                idx: 'append-event-success',
+                val: seq,
+                dat: { committedRecord: committedRecord as any },
+            },
+        })
+    }
+    return cpy
+}

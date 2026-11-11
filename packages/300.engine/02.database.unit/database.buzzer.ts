@@ -2,6 +2,9 @@
  * 02.database.unit - Database Buzzer Barrel Export
  */
 export {
+    migrateSpatialProofSchema,
+    migrateSpatialProofSchemaAction,
+    appendEventLogWithProof,
     initDatabase,
     updateDatabase,
     ensureSchemaDatabase,
