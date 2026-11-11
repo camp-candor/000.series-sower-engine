@@ -57,6 +57,27 @@ export function reducer(
                 state,
             )
 
+        case Act.BIND_SPATIAL_PORT:
+            return Buzz.bindSpatialPortAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
+
+        case Act.EVALUATE_SPATIAL_PATH:
+            return Buzz.evaluateSpatialPathAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
+
+        case Act.EVALUATE_SPATIAL_PERCEPTION:
+            return Buzz.evaluateSpatialPerceptionAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
+
         default:
             return model
     }

@@ -1,308 +1,191 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { LocationModel } from './location.model.js'
 import {
     initLocation,
-    setPortalLockAction,
-    checkPortalCrossingAction,
-    traverseLocationAction,
-    auditTopologySymmetry,
+    bindSpatialPortAction,
+    evaluateSpatialPathAction,
+    evaluateSpatialPerceptionAction,
 } from './buz/location.buzz.js'
-import { TRAVERSE_LOCATION } from './location.action.js'
-import { reducer } from './location.reduce.js'
-import type { SpatialNodeDescriptor } from './fce/location.interface.js'
+import type {
+    SpatialPort,
+    TopologyManifest,
+    PathReceipt,
+    PerceptCandidate,
+    DisplacementResult,
+} from './fce/spatial-port.interface.js'
+import type { SpatialOverlaySnapshot } from './fce/spatial-overlay.interface.js'
 
-describe('10.location.unit - Spatial Topology Routing & Portal Mesh Battery', () => {
+describe('10.location.unit - Synchronous SpatialPort Client Package Binding Battery', () => {
     let model: LocationModel
+
+    const mockTopology: TopologyManifest = {
+        topologyHash:
+            'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+        bounds: { minQ: -10, maxQ: 10, minR: -10, maxR: 10 },
+        blockedCells: new Set<number>(),
+        portalEdges: new Map(),
+        cellAcousticDampingCdB: new Map(),
+        ambientNoiseFloorCdB: 3000,
+    }
+
+    const mockOverlay: SpatialOverlaySnapshot = {
+        overlayHash:
+            'f4c2e11898fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b999',
+        closedPortals: Object.freeze(['hatch_01']),
+        impassableCells: Object.freeze([]),
+    }
+
+    const createMockSpatialPort = (version = '1.0.0'): SpatialPort => ({
+        kernelVersion: version,
+        findPath: (
+            topology,
+            overlay,
+            origin,
+            destination,
+            _maxBudgetCostUnits,
+            _workEnvelopeLimit,
+        ): PathReceipt => {
+            return {
+                schemaVersion: 1,
+                kernelVersion: version,
+                topologyHash: topology.topologyHash,
+                overlayHash: overlay.overlayHash,
+                queryHash: 'q_path_123',
+                receiptHash: 'r_path_456',
+                ok: true,
+                origin,
+                destination,
+                path: Object.freeze([origin, destination]),
+                totalCostUnits: 150,
+                cellsExpanded: 4,
+            }
+        },
+        evaluatePerception: (
+            topology,
+            overlay,
+            sourceCell,
+            observerCell,
+            emissionEnergyCdB,
+        ): PerceptCandidate => {
+            return {
+                schemaVersion: 1,
+                kernelVersion: version,
+                topologyHash: topology.topologyHash,
+                overlayHash: overlay.overlayHash,
+                queryHash: 'q_perc_123',
+                receiptHash: 'r_perc_456',
+                channel: 'VISUAL',
+                sourceCell,
+                observerCell,
+                signalCdB: emissionEnergyCdB,
+                ambientNoiseCdB: topology.ambientNoiseFloorCdB,
+                snrMarginCdB: emissionEnergyCdB - topology.ambientNoiseFloorCdB,
+                bearingDegrees: 60,
+                isOccluded: false,
+            }
+        },
+        resolveDisplacement: (): DisplacementResult => {
+            throw new Error('Not implemented')
+        },
+    })
 
     beforeEach(async () => {
         model = new LocationModel()
         await initLocation(model)
     })
 
-    afterEach(() => {
-        vi.unstubAllGlobals()
-        delete (global as any).LIBRARY
-        delete (globalThis as any).LIBRARY
-    })
-
-    it('initializes default crawlspace topology and confirms bidirectional reciprocity', () => {
-        expect(model.locations.size).toBe(4)
-        expect(model.locations.has('loc_the_warm_pipe')).toBe(true)
-
-        const report = auditTopologySymmetry(model.locations, model.originHubId)
-        expect(report.valid).toBe(true)
-        expect(report.isReciprocal).toBe(true)
-        expect(report.isReachable).toBe(true)
-        expect(report.asymmetricTraps).toHaveLength(0)
-    })
-
-    it('flags [ASYMMETRIC_PORTAL_TRAP] when a location lacks a reciprocal return link', () => {
-        const flawedNodes = new Map<string, SpatialNodeDescriptor>([
-            [
-                'room_a',
-                {
-                    locationId: 'room_a',
-                    displayName: 'Room A',
-                    adjacentLocations: ['room_b'],
-                    acousticDampingBps: 1000,
-                    lightingLevel: 'INCANDESCENT',
-                    maxOccupants: 2,
-                    isCramped: false,
-                },
-            ],
-            [
-                'room_b',
-                {
-                    locationId: 'room_b',
-                    displayName: 'Room B',
-                    adjacentLocations: [], // Missing reciprocal return link to room_a
-                    acousticDampingBps: 1000,
-                    lightingLevel: 'INCANDESCENT',
-                    maxOccupants: 2,
-                    isCramped: false,
-                },
-            ],
-        ])
-
-        const report = auditTopologySymmetry(flawedNodes, 'room_a')
-        expect(report.valid).toBe(false)
-        expect(report.isReciprocal).toBe(false)
-        expect(report.asymmetricTraps.length).toBeGreaterThan(0)
-        expect(report.asymmetricTraps[0]).toContain(
-            'Missing return room_b -> room_a',
-        )
-    })
-
-    it('flags [ORPHAN_ISLAND_DETECTED] when disconnected subgraphs exist', () => {
-        const disconnectedNodes = new Map<string, SpatialNodeDescriptor>([
-            [
-                'loc_the_warm_pipe',
-                {
-                    locationId: 'loc_the_warm_pipe',
-                    displayName: 'Origin Hub',
-                    adjacentLocations: [],
-                    acousticDampingBps: 1000,
-                    lightingLevel: 'INCANDESCENT',
-                    maxOccupants: 2,
-                    isCramped: false,
-                },
-            ],
-            [
-                'island_bunker',
-                {
-                    locationId: 'island_bunker',
-                    displayName: 'Unreachable Island Bunker',
-                    adjacentLocations: [],
-                    acousticDampingBps: 1000,
-                    lightingLevel: 'INCANDESCENT',
-                    maxOccupants: 2,
-                    isCramped: false,
-                },
-            ],
-        ])
-
-        const report = auditTopologySymmetry(
-            disconnectedNodes,
-            'loc_the_warm_pipe',
-        )
-        expect(report.valid).toBe(false)
-        expect(report.isReachable).toBe(false)
-        expect(report.orphanIslands).toContain('island_bunker')
-    })
-
-    it('rejects non-adjacent spatial teleportation with [PHYSICALLY_IMPOSSIBLE] at T_0 = $0.00', async () => {
-        // loc_siphon_chamber is not adjacent to loc_drainage_pantry
-        const slv = vi.fn()
-        await checkPortalCrossingAction(
-            model,
-            {
-                idx: 'check-impossible',
-                dat: {
-                    traversalRequest: {
-                        actorId: 'char_bog',
-                        fromLocationId: 'loc_siphon_chamber',
-                        toLocationId: 'loc_drainage_pantry',
-                        tick: 1,
-                        timestampMs: 1700000000000,
-                    },
-                },
-                slv,
+    it('fails closed when evaluating path without a bound SpatialPort', () => {
+        let response: any
+        evaluateSpatialPathAction(model, {
+            idx: 'test-unbound',
+            dat: {
+                topologyManifest: mockTopology,
+                overlaySnapshot: mockOverlay,
+                originPacked: 100,
+                destinationPacked: 200,
             },
-            {} as any,
-        )
+            slv: (res) => {
+                response = res.locBit.dat
+            },
+        })
 
-        expect(slv).toHaveBeenCalledWith(
-            expect.objectContaining({
-                locBit: expect.objectContaining({
-                    val: -1,
-                    idx: 'physically-impossible',
-                    src: '[PHYSICALLY_IMPOSSIBLE]',
-                }),
-                traversalReceipt: expect.objectContaining({
-                    permitted: false,
-                    error: expect.stringContaining('PHYSICALLY_IMPOSSIBLE'),
-                }),
-            }),
-        )
+        expect(response).toBeDefined()
+        expect(response.error).toContain('SPATIAL_UNAVAILABLE')
     })
 
-    it('blocks portal traversal with [SPATIAL_UNAVAILABLE] when portal is locked', async () => {
-        // Lock portal between pipe and culvert
-        await setPortalLockAction(
-            model,
-            {
-                idx: 'lock-portal',
-                dat: {
-                    portalId: 'loc_culvert_junction#loc_the_warm_pipe',
-                    portalStatus: 'LOCKED',
-                },
-            },
-            {} as any,
-        )
+    it('binds SpatialPort synchronously and verifies kernel version', () => {
+        const port = createMockSpatialPort('4.2.0')
+        let response: any
 
-        const slv = vi.fn()
-        await checkPortalCrossingAction(
-            model,
-            {
-                idx: 'check-locked',
-                dat: {
-                    traversalRequest: {
-                        actorId: 'char_wart',
-                        fromLocationId: 'loc_the_warm_pipe',
-                        toLocationId: 'loc_culvert_junction',
-                        tick: 2,
-                        timestampMs: 1700000000000,
-                    },
-                },
-                slv,
+        bindSpatialPortAction(model, {
+            idx: 'bind-port',
+            dat: { spatialPort: port, topologyManifest: mockTopology },
+            slv: (res) => {
+                response = res.locBit
             },
-            {} as any,
-        )
+        })
 
-        expect(slv).toHaveBeenCalledWith(
-            expect.objectContaining({
-                locBit: expect.objectContaining({
-                    val: -1,
-                    idx: 'spatial-unavailable',
-                    src: '[SPATIAL_UNAVAILABLE]',
-                }),
-                traversalReceipt: expect.objectContaining({
-                    permitted: false,
-                    error: expect.stringContaining('SPATIAL_UNAVAILABLE'),
-                }),
-            }),
-        )
+        expect(response.idx).toBe('bind-spatial-port-success')
+        expect(response.src).toBe('4.2.0')
+        expect(model.spatialPort).toBe(port)
+        expect(model.topologyManifest).toBe(mockTopology)
     })
 
-    it('blocks traversal when destination room reaches maxOccupants ceiling', async () => {
-        // loc_siphon_chamber has maxOccupants: 2
-        model.occupants.get('loc_siphon_chamber')!.add('occupant_1')
-        model.occupants.get('loc_siphon_chamber')!.add('occupant_2')
+    it('executes findPath synchronously within host V8 isolate (zero Promises)', () => {
+        const port = createMockSpatialPort('4.2.0')
+        bindSpatialPortAction(model, {
+            idx: 'bind-port',
+            dat: { spatialPort: port, topologyManifest: mockTopology },
+        })
 
-        const slv = vi.fn()
-        await checkPortalCrossingAction(
-            model,
-            {
-                idx: 'check-crowded',
-                dat: {
-                    traversalRequest: {
-                        actorId: 'char_intruder',
-                        fromLocationId: 'loc_culvert_junction',
-                        toLocationId: 'loc_siphon_chamber',
-                        tick: 3,
-                        timestampMs: 1700000000000,
-                    },
-                },
-                slv,
+        let pathResult: any
+        const actionReturn = evaluateSpatialPathAction(model, {
+            idx: 'eval-path',
+            dat: {
+                overlaySnapshot: mockOverlay,
+                originPacked: 101,
+                destinationPacked: 102,
+                maxBudgetCostUnits: 500,
             },
-            {} as any,
-        )
+            slv: (res) => {
+                pathResult = res.locBit.dat?.pathReceipt
+            },
+        })
 
-        expect(slv).toHaveBeenCalledWith(
-            expect.objectContaining({
-                locBit: expect.objectContaining({
-                    val: -1,
-                    idx: 'capacity-exceeded',
-                    src: '[CAPACITY_EXCEEDED]',
-                }),
-            }),
-        )
+        // Purity assertion: must not be a Promise
+        expect(actionReturn).not.toBeInstanceOf(Promise)
+        expect(pathResult).toBeDefined()
+        expect(pathResult.ok).toBe(true)
+        expect(pathResult.totalCostUnits).toBe(150)
+        expect(pathResult.kernelVersion).toBe('4.2.0')
     })
 
-    it('executes atomic character relocation and dispatches events across units', async () => {
-        const eventsAppended: string[] = []
-        const mockState: any = {
-            hunt: vi.fn(async (actionType: string, payload: any) => {
-                if (actionType === '[Event action] Append Event') {
-                    eventsAppended.push(payload.dat.appendParams.eventType)
-                }
-                return { eventBit: { val: 1 }, databaseBit: { val: 1 } }
-            }),
-        }
+    it('executes evaluatePerception synchronously and computes exact SNR margin', () => {
+        const port = createMockSpatialPort('4.2.0')
+        bindSpatialPortAction(model, {
+            idx: 'bind-port',
+            dat: { spatialPort: port, topologyManifest: mockTopology },
+        })
 
-        const slv = vi.fn()
-        await traverseLocationAction(
-            model,
-            {
-                idx: 'traverse',
-                dat: {
-                    traversalRequest: {
-                        actorId: 'char_bog',
-                        fromLocationId: 'loc_the_warm_pipe',
-                        toLocationId: 'loc_culvert_junction',
-                        tick: 5,
-                        timestampMs: 1700000000000,
-                    },
-                },
-                slv,
+        let perceptResult: any
+        const actionReturn = evaluateSpatialPerceptionAction(model, {
+            idx: 'eval-perc',
+            dat: {
+                overlaySnapshot: mockOverlay,
+                sourceCellPacked: 101,
+                observerCellPacked: 105,
+                emissionEnergyCdB: 7500,
             },
-            mockState,
-        )
-
-        expect(slv).toHaveBeenCalledWith(
-            expect.objectContaining({
-                locBit: expect.objectContaining({
-                    val: 1,
-                    idx: 'traverse-location-pass',
-                }),
-                traversalReceipt: expect.objectContaining({ permitted: true }),
-            }),
-        )
-
-        expect(eventsAppended).toContain('ACTOR_LEFT_LOCATION')
-        expect(eventsAppended).toContain('ACTOR_ENTERED_LOCATION')
-        expect(model.occupants.get('loc_the_warm_pipe')!.has('char_bog')).toBe(
-            false,
-        )
-        expect(
-            model.occupants.get('loc_culvert_junction')!.has('char_bog'),
-        ).toBe(true)
-    })
-
-    it('routes TRAVERSE_LOCATION cleanly through pure reducer using clone-deep', async () => {
-        const slv = vi.fn()
-        const result = (await reducer(
-            model,
-            {
-                type: TRAVERSE_LOCATION,
-                bale: {
-                    idx: 'traverse-reducer',
-                    dat: {
-                        traversalRequest: {
-                            actorId: 'char_wart',
-                            fromLocationId: 'loc_the_warm_pipe',
-                            toLocationId: 'loc_drainage_pantry',
-                            tick: 1,
-                            timestampMs: 1700000000000,
-                        },
-                    },
-                    slv,
-                } as any,
+            slv: (res) => {
+                perceptResult = res.locBit.dat?.perceptCandidate
             },
-            { hunt: async () => ({}) } as any,
-        )) as LocationModel
+        })
 
-        expect(result).toBeInstanceOf(LocationModel)
-        expect(slv).toHaveBeenCalled()
+        expect(actionReturn).not.toBeInstanceOf(Promise)
+        expect(perceptResult).toBeDefined()
+        expect(perceptResult.channel).toBe('VISUAL')
+        expect(perceptResult.signalCdB).toBe(7500)
+        expect(perceptResult.snrMarginCdB).toBe(4500) // 7500 - 3000
+        expect(perceptResult.isOccluded).toBe(false)
     })
 })

@@ -6,6 +6,10 @@ import type {
     SpatialNodeDescriptor,
     PortalRecord,
 } from './fce/location.interface.js'
+import type {
+    SpatialPort,
+    TopologyManifest,
+} from './fce/spatial-port.interface.js'
 
 export const BASELINE_TOPOLOGY_LOCATIONS: readonly SpatialNodeDescriptor[] =
     Object.freeze([
@@ -59,6 +63,8 @@ export class LocationModel implements Location {
     locations: Map<string, SpatialNodeDescriptor> = new Map()
     portals: Map<string, PortalRecord> = new Map()
     occupants: Map<string, Set<string>> = new Map()
+    spatialPort?: SpatialPort
+    topologyManifest?: TopologyManifest
 }
 
 export default LocationModel

@@ -3,6 +3,8 @@
  * Spatial topology graph, reciprocal portal meshes, and traversal routing.
  */
 
+import type { SpatialPort, TopologyManifest } from './spatial-port.interface.js'
+
 export type LightingLevel =
     | 'PITCH_BLACK'
     | 'FAINT_SEEPAGE'
@@ -14,11 +16,11 @@ export type PortalStatus = 'UNLOCKED' | 'LOCKED' | 'COLLAPSED'
 export interface SpatialNodeDescriptor {
     readonly locationId: string
     readonly displayName: string
-    readonly adjacentLocations: readonly string[] // Direct bidirectional neighbors
-    readonly acousticDampingBps: number // Sound attenuation in basis points [500, 10000]
+    readonly adjacentLocations: readonly string[]
+    readonly acousticDampingBps: number
     readonly lightingLevel: LightingLevel
-    readonly maxOccupants: number // Maximum entities permitted before crowding
-    readonly isCramped: boolean // Imposes kinetic movement constraints
+    readonly maxOccupants: number
+    readonly isCramped: boolean
 }
 
 export interface PortalRecord {
@@ -68,5 +70,7 @@ export default interface Location {
     originHubId: string
     locations: Map<string, SpatialNodeDescriptor>
     portals: Map<string, PortalRecord>
-    occupants: Map<string, Set<string>> // locationId -> Set<actorId>
+    occupants: Map<string, Set<string>>
+    spatialPort?: SpatialPort
+    topologyManifest?: TopologyManifest
 }
