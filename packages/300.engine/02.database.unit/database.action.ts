@@ -109,6 +109,8 @@ export type Actions =
     | CloseDatabase
     | ExecDatabase
     | EnsureSchema
+    | MigrateSpatialProofSchema
+    | AppendEventLogWithProof
 
 export const MOUNT_REALM_DATABASE = '[Database action] Mount Realm Database'
 export class MountRealmDatabase implements Action {
@@ -131,5 +133,19 @@ export class ExecDatabase implements Action {
 export const ENSURE_SCHEMA = '[Database action] Ensure Schema'
 export class EnsureSchema implements Action {
     readonly type = ENSURE_SCHEMA
+    constructor(public bale?: DatabaseBit) {}
+}
+
+export const MIGRATE_SPATIAL_PROOF_SCHEMA =
+    '[Database action] Migrate Spatial Proof Schema'
+export class MigrateSpatialProofSchema implements Action {
+    readonly type = MIGRATE_SPATIAL_PROOF_SCHEMA
+    constructor(public bale?: DatabaseBit) {}
+}
+
+export const APPEND_EVENT_LOG_WITH_PROOF =
+    '[Database action] Append Event Log With Proof'
+export class AppendEventLogWithProof implements Action {
+    readonly type = APPEND_EVENT_LOG_WITH_PROOF
     constructor(public bale?: DatabaseBit) {}
 }

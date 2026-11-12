@@ -1,6 +1,11 @@
-export const FOUR_VECTOR_AND_CONTINUITY_DDL = `
+/**
+ * Phase 5 Spatial Evidence Quadruple DDL: the append-only event ledger
+ * provisions the four cryptographic proof digests with STRICT column
+ * regularity (empty string defaults, never nulls).
+ */
+export const EVENT_LOG_DDL = `
 -- ==============================================================================
--- 1. HISTORICAL TRUTH VECTOR (APPEND-ONLY)
+-- 1. HISTORICAL TRUTH VECTOR (APPEND-ONLY) WITH SPATIAL PROOF QUADRUPLE
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS event_log (
   sequence_number INTEGER PRIMARY KEY,
@@ -13,11 +18,30 @@ CREATE TABLE IF NOT EXISTS event_log (
   prev_hash TEXT NOT NULL,
   seed TEXT NOT NULL,
   timestamp_ms INTEGER NOT NULL,
-  topology_hash TEXT,
-  overlay_hash TEXT,
-  query_hash TEXT,
-  receipt_hash TEXT
-);
+  topology_hash TEXT NOT NULL DEFAULT '',
+  overlay_hash TEXT NOT NULL DEFAULT '',
+  query_hash TEXT NOT NULL DEFAULT '',
+  receipt_hash TEXT NOT NULL DEFAULT ''
+);`
+
+/**
+ * Hard database-level immutability sentinels on event_log. Any UPDATE or
+ * DELETE against a committed ledger row aborts with IMMUTABILITY_VIOLATION.
+ */
+export const EVENT_LOG_TRIGGERS = `
+CREATE TRIGGER IF NOT EXISTS trg_event_log_no_update
+BEFORE UPDATE ON event_log
+BEGIN
+  SELECT RAISE(ABORT, '[IMMUTABILITY_VIOLATION] Updates forbidden on event_log');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_event_log_no_delete
+BEFORE DELETE ON event_log
+BEGIN
+  SELECT RAISE(ABORT, '[IMMUTABILITY_VIOLATION] Deletions forbidden on event_log');
+END;`
+
+export const FOUR_VECTOR_AND_CONTINUITY_DDL = `${EVENT_LOG_DDL}
 
 -- ==============================================================================
 -- 2. SOMATIC & SPATIAL VECTORS
@@ -155,19 +179,9 @@ GROUP BY f.id;
 
 export const SCHEMA_TRIGGERS_DDL = `
 -- ==============================================================================
--- IMMUTABILITY TRIGGERS ON event_log
+-- IMMUTABILITY TRIGGERS ON event_log (embedded from EVENT_LOG_TRIGGERS)
 -- ==============================================================================
-CREATE TRIGGER IF NOT EXISTS trg_event_log_no_update
-BEFORE UPDATE ON event_log
-BEGIN
-  SELECT RAISE(ABORT, '[IMMUTABILITY_VIOLATION] Updates forbidden on event_log');
-END;
-
-CREATE TRIGGER IF NOT EXISTS trg_event_log_no_delete
-BEFORE DELETE ON event_log
-BEGIN
-  SELECT RAISE(ABORT, '[IMMUTABILITY_VIOLATION] Deletions forbidden on event_log');
-END;
+${EVENT_LOG_TRIGGERS}
 
 -- ==============================================================================
 -- MONOTONIC VERSION CASCADE TRIGGER ON facts

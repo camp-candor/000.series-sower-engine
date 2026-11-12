@@ -72,6 +72,20 @@ export function reducer(
         case Act.ENSURE_SCHEMA:
             return Buzz.ensureSchema(clone(model), act.bale, state)
 
+        case Act.MIGRATE_SPATIAL_PROOF_SCHEMA:
+            return Buzz.migrateSpatialProofSchemaAction(
+                clone(model),
+                act.bale as any,
+                state,
+            )
+
+        case Act.APPEND_EVENT_LOG_WITH_PROOF:
+            return Buzz.appendEventLogWithProof(
+                clone(model),
+                act.bale as any,
+                state,
+            )
+
         default:
             return model
     }

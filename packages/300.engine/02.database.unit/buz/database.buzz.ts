@@ -204,6 +204,20 @@ export const ensureSchema = async (
     )
     db.exec(SCHEMA_TRIGGERS_DDL)
 
+    // Phase 5: Idempotent spatial proof quadruple migration. On fresh DDL
+    // this is a no-op; on pre-existing ledgers it appends missing proof
+    // columns with strict empty-string defaults (never nulls).
+    migrateSpatialProofSchema(cpy)
+
+    await emitConsole(
+        ste,
+        '>> [SCHEMA:ENSURE] [OK] event_log equipped with spatial proof quadruple.',
+    )
+    await emitConsole(
+        ste,
+        '>> [TRIGGERS:ARM] [OK] Immutability abort sentinels armed on event_log.',
+    )
+
     // Compile Schema Inventory
     const tables = db
         .prepare(
@@ -1432,6 +1446,10 @@ export const mountRealmDatabase = async (
         ste,
         `>> [DB:PRAGMA] foreign_keys=${metadata.foreignKeysEnabled} journal_mode=${walPragma} [OK]`,
     )
+    await emitConsole(
+        ste,
+        `>> [DATABASE:INIT] [OK] Mounted SQLite target: ${targetPath}`,
+    )
 
     if (bal?.slv) {
         bal.slv({
@@ -1460,22 +1478,30 @@ export const migrateSpatialProofSchema = (
 
     if (!columnNames.includes('topology_hash')) {
         cpy.connection
-            .prepare(`ALTER TABLE event_log ADD COLUMN topology_hash TEXT;`)
+            .prepare(
+                `ALTER TABLE event_log ADD COLUMN topology_hash TEXT NOT NULL DEFAULT '';`,
+            )
             .run()
     }
     if (!columnNames.includes('overlay_hash')) {
         cpy.connection
-            .prepare(`ALTER TABLE event_log ADD COLUMN overlay_hash TEXT;`)
+            .prepare(
+                `ALTER TABLE event_log ADD COLUMN overlay_hash TEXT NOT NULL DEFAULT '';`,
+            )
             .run()
     }
     if (!columnNames.includes('query_hash')) {
         cpy.connection
-            .prepare(`ALTER TABLE event_log ADD COLUMN query_hash TEXT;`)
+            .prepare(
+                `ALTER TABLE event_log ADD COLUMN query_hash TEXT NOT NULL DEFAULT '';`,
+            )
             .run()
     }
     if (!columnNames.includes('receipt_hash')) {
         cpy.connection
-            .prepare(`ALTER TABLE event_log ADD COLUMN receipt_hash TEXT;`)
+            .prepare(
+                `ALTER TABLE event_log ADD COLUMN receipt_hash TEXT NOT NULL DEFAULT '';`,
+            )
             .run()
     }
 
@@ -1486,9 +1512,15 @@ export const migrateSpatialProofSchema = (
 export const migrateSpatialProofSchemaAction = async (
     cpy: DatabaseModel,
     bal: DatabaseBit,
-    _ste?: State,
+    ste?: State,
 ): Promise<DatabaseModel> => {
     migrateSpatialProofSchema(cpy)
+    if (cpy.connection) {
+        await emitConsole(
+            ste,
+            '>> [SCHEMA:ALTER] [OK] Idempotent spatial proof migration confirmed on event_log quadruple.',
+        )
+    }
     if (bal.slv) {
         bal.slv({
             datBit: {
