@@ -17,6 +17,7 @@ export interface SpatialProbeTelemetry {
     readonly feasible: boolean
     readonly traversalCostUnits: number
     readonly cellsExpanded: number
+    readonly hopCount: number
     readonly queryHash: string
     readonly receiptHash: string
     readonly failureReason?: string

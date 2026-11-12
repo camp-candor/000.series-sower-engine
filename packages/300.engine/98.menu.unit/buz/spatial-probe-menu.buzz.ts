@@ -5,6 +5,7 @@
 import type { MenuModel } from '../menu.model.js'
 import type MenuBit from '../fce/menu.bit.js'
 import type State from '../../99.core/state.js'
+import * as Align from '../../val/align.js'
 import { SPATIAL_PROBE_CHOICES } from '../menu.model.js'
 import type { SpatialProbeTelemetry } from '../fce/menu.interface.js'
 
@@ -12,6 +13,28 @@ const UPDATE_CONSOLE = '[Console action] Update Console'
 const OPEN_CHOICE = '[Open action] Open Choice'
 const UPDATE_GRID = '[Grid action] Update Grid'
 const EVALUATE_SPATIAL_PATH = '[Location action] Evaluate Spatial Path'
+
+/**
+ * Canonical baseline realm: empty lattice, no blocked cells, no sealed
+ * portals. Used whenever a probe dispatch omits an explicit manifest or
+ * overlay so live EVALUATE_SPATIAL_PATH never fails INVALID_QUERY.
+ */
+export const canonicalBaselineManifest = () => ({
+    topologyHash:
+        'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    bounds: { minQ: -10, maxQ: 10, minR: -10, maxR: 10 },
+    blockedCells: new Set<number>(),
+    portalEdges: new Map(),
+    cellAcousticDampingCdB: new Map<number, number>(),
+    ambientNoiseFloorCdB: 3000,
+})
+
+export const canonicalBaselineOverlay = () => ({
+    overlayHash:
+        'f4c2e11898fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b999',
+    closedPortals: [],
+    impassableCells: [],
+})
 
 export const emitConsole = async (
     ste: State | undefined,
@@ -47,6 +70,10 @@ export const openSpatialProbeMenuBuzz = async (
 
     await emitConsole(
         ste,
+        `>> [SPATIAL:DIAG] Probe catalog size: ${(SPATIAL_PROBE_CHOICES as readonly string[] | undefined)?.length ?? 'undef'} entries.`,
+    )
+    await emitConsole(
+        ste,
         '>> ------------------------------------------------------------',
     )
     await emitConsole(
@@ -64,19 +91,20 @@ export const openSpatialProbeMenuBuzz = async (
 
     const lib = (globalThis as any).LIBRARY || (global as any).LIBRARY
     if (lib && typeof lib.hunt === 'function') {
-        // Allocate Left Deck (Cols 0-4, Rows 4-12) for choice list
-        await lib.hunt(UPDATE_GRID, {
-            idx: 'choice-grid',
-            src: { x: 0, y: 4, xSpan: 4, ySpan: 8 },
+        // Allocate Left Deck (Cols 0-4, Rows 4-12) for choice list.
+        // NOTE: coordinates are top-level bale fields (the harness grid
+        // reducer reads bal.x / bal.y, not a nested src object).
+        const gridBit: any = await lib.hunt(UPDATE_GRID, {
+            x: 0,
+            y: 4,
+            xSpan: 4,
+            ySpan: 8,
         })
 
-        await lib.hunt(OPEN_CHOICE, {
-            idx: 'spatial-choice',
+        const choiceRes: any = await lib.hunt(OPEN_CHOICE, {
             dat: {
                 clr0: 'black',
                 clr1: 'green',
-                layout: 'vertical',
-                choices: SPATIAL_PROBE_CHOICES,
                 cb: async (selectedChoice: string) => {
                     // Tooltip focus streamer
                     if (selectedChoice.includes('CANONICAL')) {
@@ -102,7 +130,15 @@ export const openSpatialProbeMenuBuzz = async (
                     }
                 },
             },
+            src: Align.VERTICAL,
+            lst: SPATIAL_PROBE_CHOICES,
+            net: gridBit?.grdBit?.dat,
         })
+        cpy.activeSelection = choiceRes?.chcBit?.src ?? ''
+        await emitConsole(
+            ste,
+            `>> [MENU:SPATIAL] Pick resolved: [${cpy.activeSelection || '<empty>'}] via [${choiceRes?.chcBit?.idx || '<no-idx>'}].`,
+        )
     }
 
     if (bal?.slv) {
@@ -131,18 +167,24 @@ export const dispatchSpatialProbeBuzz = async (
     let receipt: any = null
 
     if (ste && typeof ste.hunt === 'function') {
-        await ste.hunt(EVALUATE_SPATIAL_PATH, {
+        // Await the hunt's own resolver (do NOT pass a custom bale slv:
+        // a custom slv would suppress the hunt promise and hang forever).
+        const evalRes: any = await ste.hunt(EVALUATE_SPATIAL_PATH, {
             idx: 'probe-eval',
             dat: {
                 originPacked: origin,
                 destinationPacked: destination,
                 maxBudgetCostUnits: budget,
                 workEnvelopeLimit: limit,
-            },
-            slv: (res: any) => {
-                receipt = res.locBit?.dat?.pathReceipt
+                topologyManifest:
+                    (bal?.dat as any)?.topologyManifest ??
+                    canonicalBaselineManifest(),
+                overlaySnapshot:
+                    (bal?.dat as any)?.overlaySnapshot ??
+                    canonicalBaselineOverlay(),
             },
         })
+        receipt = evalRes?.locBit?.dat?.pathReceipt
     } else {
         // Headless mock fallback for testing resilience
         receipt = {
@@ -167,6 +209,7 @@ export const dispatchSpatialProbeBuzz = async (
             feasible: receipt.ok,
             traversalCostUnits: receipt.totalCostUnits,
             cellsExpanded: receipt.cellsExpanded,
+            hopCount: receipt.path ? receipt.path.length : 0,
             queryHash: receipt.queryHash,
             receiptHash: receipt.receiptHash,
             failureReason: receipt.failureReason,
@@ -176,6 +219,10 @@ export const dispatchSpatialProbeBuzz = async (
         await emitConsole(
             ste,
             `>> [SPATIAL:RECEIPT] Feasible: ${receipt.ok ? 'TRUE' : 'FALSE'} | Traversal Cost: ${receipt.totalCostUnits} units`,
+        )
+        await emitConsole(
+            ste,
+            `>> [SPATIAL:HOPS] Path length: ${receipt.path ? receipt.path.length : 0} hops | Expanded: ${receipt.cellsExpanded} cells`,
         )
         await emitConsole(
             ste,
@@ -231,18 +278,24 @@ export const testSpatialWorkCeilingBuzz = async (
     let receipt: any = null
 
     if (ste && typeof ste.hunt === 'function') {
-        await ste.hunt(EVALUATE_SPATIAL_PATH, {
+        // Await the hunt's own resolver (do NOT pass a custom bale slv:
+        // a custom slv would suppress the hunt promise and hang forever).
+        const ceilingRes: any = await ste.hunt(EVALUATE_SPATIAL_PATH, {
             idx: 'ceiling-test',
             dat: {
                 originPacked: 0x80008000,
                 destinationPacked: 0x80208020, // Distant unreachable cell
                 maxBudgetCostUnits: 50000,
                 workEnvelopeLimit: 4, // Intentionally restricted to force tripwire
-            },
-            slv: (res: any) => {
-                receipt = res.locBit?.dat?.pathReceipt
+                topologyManifest:
+                    (bal?.dat as any)?.topologyManifest ??
+                    canonicalBaselineManifest(),
+                overlaySnapshot:
+                    (bal?.dat as any)?.overlaySnapshot ??
+                    canonicalBaselineOverlay(),
             },
         })
+        receipt = ceilingRes?.locBit?.dat?.pathReceipt
     } else {
         // Headless mock fallback
         receipt = {

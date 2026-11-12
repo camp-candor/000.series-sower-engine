@@ -92,12 +92,24 @@ export const processPerceptCandidateAction = async (
     }
 
     const percept = parsePerceptCandidate(candidateRaw)
+    await emitConsole(
+        _ste,
+        `>> [PERCEPT:INGEST] Parsing 1 ${percept.channel} candidate for actor: ${actorId}`,
+    )
     const evaluation = evaluateSensoryFilter(percept, profile)
+    await emitConsole(
+        _ste,
+        `>> [SOMATIC:FILTER] Evaluated receptors: visualAcuity=${profile.visualAcuity} | ${evaluation.received ? 'Cone=PASS' : evaluation.rejectionReason}`,
+    )
 
     if (!evaluation.received) {
         await emitConsole(
             _ste,
-            `>> [IGNORANCE_BY_OMISSION] Actor [${actorId}] blocked from perceiving [${propSlug}] (${evaluation.rejectionReason})`,
+            `>> [IGNORANCE_BY_OMISSION] Actor [${actorId}] blocked: ${evaluation.rejectionReason} (0 beliefs written)`,
+        )
+        await emitConsole(
+            _ste,
+            `>> [EPISTEMIC:HORIZON] ${actorId}: TOTAL_IGNORANCE`,
         )
         if (bal?.slv) {
             bal.slv({
@@ -137,6 +149,10 @@ export const processPerceptCandidateAction = async (
         await emitConsole(
             _ste,
             `>> [BELIEF:COMMIT] Actor [${actorId}] gained DIRECT_OBSERVATION for [${propSlug}] (${belief.subjective_confidence_bp} bps)`,
+        )
+        await emitConsole(
+            _ste,
+            `>> [EPISTEMIC:HORIZON] ${actorId}: FACTUAL_WITNESS`,
         )
 
         if (bal?.slv) {

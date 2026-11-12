@@ -1476,6 +1476,14 @@ export const migrateSpatialProofSchema = (
     }>
     const columnNames = columns.map((c) => c.name)
 
+    // Legacy backfill: ledgers minted before actor attribution was
+    // provisioned lack actor_id. Backfill it idempotently so the
+    // parameter-bound append path never crashes on stale realm files.
+    if (!columnNames.includes('actor_id')) {
+        cpy.connection
+            .prepare(`ALTER TABLE event_log ADD COLUMN actor_id TEXT;`)
+            .run()
+    }
     if (!columnNames.includes('topology_hash')) {
         cpy.connection
             .prepare(

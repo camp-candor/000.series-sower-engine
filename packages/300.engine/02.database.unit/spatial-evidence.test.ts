@@ -151,4 +151,77 @@ describe('02.database.unit - Spatial Quadruple Evidence Schema Migration Battery
         expect(migrationStatus).toBe(true)
         expect(model.hasSpatialSchema).toBe(true)
     })
+
+    it('backfills actor_id on legacy ledgers minted before attribution', async () => {
+        const legacy = new DatabaseModel()
+        const { mountRealmDatabase } = await import('./buz/database.buzz.js')
+        await mountRealmDatabase(
+            legacy as any,
+            {
+                idx: 'mount',
+                dat: { seriesSlug: 'legacy-realm', storageTarget: ':memory:' },
+            } as any,
+        )
+        // Simulate a stale realm file: legacy event_log without actor_id
+        // and without the Phase 5 proof quadruple.
+        legacy.connection.exec(`DROP TABLE IF EXISTS event_log;`)
+        legacy.connection.exec(
+            `CREATE TABLE event_log (
+              sequence_number INTEGER PRIMARY KEY,
+              event_id TEXT NOT NULL UNIQUE,
+              event_type TEXT NOT NULL,
+              tick INTEGER NOT NULL DEFAULT 0,
+              payload_json TEXT NOT NULL,
+              state_hash TEXT NOT NULL,
+              prev_hash TEXT NOT NULL,
+              seed TEXT NOT NULL,
+              timestamp_ms INTEGER NOT NULL
+            );`,
+        )
+        legacy.connection.exec(
+            `CREATE TRIGGER trg_event_log_no_update BEFORE UPDATE ON event_log
+             BEGIN
+               SELECT RAISE(ABORT, '[IMMUTABILITY_VIOLATION] Updates forbidden on event_log');
+             END;`,
+        )
+        legacy.connection.exec(
+            `CREATE TRIGGER trg_event_log_no_delete BEFORE DELETE ON event_log
+             BEGIN
+               SELECT RAISE(ABORT, '[IMMUTABILITY_VIOLATION] Deletions forbidden on event_log');
+             END;`,
+        )
+        await ensureSchema(legacy as any)
+        const cols = (
+            legacy.connection.pragma('table_info(event_log)') as Array<{
+                name: string
+            }>
+        ).map((c) => c.name)
+        expect(cols).toContain('actor_id')
+        expect(cols).toContain('topology_hash')
+        expect(cols).toContain('receipt_hash')
+
+        let seq = -1
+        await appendEventLogWithProof(
+            legacy as any,
+            {
+                idx: 'append-legacy',
+                dat: {
+                    appendEvent: {
+                        eventId: 'evt_legacy_001',
+                        tick: 1,
+                        eventType: 'ACTOR_MOVED',
+                        actorId: 'char_bog',
+                        payloadJson: '{}',
+                        prevEventHash: 'prev',
+                        eventHash: 'curr',
+                    },
+                },
+                slv: (res: any) => {
+                    seq = res.datBit.val
+                },
+            } as any,
+        )
+        expect(seq).toBe(1)
+        legacy.connection.close()
+    })
 })

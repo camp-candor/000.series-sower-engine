@@ -20,6 +20,7 @@ import * as ActTrm from '../../18.trauma.unit/trauma.action.js'
 import * as ActWnd from '../../19.wounds.unit/wounds.action.js'
 import * as ActInv from '../../07.inventory.unit/inventory.action.js'
 import * as ActLoc from '../../10.location.unit/location.action.js'
+import * as ActBel from '../../11.belief.unit/belief.action.js'
 import {
     GENESIS_HASH_64,
     computeChainedEventHash,
@@ -36,6 +37,11 @@ import type State from '../../99.core/state.js'
 
 import * as Align from '../../val/align.js'
 import * as Color from '../../val/console-color.js'
+import {
+    openSpatialProbeMenuBuzz,
+    dispatchSpatialProbeBuzz,
+    testSpatialWorkCeilingBuzz,
+} from './spatial-probe-menu.buzz.js'
 import { openGauntletMenu } from './gauntlet-menu.buzz.js'
 import {
     openCompileMenu,
@@ -61,6 +67,7 @@ import type {
     PortalRecord,
 } from '../../10.location.unit/location.buzzer.js'
 import { MovementModel } from '../../11.movement.unit/movement.model.js'
+import { evaluateSensoryFilter } from '../../11.belief.unit/buz/sensory-filter.buzz.js'
 import {
     initMovement,
     setActorPositionAction,
@@ -130,6 +137,11 @@ import { auditEngine } from '../../00.engine.unit/engine.buzzer.js'
 
 let bit: any, lst: any, src: any
 let rootSlv: any
+// Modal dispatch guard: stacked curses forms from timer re-arms submit
+// concurrently on every keypress. Serialize handleMenuSelection so only
+// the first submission runs; stale duplicates defer with a receipt
+// instead of tearing down shared engine state mid-flight.
+let menuDispatchBusy = false
 
 const UPDATE_GRID = '[Grid action] Update Grid'
 const WRITE_CONSOLE = '[Write action] Write Console'
@@ -184,599 +196,905 @@ export const handleMenuSelection = async (
         return
     }
 
-    switch (selection) {
-        case '[01] BOOT ENGINE & ENSURE SCHEMA': {
-            if (model) model.airlockState = 'SELECTING'
-            const selectedSlug = await promptAirlockUniverseSelection(
-                ste,
-                baseDir,
-            )
-
-            if (!selectedSlug) {
-                if (model) model.airlockState = 'ABORTED'
-                break
-            }
-
-            await emitConsole(
-                ste,
-                '>> ==============================================================================',
-            )
-            await emitConsole(
-                ste,
-                '>> [EPIC-08] INITIATING CANON AIRLOCK & DISCRETE REALM VAULT',
-            )
-            await emitConsole(
-                ste,
-                `>> [AIRLOCK::INGEST] Target selected: [${selectedSlug}]`,
-            )
-            await emitConsole(
-                ste,
-                `>> [AIRLOCK::BYTE_0] Reading compiled/${selectedSlug}/bible-state.json`,
-            )
-
-            let frozenBibleState: DeepReadonly<Record<string, any>>
-            try {
-                frozenBibleState = loadAndFreezeUniverseManifest(
-                    selectedSlug,
+    if (menuDispatchBusy) {
+        await emitConsole(
+            ste,
+            `>> [MENU:BUSY] Switchboard occupied; deferred [${selection}].`,
+        )
+        return
+    }
+    menuDispatchBusy = true
+    try {
+        switch (selection) {
+            case '[01] BOOT ENGINE & ENSURE SCHEMA': {
+                if (model) model.airlockState = 'SELECTING'
+                const selectedSlug = await promptAirlockUniverseSelection(
+                    ste,
                     baseDir,
                 )
-                await emitConsole(
-                    ste,
-                    '>> [AIRLOCK::SEAL] In-memory immutable defensive lock applied (Object.freeze)',
-                )
-                await emitConsole(
-                    ste,
-                    '>> [AIRLOCK::PURITY] Zero Native I/O Fence verified: 0 disk handles forwarded',
-                )
+
+                if (!selectedSlug) {
+                    if (model) model.airlockState = 'ABORTED'
+                    break
+                }
+
                 await emitConsole(
                     ste,
                     '>> ==============================================================================',
                 )
-            } catch (err: any) {
                 await emitConsole(
                     ste,
-                    `:: [AIRLOCK::FATAL] Ingestion failure: ${err.message}`,
+                    '>> [EPIC-08] INITIATING CANON AIRLOCK & DISCRETE REALM VAULT',
                 )
-                if (model) model.airlockState = 'ABORTED'
-                break
-            }
+                await emitConsole(
+                    ste,
+                    `>> [AIRLOCK::INGEST] Target selected: [${selectedSlug}]`,
+                )
+                await emitConsole(
+                    ste,
+                    `>> [AIRLOCK::BYTE_0] Reading compiled/${selectedSlug}/bible-state.json`,
+                )
 
-            if (model) {
-                model.activeUniverseSlug = selectedSlug
-                model.flightDeckMode = 'RUNTIME'
-                model.activeSeriesSlug = selectedSlug
-                model.airlockState = 'DISPATCHED'
-            }
-
-            await emitConsole(
-                ste,
-                `>> [MENU:ACTION] Dispatching BOOT_ENGINE with realm [${selectedSlug}]...`,
-            )
-            await ste.hunt(ActEng.BOOT_ENGINE, {
-                dat: {
-                    bootParams: {
-                        seriesSlug: selectedSlug,
-                        bibleState: frozenBibleState,
-                        seedGenesis: true,
-                    },
-                },
-            })
-
-            // Phase 1 SpatialPort binding: mount the synchronous in-process
-            // geometry oracle into 10.location.unit during initialization.
-            try {
-                await ste.hunt(ActLoc.INIT_LOCATION, {})
-                await ste.hunt(ActLoc.BIND_SPATIAL_PORT, {
-                    dat: { spatialPort: new InProcessSpatialAdapter() },
-                })
-            } catch (err: any) {
-                await emitConsole(
-                    ste,
-                    `:: [SPATIAL:PORT] Initialization binding failed: ${err?.message ?? String(err)}`,
-                )
-            }
-
-            await emitConsole(
-                ste,
-                '------------------------------------------------------------',
-            )
-            await emitConsole(
-                ste,
-                '>> [EPIC-08] AXIOMATIC GENESIS & COMPARTMENTALIZED LEDGERS [ACTIVE]',
-            )
-            await emitConsole(
-                ste,
-                `>> [RUNTIME:READY] Active Universe: [${selectedSlug}]`,
-            )
-            await emitConsole(
-                ste,
-                '>> [SWITCHBOARD] Navigation switched to RUNTIME DISPATCH in left deck.',
-            )
-            await emitConsole(
-                ste,
-                '------------------------------------------------------------',
-            )
-            break
-        }
-
-        case '[14] EXECUTE DETERMINISTIC': {
-            await emitConsole(
-                ste,
-                '>> [EXECUTE] Dispatching Stage 3 Deterministic Encounter Lottery...',
-            )
-            if (ste && typeof ste.hunt === 'function') {
-                await ste.hunt(ActEng.STATUS_ENGINE, {})
-            }
-            await emitConsole(
-                ste,
-                '>> [EXECUTE:OK] Deterministic stage evaluation complete.',
-            )
-            break
-        }
-
-        case 'ADVANCE TICK': {
-            await emitConsole(
-                ste,
-                '>> [TICK] Advancing logical clock (+1 tick) & executing decay sweep...',
-            )
-            if (ste && typeof ste.hunt === 'function') {
-                const tickRes: any = await ste.hunt(ActEng.ADVANCE_TICK, {
-                    val: 1,
-                })
-                if (tickRes?.fenBit?.src) {
-                    await emitConsole(ste, `>> [TICK] ${tickRes.fenBit.src}`)
-                }
-            }
-            await emitConsole(
-                ste,
-                '>> [TICK:OK] Clock advanced. Doom meters decayed.',
-            )
-            // Phase 3 diagnostics: derive the live somatic traversal
-            // budget, hand capacity, and guard verdict for the tick cast.
-            try {
-                const tickSomatic = extractSomaticState({
-                    entityId: 'char_skulk',
-                    availableArms: 2,
-                    availableLegs: 1,
-                    locomotionTier: 'LIMP',
-                    fatigueBps: 5000,
-                    painBps: 2000,
-                    refusalStrainBps: 0,
-                    activeTrauma: [],
-                })
-                const tickReceipt = deriveSomaticBudget(tickSomatic)
-                const tickHands = validateHandCapacity(1, [
-                    { itemId: 'item_torch', occupiesHands: 1 },
-                ])
-                const tickGuard = verifyTraversalBudget(
-                    150,
-                    tickReceipt.movementBudgetCostUnits,
-                )
-                await emitConsole(
-                    ste,
-                    `>> [SOMATIC:STATE] Ingested entity somatic profile: ${tickSomatic.entityId}`,
-                )
-                await emitConsole(
-                    ste,
-                    `>> [SOMATIC:BUDGET] Locomotion: ${tickSomatic.locomotionTier} | Fatigue: ${tickSomatic.fatigueBps} bps | Budget: ${tickReceipt.movementBudgetCostUnits} units`,
-                )
-                await emitConsole(
-                    ste,
-                    `>> [SOMATIC:VERBS] ${tickReceipt.bannedKineticVerbs.length} kinetic verbs masked: [${tickReceipt.bannedKineticVerbs.join(', ')}]`,
-                )
-                await emitConsole(
-                    ste,
-                    `>> [HANDS:SAT] Capacity check: ${tickHands.totalOccupiedHands}/${tickHands.availableArms} hands occupied ${tickHands.valid ? '[PASS]' : '[FAIL]'}`,
-                )
-                await emitConsole(
-                    ste,
-                    `>> [BUDGET:GUARD] Traversal cost ${tickGuard.traversalCostUnits} <= allowed ${tickGuard.allowedBudgetUnits} ${tickGuard.permitted ? '[PERMITTED]' : '[DENIED]'}`,
-                )
-            } catch (err: any) {
-                await emitConsole(
-                    ste,
-                    `:: [SOMATIC:STATE] Budget derivation failed: ${err?.message ?? String(err)}`,
-                )
-            }
-            break
-        }
-
-        case 'RUN SIM GAUNTLET': {
-            await emitConsole(
-                ste,
-                '>> [GAUNTLET] Launching continuous simulation gauntlet (100 ticks)...',
-            )
-            if (ste && typeof ste.hunt === 'function') {
-                const gauntletRes: any = await ste.hunt(
-                    ActEng.FAST_FORWARD_TICKS,
-                    {},
-                )
-                if (gauntletRes?.fenBit?.src) {
+                let frozenBibleState: DeepReadonly<Record<string, any>>
+                try {
+                    frozenBibleState = loadAndFreezeUniverseManifest(
+                        selectedSlug,
+                        baseDir,
+                    )
                     await emitConsole(
                         ste,
-                        `>> [GAUNTLET] ${gauntletRes.fenBit.src}`,
+                        '>> [AIRLOCK::SEAL] In-memory immutable defensive lock applied (Object.freeze)',
+                    )
+                    await emitConsole(
+                        ste,
+                        '>> [AIRLOCK::PURITY] Zero Native I/O Fence verified: 0 disk handles forwarded',
+                    )
+                    await emitConsole(
+                        ste,
+                        '>> ==============================================================================',
+                    )
+                } catch (err: any) {
+                    await emitConsole(
+                        ste,
+                        `:: [AIRLOCK::FATAL] Ingestion failure: ${err.message}`,
+                    )
+                    if (model) model.airlockState = 'ABORTED'
+                    break
+                }
+
+                if (model) {
+                    model.activeUniverseSlug = selectedSlug
+                    model.flightDeckMode = 'RUNTIME'
+                    model.activeSeriesSlug = selectedSlug
+                    model.airlockState = 'DISPATCHED'
+                }
+
+                await emitConsole(
+                    ste,
+                    `>> [MENU:ACTION] Dispatching BOOT_ENGINE with realm [${selectedSlug}]...`,
+                )
+                await ste.hunt(ActEng.BOOT_ENGINE, {
+                    dat: {
+                        bootParams: {
+                            seriesSlug: selectedSlug,
+                            bibleState: frozenBibleState,
+                            seedGenesis: true,
+                        },
+                    },
+                })
+
+                // Phase 1 SpatialPort binding: mount the synchronous in-process
+                // geometry oracle into 10.location.unit during initialization.
+                try {
+                    await ste.hunt(ActLoc.INIT_LOCATION, {})
+                    await ste.hunt(ActLoc.BIND_SPATIAL_PORT, {
+                        dat: { spatialPort: new InProcessSpatialAdapter() },
+                    })
+                } catch (err: any) {
+                    await emitConsole(
+                        ste,
+                        `:: [SPATIAL:PORT] Initialization binding failed: ${err?.message ?? String(err)}`,
                     )
                 }
-            }
-            await emitConsole(
-                ste,
-                '>> [GAUNTLET:COMPLETE] 100 ticks evaluated in host RAM (0 MB VRAM).',
-            )
-            break
-        }
 
-        case 'INSPECT 4-VECTOR STATE':
-        case '[02] STATUS ENGINE & TABLE':
-        case '[02] STATUS ENGINE & TABLE INVENTORY': {
-            await emitConsole(
-                ste,
-                '>> [STATUS] Querying 4-Vector table status and row inventories...',
-            )
-            await ste.hunt(ActEng.STATUS_ENGINE, {})
-            break
-        }
-
-        case '[03] AUDIT SIMULATION INVARIANTS': {
-            await emitConsole(
-                ste,
-                '>> [MENU:ACTION] Dispatching AUDIT_ENGINE...',
-            )
-            await ste.hunt(ActEng.AUDIT_ENGINE, {})
-            break
-        }
-
-        case '[04] RESET ENGINE TO OFFLINE': {
-            await emitConsole(
-                ste,
-                '>> [MENU:ACTION] Dispatching RESET_ENGINE...',
-            )
-            await ste.hunt(ActEng.RESET_ENGINE, {})
-            if (model) {
-                model.flightDeckMode = 'BOOT'
-                model.activeSeriesSlug = ''
-            }
-            await emitConsole(
-                ste,
-                '>> [RESET:OK] Cockpit returned to BOOT & ENSURE SCHEMA mode.',
-            )
-            break
-        }
-
-        case '[10] EXECUTE STAGE 3 GRIEVANCE LOTTERY & ENCOUNTER SELECTION': {
-            await emitConsole(
-                ste,
-                '>> [MENU:ACTION] Dispatching SELECT_STAGE3_ENCOUNTER...',
-            )
-            await ste.hunt(ActGrv.SELECT_STAGE3_ENCOUNTER, {
-                dat: {
-                    selectionParams: {
-                        sceneCast: ['char_bog', 'char_wart'],
-                        currentTensionBps: 3000,
-                        tick: 1,
-                        timestamp_ms: 1700000000000,
-                    },
-                },
-            })
-            break
-        }
-
-        case '[11] AUDIT STAGING ACCUMULATOR & ATOMIC COMMIT': {
-            await emitConsole(
-                ste,
-                '>> [MENU:ACTION] Dispatching COMMIT_STAGING_LEDGER...',
-            )
-            await ste.hunt(ActLed.COMMIT_STAGING_LEDGER, {
-                dat: { timestampMs: 1700000000000 },
-            })
-            break
-        }
-
-        case '[12] EXECUTE STAGE 4 DUAL-SET 2D6 CONFLICT RESOLUTION': {
-            await emitConsole(
-                ste,
-                '>> [MENU:ACTION] Dispatching RESOLVE_DUAL_2D6_LEDGER...',
-            )
-            await ste.hunt(ActLed.RESOLVE_DUAL_2D6_LEDGER, {
-                dat: {
-                    resolveParams: {
-                        context: {
-                            initiator: {
-                                id: 'char_bog',
-                                stats: { cunning: 2, poise: 1 },
-                            },
-                            target: {
-                                id: 'char_wart',
-                                stats: { spite: 1, vigor: 2 },
-                            },
-                            tick: 1,
-                            timestampMs: 1700000000000,
-                        },
-                        autoStage: true,
-                    },
-                },
-            })
-            break
-        }
-
-        case '[13] AUDIT UNRATIFIED DETAILS & SALIENCE HARVEST QUEUE': {
-            await emitConsole(
-                ste,
-                '>> [MENU:ACTION] Dispatching STAGE_DETAIL_ACTOR...',
-            )
-            await ste.hunt(ActAct.STAGE_DETAIL_ACTOR, {
-                dat: {
-                    stageDetailParams: {
-                        detail_id: 'det_cockpit_green_cup',
-                        scene_id: 'sc01',
-                        label_candidate: 'green_enamel_cup',
-                        category: 'PROP',
-                        recurrence_count: 3,
-                        dramatic_turn: 'GAZE_PROXIMITY',
-                        claim_proposal: 'Chipped green enamel cup on floor',
-                    },
-                },
-            })
-            break
-        }
-
-        case '[14] EXECUTE DETERMINISTIC STATE FOLD & AUDIT WHY-DIRTY': {
-            await emitConsole(
-                ste,
-                '>> [MENU:ACTION] Dispatching HYDRATE_STATE & WHY_DIRTY_STATE...',
-            )
-            await ste.hunt(ActSte.HYDRATE_STATE, {
-                dat: {
-                    hydrateParams: {
-                        seriesSlug: 'under-the-floorboards',
-                        tick: 1,
-                    },
-                },
-            })
-            await ste.hunt(ActSte.WHY_DIRTY_STATE, {
-                dat: { whyDirtyParams: { entityId: 'char_bog' } },
-            })
-            break
-        }
-
-        case '[15] AUDIT EPISTEMIC HORIZONS & SUBTEXT ATTENUATION': {
-            await emitConsole(
-                ste,
-                '>> [MENU:ACTION] Dispatching BUILD_SUBTEXT_DIRECTIVE_ACTOR...',
-            )
-            await ste.hunt(ActAct.BUILD_SUBTEXT_DIRECTIVE_ACTOR, {
-                dat: {
-                    subtextParams: {
-                        actor_id: 'char_bog',
-                        tension_bps: 8000,
-                        candidate_props: ['item_copper_tea_kettle'],
-                        surface_dispute: 'bent kettle lid',
-                        underlying_conflict: 'fear of seasonal abandonment',
-                    },
-                },
-            })
-            break
-        }
-
-        case '[16] COMPILE DUAL-FIELD DIALOGUE AST & ENFORCE CURTNESS': {
-            await emitConsole(
-                ste,
-                '>> [MENU:ACTION] Dispatching COMPILE_DIALOGUE_BEAT_ACTOR...',
-            )
-            await ste.hunt(ActAct.COMPILE_DIALOGUE_BEAT_ACTOR, {
-                dat: {
-                    compileBeatParams: {
-                        beat_id: 'b_cockpit_01',
-                        speaker: 'char_bog',
-                        dialogue_text: 'Leave the valve.',
-                        camera_parenthetical: 'Camera pushes in on Bog jaw.',
-                        observable_parenthetical: 'Bog stands motionless.',
-                        speech_act: 'IMPLICIT_WARNING',
-                        emotion: 'cold_urgency',
-                        swain_mru_phase: 'SPEECH',
-                        extracted_motor_actions: ['STAND'],
-                        curtness_bps: 10000,
-                    },
-                },
-            })
-            break
-        }
-
-        case '[17] SPATIAL FEASIBILITY PROBE': {
-            await emitConsole(
-                ste,
-                '>> [SPATIAL:PORT] Checking SpatialPort binding in 10.location.unit... [OK]',
-            )
-            // Bind the live port first so the probe always queries the same
-            // synchronous instance it mounts into 10.location.unit.
-            const probeAdapter = new InProcessSpatialAdapter()
-            try {
-                await ste.hunt(ActLoc.BIND_SPATIAL_PORT, {
-                    dat: { spatialPort: probeAdapter },
-                })
-            } catch (err: any) {
                 await emitConsole(
                     ste,
-                    `:: [SPATIAL:PORT] Probe binding failed: ${err?.message ?? String(err)}`,
+                    '------------------------------------------------------------',
+                )
+                await emitConsole(
+                    ste,
+                    '>> [EPIC-08] AXIOMATIC GENESIS & COMPARTMENTALIZED LEDGERS [ACTIVE]',
+                )
+                await emitConsole(
+                    ste,
+                    `>> [RUNTIME:READY] Active Universe: [${selectedSlug}]`,
+                )
+                await emitConsole(
+                    ste,
+                    '>> [SWITCHBOARD] Navigation switched to RUNTIME DISPATCH in left deck.',
+                )
+                await emitConsole(
+                    ste,
+                    '------------------------------------------------------------',
                 )
                 break
             }
-            await emitConsole(
-                ste,
-                `>> [SPATIAL:KERNEL] Kernel Version: ${probeAdapter.kernelVersion} | Mode: SYNCHRONOUS_IN_PROCESS`,
-            )
-            // Phase 2 diagnostics: run the live epistemic sanitizer, axial
-            // packer, and overlay sealer so cns00 streams real receipts.
-            const demoSanitized = sanitizePathQuery({
-                qOrigin: 5,
-                rOrigin: -2,
-                qDest: 8,
-                rDest: -5,
-                budget: 500,
-                workLimit: 256,
-                lighting_lux: 300,
-                room_acoustic_tier: 2,
-            })
-            if (
-                !demoSanitized.ok ||
-                !demoSanitized.scrubbedPayload ||
-                !demoSanitized.queryHash
-            ) {
+
+            case '[14] EXECUTE DETERMINISTIC': {
                 await emitConsole(
                     ste,
-                    `:: [EPISTEMIC:SCRUB] Outbound query rejected: ${demoSanitized.error ?? 'UNKNOWN'}`,
+                    '>> [EXECUTE] Dispatching Stage 3 Deterministic Encounter Lottery...',
+                )
+                if (ste && typeof ste.hunt === 'function') {
+                    await ste.hunt(ActEng.STATUS_ENGINE, {})
+                }
+                await emitConsole(
+                    ste,
+                    '>> [EXECUTE:OK] Deterministic stage evaluation complete.',
                 )
                 break
             }
-            await emitConsole(
-                ste,
-                '>> [EPISTEMIC:SCRUB] Outbound query sanitized: narrative keys stripped.',
-            )
-            const demoPacked = packAxial(5, -2)
-            await emitConsole(
-                ste,
-                `>> [AXIAL:PACK] Coordinates packed: Origin (5,-2) -> PackedAxial ${demoPacked} [OK]`,
-            )
-            const demoOverlay = buildSpatialOverlaySnapshot(
-                new Map<string, PortalRecord>(),
-                [],
-            )
-            await emitConsole(
-                ste,
-                `>> [OVERLAY:SEAL] Dynamic overlay snapshot sealed. Hash: ${demoOverlay.overlayHash}`,
-            )
-            await emitConsole(
-                ste,
-                `>> [QUERY:HASH] Canonical SHA-256 stamped. ${demoSanitized.queryHash} [PASS]`,
-            )
-            // Scrubbed probe fixture: packed axial integers, content hashes,
-            // and integer budgets only; zero narrative lore crosses the port.
-            const probeTopology: TopologyManifest = {
-                topologyHash:
-                    'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-                bounds: { minQ: -10, maxQ: 10, minR: -10, maxR: 10 },
-                blockedCells: new Set<number>(),
-                portalEdges: new Map<
-                    string,
-                    {
-                        readonly from: number
-                        readonly to: number
-                        readonly occluderId?: string
+
+            case 'ADVANCE TICK': {
+                await emitConsole(
+                    ste,
+                    '>> [TICK] Advancing logical clock (+1 tick) & executing decay sweep...',
+                )
+                if (ste && typeof ste.hunt === 'function') {
+                    const tickRes: any = await ste.hunt(ActEng.ADVANCE_TICK, {
+                        val: 1,
+                    })
+                    if (tickRes?.fenBit?.src) {
+                        await emitConsole(
+                            ste,
+                            `>> [TICK] ${tickRes.fenBit.src}`,
+                        )
                     }
-                >(),
-                cellAcousticDampingCdB: new Map<number, number>(),
-                ambientNoiseFloorCdB: 3000,
+                }
+                await emitConsole(
+                    ste,
+                    '>> [TICK:OK] Clock advanced. Doom meters decayed.',
+                )
+                // Phase 3 diagnostics: derive the live somatic traversal
+                // budget, hand capacity, and guard verdict for the tick cast.
+                try {
+                    const tickSomatic = extractSomaticState({
+                        entityId: 'char_skulk',
+                        availableArms: 2,
+                        availableLegs: 1,
+                        locomotionTier: 'LIMP',
+                        fatigueBps: 5000,
+                        painBps: 2000,
+                        refusalStrainBps: 0,
+                        activeTrauma: [],
+                    })
+                    const tickReceipt = deriveSomaticBudget(tickSomatic)
+                    const tickHands = validateHandCapacity(1, [
+                        { itemId: 'item_torch', occupiesHands: 1 },
+                    ])
+                    const tickGuard = verifyTraversalBudget(
+                        150,
+                        tickReceipt.movementBudgetCostUnits,
+                    )
+                    await emitConsole(
+                        ste,
+                        `>> [SOMATIC:STATE] Ingested entity somatic profile: ${tickSomatic.entityId}`,
+                    )
+                    await emitConsole(
+                        ste,
+                        `>> [SOMATIC:BUDGET] Locomotion: ${tickSomatic.locomotionTier} | Fatigue: ${tickSomatic.fatigueBps} bps | Budget: ${tickReceipt.movementBudgetCostUnits} units`,
+                    )
+                    await emitConsole(
+                        ste,
+                        `>> [SOMATIC:VERBS] ${tickReceipt.bannedKineticVerbs.length} kinetic verbs masked: [${tickReceipt.bannedKineticVerbs.join(', ')}]`,
+                    )
+                    await emitConsole(
+                        ste,
+                        `>> [HANDS:SAT] Capacity check: ${tickHands.totalOccupiedHands}/${tickHands.availableArms} hands occupied ${tickHands.valid ? '[PASS]' : '[FAIL]'}`,
+                    )
+                    await emitConsole(
+                        ste,
+                        `>> [BUDGET:GUARD] Traversal cost ${tickGuard.traversalCostUnits} <= allowed ${tickGuard.allowedBudgetUnits} ${tickGuard.permitted ? '[PERMITTED]' : '[DENIED]'}`,
+                    )
+                } catch (err: any) {
+                    await emitConsole(
+                        ste,
+                        `:: [SOMATIC:STATE] Budget derivation failed: ${err?.message ?? String(err)}`,
+                    )
+                }
+                // Phase 6 sensory sweep: route one witnessed optical percept
+                // (char_bog) and one occluded percept (char_skulk) through the
+                // 11.belief.unit gate so cns00 streams PERCEPT / FILTER /
+                // COMMIT / IGNORANCE / HORIZON telemetry for this tick.
+                try {
+                    if (ste && typeof ste.hunt === 'function') {
+                        await ste.hunt(ActBel.PROCESS_PERCEPT_CANDIDATE, {
+                            dat: {
+                                actorId: 'char_bog',
+                                eventId: 'evt_tick_witness',
+                                propositionSlug: 'fact_siphon_theft',
+                                subjectId: 'char_spleen',
+                                predicate: 'stole',
+                                objectId: 'item_siphon',
+                                perceptCandidate: {
+                                    channel: 'OPTICAL',
+                                    sourceCell: 100,
+                                    observerCell: 101,
+                                    signalCdB: 9000,
+                                    ambientNoiseCdB: 1000,
+                                    snrMarginCdB: 8000,
+                                    bearingDegrees: 0,
+                                    isOccluded: false,
+                                    receiptHash:
+                                        'b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0',
+                                },
+                                somaticProfile: {
+                                    actorId: 'char_bog',
+                                    visualAcuity: 'NORMAL',
+                                    facingSector: 0,
+                                    hasConcussiveDeafness: false,
+                                    hearingThresholdCdB: 2000,
+                                },
+                            },
+                        })
+                        await ste.hunt(ActBel.PROCESS_PERCEPT_CANDIDATE, {
+                            dat: {
+                                actorId: 'char_skulk',
+                                eventId: 'evt_tick_occluded',
+                                propositionSlug: 'fact_siphon_theft',
+                                subjectId: 'char_spleen',
+                                predicate: 'stole',
+                                objectId: 'item_siphon',
+                                perceptCandidate: {
+                                    channel: 'OPTICAL',
+                                    sourceCell: 100,
+                                    observerCell: 109,
+                                    signalCdB: 9000,
+                                    ambientNoiseCdB: 1000,
+                                    snrMarginCdB: 8000,
+                                    bearingDegrees: 180,
+                                    isOccluded: true,
+                                    receiptHash:
+                                        '5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c',
+                                },
+                                somaticProfile: {
+                                    actorId: 'char_skulk',
+                                    visualAcuity: 'NORMAL',
+                                    facingSector: 0,
+                                    hasConcussiveDeafness: false,
+                                    hearingThresholdCdB: 2000,
+                                },
+                            },
+                        })
+                    }
+                } catch (err: any) {
+                    await emitConsole(
+                        ste,
+                        `:: [SENSORY:SWEEP] Belief sweep failed: ${err?.message ?? String(err)}`,
+                    )
+                }
+                break
             }
-            const probeOverlay: SpatialOverlaySnapshot = {
-                overlayHash:
-                    'f4c2e11898fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b999',
-                closedPortals: [],
-                impassableCells: [],
+
+            case 'RUN SIM GAUNTLET': {
+                await emitConsole(
+                    ste,
+                    '>> [GAUNTLET] Launching continuous simulation gauntlet (100 ticks)...',
+                )
+                if (ste && typeof ste.hunt === 'function') {
+                    const gauntletRes: any = await ste.hunt(
+                        ActEng.FAST_FORWARD_TICKS,
+                        {},
+                    )
+                    if (gauntletRes?.fenBit?.src) {
+                        await emitConsole(
+                            ste,
+                            `>> [GAUNTLET] ${gauntletRes.fenBit.src}`,
+                        )
+                    }
+                }
+                await emitConsole(
+                    ste,
+                    '>> [GAUNTLET:COMPLETE] 100 ticks evaluated in host RAM (0 MB VRAM).',
+                )
+                break
             }
-            await emitConsole(
-                ste,
-                '>> [SPATIAL:PROBE] Querying path: Origin (0,0) -> Dest (2,-1) [Budget: 500]',
-            )
-            let probeReceipt: PathReceipt | undefined
-            try {
-                // Pure synchronous invocation inside the local V8 isolate.
-                probeReceipt = probeAdapter.findPath(
+
+            case 'INSPECT 4-VECTOR STATE':
+            case '[02] STATUS ENGINE & TABLE':
+            case '[02] STATUS ENGINE & TABLE INVENTORY': {
+                await emitConsole(
+                    ste,
+                    '>> [STATUS] Querying 4-Vector table status and row inventories...',
+                )
+                await ste.hunt(ActEng.STATUS_ENGINE, {})
+                break
+            }
+
+            case '[03] AUDIT SIMULATION INVARIANTS': {
+                await emitConsole(
+                    ste,
+                    '>> [MENU:ACTION] Dispatching AUDIT_ENGINE...',
+                )
+                await ste.hunt(ActEng.AUDIT_ENGINE, {})
+                break
+            }
+
+            case '[04] RESET ENGINE TO OFFLINE': {
+                await emitConsole(
+                    ste,
+                    '>> [MENU:ACTION] Dispatching RESET_ENGINE...',
+                )
+                await ste.hunt(ActEng.RESET_ENGINE, {})
+                if (model) {
+                    model.flightDeckMode = 'BOOT'
+                    model.activeSeriesSlug = ''
+                }
+                await emitConsole(
+                    ste,
+                    '>> [RESET:OK] Cockpit returned to BOOT & ENSURE SCHEMA mode.',
+                )
+                break
+            }
+
+            case '[10] EXECUTE STAGE 3 GRIEVANCE LOTTERY & ENCOUNTER SELECTION': {
+                await emitConsole(
+                    ste,
+                    '>> [MENU:ACTION] Dispatching SELECT_STAGE3_ENCOUNTER...',
+                )
+                await ste.hunt(ActGrv.SELECT_STAGE3_ENCOUNTER, {
+                    dat: {
+                        selectionParams: {
+                            sceneCast: ['char_bog', 'char_wart'],
+                            currentTensionBps: 3000,
+                            tick: 1,
+                            timestamp_ms: 1700000000000,
+                        },
+                    },
+                })
+                break
+            }
+
+            case '[11] AUDIT STAGING ACCUMULATOR & ATOMIC COMMIT': {
+                await emitConsole(
+                    ste,
+                    '>> [MENU:ACTION] Dispatching COMMIT_STAGING_LEDGER...',
+                )
+                await ste.hunt(ActLed.COMMIT_STAGING_LEDGER, {
+                    dat: { timestampMs: 1700000000000 },
+                })
+                break
+            }
+
+            case '[12] EXECUTE STAGE 4 DUAL-SET 2D6 CONFLICT RESOLUTION': {
+                await emitConsole(
+                    ste,
+                    '>> [MENU:ACTION] Dispatching RESOLVE_DUAL_2D6_LEDGER...',
+                )
+                await ste.hunt(ActLed.RESOLVE_DUAL_2D6_LEDGER, {
+                    dat: {
+                        resolveParams: {
+                            context: {
+                                initiator: {
+                                    id: 'char_bog',
+                                    stats: { cunning: 2, poise: 1 },
+                                },
+                                target: {
+                                    id: 'char_wart',
+                                    stats: { spite: 1, vigor: 2 },
+                                },
+                                tick: 1,
+                                timestampMs: 1700000000000,
+                            },
+                            autoStage: true,
+                        },
+                    },
+                })
+                break
+            }
+
+            case '[13] AUDIT UNRATIFIED DETAILS & SALIENCE HARVEST QUEUE': {
+                await emitConsole(
+                    ste,
+                    '>> [MENU:ACTION] Dispatching STAGE_DETAIL_ACTOR...',
+                )
+                await ste.hunt(ActAct.STAGE_DETAIL_ACTOR, {
+                    dat: {
+                        stageDetailParams: {
+                            detail_id: 'det_cockpit_green_cup',
+                            scene_id: 'sc01',
+                            label_candidate: 'green_enamel_cup',
+                            category: 'PROP',
+                            recurrence_count: 3,
+                            dramatic_turn: 'GAZE_PROXIMITY',
+                            claim_proposal: 'Chipped green enamel cup on floor',
+                        },
+                    },
+                })
+                break
+            }
+
+            case '[14] EXECUTE DETERMINISTIC STATE FOLD & AUDIT WHY-DIRTY': {
+                await emitConsole(
+                    ste,
+                    '>> [MENU:ACTION] Dispatching HYDRATE_STATE & WHY_DIRTY_STATE...',
+                )
+                await ste.hunt(ActSte.HYDRATE_STATE, {
+                    dat: {
+                        hydrateParams: {
+                            seriesSlug: 'under-the-floorboards',
+                            tick: 1,
+                        },
+                    },
+                })
+                await ste.hunt(ActSte.WHY_DIRTY_STATE, {
+                    dat: { whyDirtyParams: { entityId: 'char_bog' } },
+                })
+                break
+            }
+
+            case '[15] AUDIT EPISTEMIC HORIZONS & SUBTEXT ATTENUATION': {
+                await emitConsole(
+                    ste,
+                    '>> [MENU:ACTION] Dispatching BUILD_SUBTEXT_DIRECTIVE_ACTOR...',
+                )
+                await ste.hunt(ActAct.BUILD_SUBTEXT_DIRECTIVE_ACTOR, {
+                    dat: {
+                        subtextParams: {
+                            actor_id: 'char_bog',
+                            tension_bps: 8000,
+                            candidate_props: ['item_copper_tea_kettle'],
+                            surface_dispute: 'bent kettle lid',
+                            underlying_conflict: 'fear of seasonal abandonment',
+                        },
+                    },
+                })
+                break
+            }
+
+            case '[16] COMPILE DUAL-FIELD DIALOGUE AST & ENFORCE CURTNESS': {
+                await emitConsole(
+                    ste,
+                    '>> [MENU:ACTION] Dispatching COMPILE_DIALOGUE_BEAT_ACTOR...',
+                )
+                await ste.hunt(ActAct.COMPILE_DIALOGUE_BEAT_ACTOR, {
+                    dat: {
+                        compileBeatParams: {
+                            beat_id: 'b_cockpit_01',
+                            speaker: 'char_bog',
+                            dialogue_text: 'Leave the valve.',
+                            camera_parenthetical:
+                                'Camera pushes in on Bog jaw.',
+                            observable_parenthetical: 'Bog stands motionless.',
+                            speech_act: 'IMPLICIT_WARNING',
+                            emotion: 'cold_urgency',
+                            swain_mru_phase: 'SPEECH',
+                            extracted_motor_actions: ['STAND'],
+                            curtness_bps: 10000,
+                        },
+                    },
+                })
+                break
+            }
+
+            case '[17] SPATIAL FEASIBILITY PROBE': {
+                await emitConsole(
+                    ste,
+                    '>> [SPATIAL:PORT] Checking SpatialPort binding in 10.location.unit... [OK]',
+                )
+                // Bind the live port first so the probe always queries the same
+                // synchronous instance it mounts into 10.location.unit.
+                const probeAdapter = new InProcessSpatialAdapter()
+                try {
+                    await ste.hunt(ActLoc.BIND_SPATIAL_PORT, {
+                        dat: { spatialPort: probeAdapter },
+                    })
+                } catch (err: any) {
+                    await emitConsole(
+                        ste,
+                        `:: [SPATIAL:PORT] Probe binding failed: ${err?.message ?? String(err)}`,
+                    )
+                    break
+                }
+                await emitConsole(
+                    ste,
+                    `>> [SPATIAL:KERNEL] Kernel Version: ${probeAdapter.kernelVersion} | Mode: SYNCHRONOUS_IN_PROCESS`,
+                )
+                // Phase 2 diagnostics: run the live epistemic sanitizer, axial
+                // packer, and overlay sealer so cns00 streams real receipts.
+                const demoSanitized = sanitizePathQuery({
+                    qOrigin: 5,
+                    rOrigin: -2,
+                    qDest: 8,
+                    rDest: -5,
+                    budget: 500,
+                    workLimit: 256,
+                    lighting_lux: 300,
+                    room_acoustic_tier: 2,
+                })
+                if (
+                    !demoSanitized.ok ||
+                    !demoSanitized.scrubbedPayload ||
+                    !demoSanitized.queryHash
+                ) {
+                    await emitConsole(
+                        ste,
+                        `:: [EPISTEMIC:SCRUB] Outbound query rejected: ${demoSanitized.error ?? 'UNKNOWN'}`,
+                    )
+                    break
+                }
+                await emitConsole(
+                    ste,
+                    '>> [EPISTEMIC:SCRUB] Outbound query sanitized: narrative keys stripped.',
+                )
+                const demoPacked = packAxial(5, -2)
+                await emitConsole(
+                    ste,
+                    `>> [AXIAL:PACK] Coordinates packed: Origin (5,-2) -> PackedAxial ${demoPacked} [OK]`,
+                )
+                const demoOverlay = buildSpatialOverlaySnapshot(
+                    new Map<string, PortalRecord>(),
+                    [],
+                )
+                await emitConsole(
+                    ste,
+                    `>> [OVERLAY:SEAL] Dynamic overlay snapshot sealed. Hash: ${demoOverlay.overlayHash}`,
+                )
+                await emitConsole(
+                    ste,
+                    `>> [QUERY:HASH] Canonical SHA-256 stamped. ${demoSanitized.queryHash} [PASS]`,
+                )
+                // Scrubbed probe fixture: packed axial integers, content hashes,
+                // and integer budgets only; zero narrative lore crosses the port.
+                const probeTopology: TopologyManifest = {
+                    topologyHash:
+                        'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+                    bounds: { minQ: -10, maxQ: 10, minR: -10, maxR: 10 },
+                    blockedCells: new Set<number>(),
+                    portalEdges: new Map<
+                        string,
+                        {
+                            readonly from: number
+                            readonly to: number
+                            readonly occluderId?: string
+                        }
+                    >(),
+                    cellAcousticDampingCdB: new Map<number, number>(),
+                    ambientNoiseFloorCdB: 3000,
+                }
+                const probeOverlay: SpatialOverlaySnapshot = {
+                    overlayHash:
+                        'f4c2e11898fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b999',
+                    closedPortals: [],
+                    impassableCells: [],
+                }
+                await emitConsole(
+                    ste,
+                    '>> [SPATIAL:PROBE] Querying path: Origin (0,0) -> Dest (2,-1) [Budget: 500]',
+                )
+                let probeReceipt: PathReceipt | undefined
+                try {
+                    // Pure synchronous invocation inside the local V8 isolate.
+                    probeReceipt = probeAdapter.findPath(
+                        probeTopology,
+                        probeOverlay,
+                        packAxial(0, 0),
+                        packAxial(2, -1),
+                        500,
+                    )
+                } catch (err: any) {
+                    await emitConsole(
+                        ste,
+                        `:: [SPATIAL:PROBE] Evaluation failed: ${err?.message ?? String(err)}`,
+                    )
+                    break
+                }
+                if (!probeReceipt || probeReceipt instanceof Promise) {
+                    await emitConsole(
+                        ste,
+                        ':: [SPATIAL:RECEIPT] No synchronous path receipt returned [FAIL]',
+                    )
+                    break
+                }
+                const feasible = probeReceipt.ok ? 'TRUE' : 'FALSE'
+                await emitConsole(
+                    ste,
+                    `>> [SPATIAL:RECEIPT] Feasible: ${feasible} | Cost: ${probeReceipt.totalCostUnits} units | Hops: ${probeReceipt.path.length}`,
+                )
+                await emitConsole(
+                    ste,
+                    `>> [SPATIAL:PROOF] Topology: ${probeReceipt.topologyHash.slice(0, 4)}... | Overlay: ${probeReceipt.overlayHash.slice(0, 4)}... | Receipt: ${probeReceipt.receiptHash}`,
+                )
+                await emitConsole(
+                    ste,
+                    '>> [SPATIAL:STATUS] Synchronous client binding verified at T_0 = $0.00.',
+                )
+                // Phase 4 diagnostics: dispatch a live 2-query batch through
+                // the synchronous adapter; route 2 intentionally trips the
+                // 512-cell anti-DoS work envelope governor.
+                await emitConsole(
+                    ste,
+                    `>> [ADAPTER:SYNC] InProcessSpatialAdapter active (Kernel: ${probeAdapter.kernelVersion})`,
+                )
+                await emitConsole(
+                    ste,
+                    '>> [BATCH:PATH] Evaluating 2 scrubbed path queries in local V8 heap...',
+                )
+                const batchRouteA = sanitizePathQuery({
+                    qOrigin: 0,
+                    rOrigin: 0,
+                    qDest: 2,
+                    rDest: -1,
+                    budget: 500,
+                    workLimit: 512,
+                })
+                const batchRouteB = sanitizePathQuery({
+                    qOrigin: 0,
+                    rOrigin: 0,
+                    qDest: 30,
+                    rDest: 30,
+                    budget: 100000,
+                    workLimit: 10000,
+                })
+                if (
+                    !batchRouteA.ok ||
+                    !batchRouteA.scrubbedPayload ||
+                    !batchRouteB.ok ||
+                    !batchRouteB.scrubbedPayload
+                ) {
+                    await emitConsole(
+                        ste,
+                        ':: [BATCH:PATH] Batch query sanitization failed [FAIL]',
+                    )
+                    break
+                }
+                const batchReceipt = executeBatchPath(
+                    probeAdapter,
                     probeTopology,
                     probeOverlay,
-                    packAxial(0, 0),
-                    packAxial(2, -1),
-                    500,
+                    [batchRouteA.scrubbedPayload, batchRouteB.scrubbedPayload],
                 )
-            } catch (err: any) {
+                const [route1, route2] = batchReceipt.receipts
                 await emitConsole(
                     ste,
-                    `:: [SPATIAL:PROBE] Evaluation failed: ${err?.message ?? String(err)}`,
+                    `>> [PATH:RESULT] Route 1: ${route1.path.length} hops | Cost: ${route1.totalCostUnits} units | Expanded: ${route1.cellsExpanded} cells ${route1.ok ? '[OK]' : '[FAIL]'}`,
                 )
-                break
-            }
-            if (!probeReceipt || probeReceipt instanceof Promise) {
+                const governorTripped =
+                    !route2.ok &&
+                    route2.failureReason === 'BUDGET_EXCEEDED' &&
+                    route2.cellsExpanded === 512
                 await emitConsole(
                     ste,
-                    ':: [SPATIAL:RECEIPT] No synchronous path receipt returned [FAIL]',
+                    `>> [CEILING:GUARD] Route 2: Expanded: ${route2.cellsExpanded} cells | Status: ${route2.failureReason ?? 'OK'} ${governorTripped ? '[TRIPPED]' : '[OPEN]'}`,
                 )
-                break
-            }
-            const feasible = probeReceipt.ok ? 'TRUE' : 'FALSE'
-            await emitConsole(
-                ste,
-                `>> [SPATIAL:RECEIPT] Feasible: ${feasible} | Cost: ${probeReceipt.totalCostUnits} units | Hops: ${probeReceipt.path.length}`,
-            )
-            await emitConsole(
-                ste,
-                `>> [SPATIAL:PROOF] Topology: ${probeReceipt.topologyHash.slice(0, 4)}... | Overlay: ${probeReceipt.overlayHash.slice(0, 4)}... | Receipt: ${probeReceipt.receiptHash}`,
-            )
-            await emitConsole(
-                ste,
-                '>> [SPATIAL:STATUS] Synchronous client binding verified at T_0 = $0.00.',
-            )
-            // Phase 4 diagnostics: dispatch a live 2-query batch through
-            // the synchronous adapter; route 2 intentionally trips the
-            // 512-cell anti-DoS work envelope governor.
-            await emitConsole(
-                ste,
-                `>> [ADAPTER:SYNC] InProcessSpatialAdapter active (Kernel: ${probeAdapter.kernelVersion})`,
-            )
-            await emitConsole(
-                ste,
-                '>> [BATCH:PATH] Evaluating 2 scrubbed path queries in local V8 heap...',
-            )
-            const batchRouteA = sanitizePathQuery({
-                qOrigin: 0,
-                rOrigin: 0,
-                qDest: 2,
-                rDest: -1,
-                budget: 500,
-                workLimit: 512,
-            })
-            const batchRouteB = sanitizePathQuery({
-                qOrigin: 0,
-                rOrigin: 0,
-                qDest: 30,
-                rDest: 30,
-                budget: 100000,
-                workLimit: 10000,
-            })
-            if (
-                !batchRouteA.ok ||
-                !batchRouteA.scrubbedPayload ||
-                !batchRouteB.ok ||
-                !batchRouteB.scrubbedPayload
-            ) {
                 await emitConsole(
                     ste,
-                    ':: [BATCH:PATH] Batch query sanitization failed [FAIL]',
+                    `>> [BATCH:SEAL] BatchQueryHash: ${batchReceipt.batchQueryHash.slice(0, 4)}... | BatchReceiptHash: ${batchReceipt.batchReceiptHash.slice(0, 4)}... [SEALED]`,
                 )
+                // Phase 7 submenu: mount the spatial probe switchboard in the
+                // left deck and route the operator pick to the probe buzzers.
+                if (model) {
+                    await emitConsole(
+                        ste,
+                        '>> [MENU:SPATIAL] Opening spatial probe switchboard...',
+                    )
+                    await emitConsole(
+                        ste,
+                        '>> [TOOLTIP] Focus [01] TEST CANONICAL PASSAGE: Validates unhindered path through baseline culvert lattice.',
+                    )
+                    await openSpatialProbeMenuBuzz(model, undefined, ste)
+                    const rawPick = model.activeSelection || ''
+                    // Hardened default: the switchboard mounts with [01] focused,
+                    // so an empty resolution (spurious cancel under key emulation
+                    // with no Escape pressed) carries the operator's evident
+                    // intent to run the default canonical passage probe.
+                    const probePick =
+                        rawPick ||
+                        '[01] TEST CANONICAL PASSAGE (Pipe -> Culvert Junction)'
+                    if (!rawPick) {
+                        await emitConsole(
+                            ste,
+                            '>> [MENU:SPATIAL] Empty pick resolved; defaulting to [01] canonical passage.',
+                        )
+                    }
+                    if (probePick.startsWith('[01] TEST CANONICAL PASSAGE')) {
+                        const canonicalAdapter = new InProcessSpatialAdapter()
+                        try {
+                            await ste.hunt(ActLoc.BIND_SPATIAL_PORT, {
+                                dat: { spatialPort: canonicalAdapter },
+                            })
+                        } catch (err: any) {
+                            await emitConsole(
+                                ste,
+                                `:: [SPATIAL:PORT] Probe binding failed: ${err?.message ?? String(err)}`,
+                            )
+                            break
+                        }
+                        await dispatchSpatialProbeBuzz(
+                            model,
+                            {
+                                idx: 'probe-canonical',
+                                dat: {
+                                    originPacked: packAxial(0, 0),
+                                    destinationPacked: packAxial(2, -1),
+                                    maxBudgetCostUnits: 500,
+                                    workEnvelopeLimit: 512,
+                                },
+                            } as any,
+                            ste,
+                        )
+                    } else if (
+                        probePick.startsWith('[02] TEST OCCLUDED ROUTE')
+                    ) {
+                        const occludedAdapter = new InProcessSpatialAdapter()
+                        const ringed = new Set<number>()
+                        const originCell = packAxial(0, 0)
+                        const sealedDest = packAxial(2, -1)
+                        const originCoord = { q: 0, r: 0 }
+                        const dirs = [
+                            [1, 0],
+                            [1, -1],
+                            [0, -1],
+                            [-1, 0],
+                            [-1, 1],
+                            [0, 1],
+                        ]
+                        for (const [dq, dr] of dirs) {
+                            ringed.add(
+                                packAxial(
+                                    originCoord.q + dq,
+                                    originCoord.r + dr,
+                                ),
+                            )
+                        }
+                        const occludedTopology: TopologyManifest = {
+                            topologyHash:
+                                'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+                            bounds: {
+                                minQ: -10,
+                                maxQ: 10,
+                                minR: -10,
+                                maxR: 10,
+                            },
+                            blockedCells: ringed,
+                            portalEdges: new Map(),
+                            cellAcousticDampingCdB: new Map<number, number>(),
+                            ambientNoiseFloorCdB: 3000,
+                        }
+                        const occludedOverlay: SpatialOverlaySnapshot = {
+                            overlayHash:
+                                'f4c2e11898fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b999',
+                            closedPortals: ['hatch_valve_04'],
+                            impassableCells: [],
+                        }
+                        await emitConsole(
+                            ste,
+                            '>> [SPATIAL:OCCLUDE] Locked sluice valve sealed: 6 cells ringed around origin (hatch_valve_04) [SEALED]',
+                        )
+                        let occludedReceipt: PathReceipt | undefined
+                        try {
+                            occludedReceipt = occludedAdapter.findPath(
+                                occludedTopology,
+                                occludedOverlay,
+                                originCell,
+                                sealedDest,
+                                500,
+                                512,
+                            )
+                        } catch (err: any) {
+                            await emitConsole(
+                                ste,
+                                `:: [SPATIAL:PROBE] Occluded evaluation failed: ${err?.message ?? String(err)}`,
+                            )
+                            break
+                        }
+                        const occludedFeasible =
+                            occludedReceipt && occludedReceipt.ok
+                                ? 'TRUE'
+                                : 'FALSE'
+                        await emitConsole(
+                            ste,
+                            `>> [SPATIAL:RECEIPT] Feasible: ${occludedFeasible} | Cost: ${occludedReceipt?.totalCostUnits ?? 0} units | Hops: ${occludedReceipt?.path?.length ?? 0} | Failure: ${occludedReceipt?.failureReason ?? 'NONE'}`,
+                        )
+                        await emitConsole(
+                            ste,
+                            `>> [SPATIAL:PROOF] Topology: ${(occludedReceipt?.topologyHash ?? '').slice(0, 4)}... | Overlay: ${(occludedReceipt?.overlayHash ?? '').slice(0, 4)}... | Receipt: ${occludedReceipt?.receiptHash ?? ''}`,
+                        )
+                    } else if (probePick.startsWith('[03] TEST WORK CEILING')) {
+                        const ceilingAdapter = new InProcessSpatialAdapter()
+                        try {
+                            await ste.hunt(ActLoc.BIND_SPATIAL_PORT, {
+                                dat: { spatialPort: ceilingAdapter },
+                            })
+                        } catch (err: any) {
+                            await emitConsole(
+                                ste,
+                                `:: [SPATIAL:PORT] Probe binding failed: ${err?.message ?? String(err)}`,
+                            )
+                            break
+                        }
+                        await testSpatialWorkCeilingBuzz(
+                            model,
+                            { idx: 'probe-ceiling' } as any,
+                            ste,
+                        )
+                    } else if (
+                        probePick.startsWith('[04] TEST SENSORY PERCEPTION')
+                    ) {
+                        await emitConsole(
+                            ste,
+                            '>> [SENSORY:PROBE] Evaluating optical raycast + acoustic cdB wavefront SNR margin...',
+                        )
+                        const opticalEval = evaluateSensoryFilter(
+                            {
+                                schemaVersion: 1,
+                                kernelVersion: '1.0.0',
+                                topologyHash: 'topo',
+                                overlayHash: 'overlay',
+                                queryHash: 'query',
+                                receiptHash: 'receipt',
+                                channel: 'OPTICAL',
+                                sourceCell: packAxial(2, -1),
+                                observerCell: packAxial(0, 0),
+                                signalCdB: 9000,
+                                ambientNoiseCdB: 1000,
+                                snrMarginCdB: 8000,
+                                bearingDegrees: 0,
+                                isOccluded: false,
+                            },
+                            {
+                                actorId: 'char_bog',
+                                visualAcuity: 'NORMAL',
+                                facingSector: 0,
+                                hasConcussiveDeafness: false,
+                                hearingThresholdCdB: 2000,
+                            },
+                        )
+                        await emitConsole(
+                            ste,
+                            `>> [SOMATIC:FILTER] Optical NORMAL forward cone: received=${opticalEval.received} quality=${opticalEval.effectiveQualityBps} bps`,
+                        )
+                        const acousticEval = evaluateSensoryFilter(
+                            {
+                                schemaVersion: 1,
+                                kernelVersion: '1.0.0',
+                                topologyHash: 'topo',
+                                overlayHash: 'overlay',
+                                queryHash: 'query',
+                                receiptHash: 'receipt',
+                                channel: 'ACOUSTIC',
+                                sourceCell: packAxial(2, -1),
+                                observerCell: packAxial(0, 0),
+                                signalCdB: 2800,
+                                ambientNoiseCdB: 1500,
+                                snrMarginCdB: 1300,
+                                bearingDegrees: null,
+                                isOccluded: false,
+                            },
+                            {
+                                actorId: 'char_moss',
+                                visualAcuity: 'NORMAL',
+                                facingSector: 0,
+                                hasConcussiveDeafness: true,
+                                hearingThresholdCdB: 2000,
+                            },
+                        )
+                        await emitConsole(
+                            ste,
+                            `>> [SOMATIC:FILTER] Acoustic concussed (+1500 cdB floor): received=${acousticEval.received} reason=${acousticEval.rejectionReason ?? 'NONE'}`,
+                        )
+                    } else {
+                        await emitConsole(
+                            ste,
+                            `>> [MENU:SPATIAL] Probe switchboard dismissed on pick [${probePick || '<empty>'}]. Returning to flight deck.`,
+                        )
+                    }
+                }
                 break
             }
-            const batchReceipt = executeBatchPath(
-                probeAdapter,
-                probeTopology,
-                probeOverlay,
-                [batchRouteA.scrubbedPayload, batchRouteB.scrubbedPayload],
-            )
-            const [route1, route2] = batchReceipt.receipts
-            await emitConsole(
-                ste,
-                `>> [PATH:RESULT] Route 1: ${route1.path.length} hops | Cost: ${route1.totalCostUnits} units | Expanded: ${route1.cellsExpanded} cells ${route1.ok ? '[OK]' : '[FAIL]'}`,
-            )
-            const governorTripped =
-                !route2.ok &&
-                route2.failureReason === 'BUDGET_EXCEEDED' &&
-                route2.cellsExpanded === 512
-            await emitConsole(
-                ste,
-                `>> [CEILING:GUARD] Route 2: Expanded: ${route2.cellsExpanded} cells | Status: ${route2.failureReason ?? 'OK'} ${governorTripped ? '[TRIPPED]' : '[OPEN]'}`,
-            )
-            await emitConsole(
-                ste,
-                `>> [BATCH:SEAL] BatchQueryHash: ${batchReceipt.batchQueryHash.slice(0, 4)}... | BatchReceiptHash: ${batchReceipt.batchReceiptHash.slice(0, 4)}... [SEALED]`,
-            )
-            break
         }
+    } finally {
+        menuDispatchBusy = false
     }
 }
 
