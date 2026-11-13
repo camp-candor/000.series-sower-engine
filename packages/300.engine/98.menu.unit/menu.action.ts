@@ -234,6 +234,26 @@ export class TestSpatialWorkCeiling implements Action {
     constructor(public bale?: MenuBit) {}
 }
 
+export const STAGE_FOUNTAIN_SCREENPLAY_EDITOR =
+    '[Menu action] Stage Spatial Header With Fountain Screenplay Editor'
+export class StageFountainScreenplayEditor implements Action {
+    readonly type = STAGE_FOUNTAIN_SCREENPLAY_EDITOR
+    constructor(public bale?: MenuBit) {}
+}
+
+export const COMPILE_FULL_FOUNTAIN_DRAFT =
+    '[Menu action] Compile Full Fountain Draft To Dialogue AST'
+export class CompileFullFountainDraft implements Action {
+    readonly type = COMPILE_FULL_FOUNTAIN_DRAFT
+    constructor(public bale?: MenuBit) {}
+}
+
+export const EXPORT_TO_CONDUCTOR = '[Menu action] Export To Conductor'
+export class ExportToConductor implements Action {
+    readonly type = EXPORT_TO_CONDUCTOR
+    constructor(public bale?: MenuBit) {}
+}
+
 export type Actions =
     | InitMenu
     | UpdateMenu
@@ -269,3 +289,6 @@ export type Actions =
     | DispatchSpatialProbe
     | DispatchEdgeSyncProbe
     | TestSpatialWorkCeiling
+    | StageFountainScreenplayEditor
+    | CompileFullFountainDraft
+    | ExportToConductor

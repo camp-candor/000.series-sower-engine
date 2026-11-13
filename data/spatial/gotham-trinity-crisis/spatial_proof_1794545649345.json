@@ -1,0 +1,70 @@
+{
+  "series_slug": "gotham-trinity-crisis",
+  "spatial_audit_quadruple": {
+    "topology_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "overlay_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "query_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "receipt_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  },
+  "kernel_version": "v0.1.4",
+  "metrics": {
+    "max_cells_expanded": 512,
+    "cost_units": 142,
+    "optical_proof": {
+      "sourceCoord": {
+        "q": 0,
+        "r": 0,
+        "s": 0
+      },
+      "observerCoord": {
+        "q": 2,
+        "r": -1,
+        "s": -1
+      },
+      "qualityScorePerMille": 950,
+      "arrivalBearing": 1,
+      "isOccluded": false,
+      "evidence": {
+        "modality": "OPTICAL",
+        "transmissionBps": 10000,
+        "topologicalDistance": 2,
+        "occludingBarrierCoord": null
+      },
+      "auditQuadruple": {
+        "topologyHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "overlayHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "queryHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "receiptHash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      }
+    },
+    "acoustic_proof": {
+      "sourceCoord": {
+        "q": 0,
+        "r": 0,
+        "s": 0
+      },
+      "observerCoord": {
+        "q": 0,
+        "r": 3,
+        "s": -3
+      },
+      "qualityScorePerMille": 700,
+      "arrivalBearing": 3,
+      "isOccluded": false,
+      "evidence": {
+        "modality": "ACOUSTIC",
+        "intensityCdb": 5000,
+        "noiseFloorCdb": 2700,
+        "snrMarginCdb": 2300,
+        "portalHopCount": 2
+      },
+      "auditQuadruple": {
+        "topologyHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "overlayHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "queryHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "receiptHash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      }
+    }
+  },
+  "dispatched_at": "2026-11-13T04:54:09.345Z"
+}

@@ -48,6 +48,11 @@ import {
     openCompileMenu,
     runParallaxCompileAudit,
 } from './compile-menu.buzz.js'
+import {
+    stageSpatialHeaderWithFountainEditor,
+    compileFullFountainDraftToAst,
+    exportFountainAndAstToConductor,
+} from './fountain-workflow-menu.buzz.js'
 import { LocationModel } from '../../10.location.unit/location.model.js'
 import {
     initLocation,
@@ -163,6 +168,9 @@ export const MENU_CHOICES: readonly string[] = Object.freeze([
     '[14] EXECUTE DETERMINISTIC STATE FOLD & AUDIT WHY-DIRTY',
     '[15] AUDIT EPISTEMIC HORIZONS & SUBTEXT ATTENUATION',
     '[16] COMPILE DUAL-FIELD DIALOGUE AST & ENFORCE CURTNESS',
+    '[18] STAGE SPATIAL HEADER WITH FOUNTAIN SCREENPLAY EDITOR',
+    '[20] COMPILE FULL FOUNTAIN DRAFT TO DIALOGUE AST',
+    '[21] EXPORT TO CONDUCTOR',
     '[ROOT MENU]',
 ])
 
@@ -1124,6 +1132,36 @@ export const handleMenuSelection = async (
                 }
                 break
             }
+
+            case '[18] STAGE SPATIAL HEADER WITH FOUNTAIN SCREENPLAY EDITOR':
+            case 'STAGE SPATIAL HEADER WITH FOUNTAIN SCREENPLAY EDITOR': {
+                await stageSpatialHeaderWithFountainEditor(
+                    model,
+                    { dat: { baseDir } },
+                    ste,
+                )
+                break
+            }
+
+            case '[20] COMPILE FULL FOUNTAIN DRAFT TO DIALOGUE AST':
+            case 'COMPILE FULL FOUNTAIN DRAFT TO DIALOGUE AST': {
+                await compileFullFountainDraftToAst(
+                    model,
+                    { dat: { baseDir } },
+                    ste,
+                )
+                break
+            }
+
+            case '[21] EXPORT TO CONDUCTOR':
+            case 'EXPORT TO CONDUCTOR': {
+                await exportFountainAndAstToConductor(
+                    model,
+                    { dat: { baseDir } },
+                    ste,
+                )
+                break
+            }
         }
     } finally {
         menuDispatchBusy = false
@@ -1643,6 +1681,9 @@ export const updateMenu = async (
         '[03] AUDIT SIMULATION INVARIANTS',
         '[04] RESET ENGINE TO OFFLINE',
         '[17] SPATIAL FEASIBILITY PROBE',
+        '[18] STAGE SPATIAL HEADER WITH FOUNTAIN SCREENPLAY EDITOR',
+        '[20] COMPILE FULL FOUNTAIN DRAFT TO DIALOGUE AST',
+        '[21] EXPORT TO CONDUCTOR',
         '[ROOT MENU]',
     ]
 
@@ -1655,6 +1696,12 @@ export const updateMenu = async (
             'Advance logical clock (+1 tick) across 17.tick.unit and trigger decay sweeps.',
         '[17] SPATIAL FEASIBILITY PROBE':
             'Probe the live synchronous SpatialPort binding with a packed-axial path query.',
+        '[18] STAGE SPATIAL HEADER WITH FOUNTAIN SCREENPLAY EDITOR':
+            'Write Line 0 Spatial Stage Header to drafts/ and open Fountain screenplay editor via EDIT_TERMINAL.',
+        '[20] COMPILE FULL FOUNTAIN DRAFT TO DIALOGUE AST':
+            'Sanitize Fountain draft, run multi-turn 01.actor.unit & 11.belief.unit gates, verify verbatim parity, and write drafts/dialogue_ast.json.',
+        '[21] EXPORT TO CONDUCTOR':
+            'Export finalized .fountain screenplay and dialogue_ast.json to 000.series-sower-conductor.',
         'RUN SIM GAUNTLET':
             'Dispatch autonomous continuous multi-tick batch execution in host RAM.',
         'INSPECT 4-VECTOR STATE':
@@ -1812,6 +1859,9 @@ export const updateMenu = async (
         'INSPECT 4-VECTOR STATE',
         '[02] STATUS ENGINE & TABLE',
         '[17] SPATIAL FEASIBILITY PROBE',
+        '[18] STAGE SPATIAL HEADER WITH FOUNTAIN SCREENPLAY EDITOR',
+        '[20] COMPILE FULL FOUNTAIN DRAFT TO DIALOGUE AST',
+        '[21] EXPORT TO CONDUCTOR',
     ]
 
     // NOTE: '[03]' runs through the dedicated TUI case below via direct unit
@@ -1865,6 +1915,9 @@ export const updateMenu = async (
         case 'RUN SIM GAUNTLET':
         case 'INSPECT 4-VECTOR STATE':
         case '[17] SPATIAL FEASIBILITY PROBE':
+        case '[18] STAGE SPATIAL HEADER WITH FOUNTAIN SCREENPLAY EDITOR':
+        case '[20] COMPILE FULL FOUNTAIN DRAFT TO DIALOGUE AST':
+        case '[21] EXPORT TO CONDUCTOR':
             break
 
         case '[03] AUDIT SIMULATION INVARIANTS': {

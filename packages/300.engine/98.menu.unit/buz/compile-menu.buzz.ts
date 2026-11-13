@@ -1,7 +1,11 @@
 import { CompileModel } from '../../21.compile.unit/compile.model.js'
 import { runCompile } from '../../21.compile.unit/buz/compile.buzz.js'
 import { WIREGRASS_BASIN_CANON_CORPUS } from '../../21.compile.unit/buz/wiregrass-canon.fixture.js'
-import { runParallaxPreflightGate } from '../../21.compile.unit/buz/parallax-preflight.buzz.js'
+import {
+    runParallaxPreflightGate,
+    runSeriesFountainPreflightGate,
+} from '../../21.compile.unit/buz/parallax-preflight.buzz.js'
+import { resolveActiveSeriesCorpus } from './fountain-workflow-menu.buzz.js'
 
 declare const global: any
 
@@ -50,24 +54,39 @@ export async function runParallaxCompileAudit(
     readonly receipts: readonly string[]
 }> {
     void ste
+    const hasCustomCorpus = Boolean(bal?.dat?.corpus || bal?.dat?.seriesSlug)
+    const activeCorpusInfo = hasCustomCorpus
+        ? resolveActiveSeriesCorpus({
+              baseDir: bal?.dat?.baseDir,
+              seriesSlug: bal?.dat?.seriesSlug,
+              corpus: bal?.dat?.corpus,
+          })
+        : {
+              seriesSlug: 'wiregrass-basin',
+              corpus: WIREGRASS_BASIN_CANON_CORPUS,
+          }
+
     const compileModel = new CompileModel()
     runCompile(compileModel, {
         idx: 'run-compile',
         dat: {
-            seriesSlug: 'wiregrass-basin',
-            corpus: WIREGRASS_BASIN_CANON_CORPUS,
+            seriesSlug: activeCorpusInfo.seriesSlug,
+            corpus: activeCorpusInfo.corpus,
         },
     })
 
     const fountainInput =
-        typeof bal?.src === 'string' && bal.src.includes('JOHNNY')
+        typeof bal?.src === 'string' && bal.src.trim().length > 0
             ? bal.src
             : CANONICAL_PARALLAX_SAMPLE
 
-    const preflight = runParallaxPreflightGate(
-        fountainInput,
-        WIREGRASS_BASIN_CANON_CORPUS,
-    )
+    const preflight = hasCustomCorpus
+        ? runSeriesFountainPreflightGate(
+              fountainInput,
+              activeCorpusInfo.corpus,
+              { enforceWiregrassDefaults: false },
+          )
+        : runParallaxPreflightGate(fountainInput, activeCorpusInfo.corpus)
 
     const totalEntities = compileModel.catalogSummary?.totalEntities ?? 0
     const rootMerkleHash = compileModel.rootMerkleHash ?? 'UNSEALED'
@@ -75,7 +94,7 @@ export async function runParallaxCompileAudit(
 
     const receipts = [
         '>> --------------------------------------------------',
-        '>> [COMPILE:INIT] Executing 3-Pass Canon Compiler (wiregrass-basin)...',
+        `>> [COMPILE:INIT] Executing 3-Pass Canon Compiler (${activeCorpusInfo.seriesSlug})...`,
         `>> [COMPILE:PASS_1] Structural & Somatic Bounds : ${pass123Ok ? `[PASS: ${totalEntities} ENTITIES]` : '[FAIL]'}`,
         `>> [COMPILE:PASS_2] Relational DAG & Portals    : ${pass123Ok ? '[PASS: 0 CYCLES]' : '[FAIL]'}`,
         `>> [COMPILE:PASS_3] Deterministic JCS Seal      : ${pass123Ok ? '[SEALED]' : '[FAILED]'}`,

@@ -10,6 +10,16 @@ export interface FountainIngressReport {
     readonly violations: readonly string[]
 }
 
+export interface FountainIngressOptions {
+    readonly expectedTitle?: string
+    readonly allowAnyTitle?: boolean
+    readonly requirePageBreak?: boolean
+    readonly characterCues?: ReadonlyArray<{
+        readonly inlineName: string
+        readonly cue: string
+    }>
+}
+
 const UTF8_TRANSLITERATION_TABLE: ReadonlyArray<readonly [RegExp, string]> = [
     [/\u2014/g, '--'],
     [/\u2013/g, '-'],
@@ -36,10 +46,27 @@ export function sanitizeFountainToAscii(rawText: string): {
         text = text.replace(pattern, replacement)
     }
 
-    return { text, transliteratedCount }
+    // Fallback strip/transliterate any remaining >127 byte so output is 100% 7-bit ASCII
+    let residualClean = ''
+    for (let i = 0; i < text.length; i += 1) {
+        const code = text.charCodeAt(i)
+        residualClean += code <= 127 ? text[i] : '?'
+    }
+
+    return { text: residualClean, transliteratedCount }
 }
 
-export function promoteEmbeddedDialogueCues(asciiText: string): {
+function escapeRegExp(literal: string): string {
+    return literal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+export function promoteEmbeddedDialogueCues(
+    asciiText: string,
+    characterCues?: ReadonlyArray<{
+        readonly inlineName: string
+        readonly cue: string
+    }>,
+): {
     readonly text: string
     readonly promotedCueCount: number
 } {
@@ -50,6 +77,17 @@ export function promoteEmbeddedDialogueCues(asciiText: string): {
     // Matches action prose where Orbie speaks inline quoted dialogue after a physical beat
     const inlineOrbiePattern =
         /^(.*?\bOrbie\b[^"]*?)\s*"([^"]+Miss Beverly\.[^"]+)"\s*$/
+
+    const dynamicPatterns = (characterCues ?? [])
+        .filter(
+            (c) => c.inlineName.trim().length > 0 && c.cue.trim().length > 0,
+        )
+        .map((c) => ({
+            cue: c.cue.trim().toUpperCase(),
+            pattern: new RegExp(
+                `^(.*?\\b${escapeRegExp(c.inlineName.trim())}\\b[^"]*?)\\s*"([^"]+)"\\s*$`,
+            ),
+        }))
 
     for (const line of lines) {
         const match = inlineOrbiePattern.exec(line)
@@ -63,7 +101,28 @@ export function promoteEmbeddedDialogueCues(asciiText: string): {
             out.push('ORBIE')
             out.push(spokenLine)
             promotedCueCount += 1
-        } else {
+            continue
+        }
+
+        let matchedDynamic = false
+        for (const dyn of dynamicPatterns) {
+            const dynMatch = dyn.pattern.exec(line)
+            if (dynMatch) {
+                const actionPrefix = (dynMatch[1] ?? '').trim()
+                const spokenLine = (dynMatch[2] ?? '').trim()
+                if (actionPrefix.length > 0) {
+                    out.push(actionPrefix)
+                    out.push('')
+                }
+                out.push(dyn.cue)
+                out.push(spokenLine)
+                promotedCueCount += 1
+                matchedDynamic = true
+                break
+            }
+        }
+
+        if (!matchedDynamic) {
             out.push(line)
         }
     }
@@ -75,6 +134,7 @@ export function validateFountainIngress(
     text: string,
     transliteratedCount = 0,
     promotedCueCount = 0,
+    options?: FountainIngressOptions,
 ): FountainIngressReport {
     const violations: string[] = []
     const lines = text.split(/\r?\n/)
@@ -91,12 +151,21 @@ export function validateFountainIngress(
         }
     }
 
-    if (!text.includes('Title: THE PARALLAX DINNER')) {
-        violations.push(
-            'Missing mandatory Fountain header "Title: THE PARALLAX DINNER"',
-        )
+    if (options?.allowAnyTitle) {
+        if (!/^Title:\s*\S+/m.test(text)) {
+            violations.push('Missing mandatory Fountain "Title:" header')
+        }
+    } else {
+        const expectedTitle = options?.expectedTitle ?? 'THE PARALLAX DINNER'
+        const requiredHeader = `Title: ${expectedTitle}`
+        if (!text.includes(requiredHeader)) {
+            violations.push(
+                `Missing mandatory Fountain header "${requiredHeader}"`,
+            )
+        }
     }
-    if (!text.includes('\n===\n')) {
+
+    if (options?.requirePageBreak !== false && !text.includes('\n===\n')) {
         violations.push('Missing mandatory Fountain page break "==="')
     }
 

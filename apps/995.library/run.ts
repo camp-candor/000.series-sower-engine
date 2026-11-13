@@ -78,8 +78,272 @@ program
     .option('--run-all-levels')
     .option('--gauntlet')
     .option('--run-gauntlet')
-program.parse(process.argv)
+
+const isDirectExecution = () => {
+    if (!process.argv[1]) return false
+    const entry = path.resolve(process.argv[1]).toLowerCase()
+    const current = path.resolve(fileURLToPath(import.meta.url)).toLowerCase()
+    return entry === current || entry.endsWith('run.ts')
+}
+
+if (isDirectExecution()) {
+    program.parse(process.argv)
+}
 const options = program.opts()
+
+export interface DetectedCanonPayloadSummary {
+    readonly seriesSlug: string
+    readonly manifestPath: string
+    readonly byteSize: number
+    readonly merkleRootHex: string
+    readonly entityCount: number
+}
+
+export interface DetectedSpatialReceiptSummary {
+    readonly seriesSlug: string
+    readonly receiptPath: string
+    readonly receiptHash: string
+    readonly queryHash: string
+    readonly modality: string
+    readonly feasible: boolean
+}
+
+export interface EngineDropDetectionReport {
+    readonly canonPayloads: readonly DetectedCanonPayloadSummary[]
+    readonly spatialReceipts: readonly DetectedSpatialReceiptSummary[]
+    readonly activeCanonSlug: string | null
+    readonly logs: readonly string[]
+}
+
+/**
+ * [Task 1.3.1] Wire Engine Runner Hooks:
+ * Auto-detects incoming `bible-state.json` payload drops in `compiled/<slug>/bible-state.json`
+ * and staged spatial proof receipts in `data/spatial/<slug>/*.json` upon terminal boot.
+ */
+export async function detectIncomingCanonPayloads(opts?: {
+    repoRoot?: string
+    libraryBus?: any
+    consoleAction?: string
+}): Promise<EngineDropDetectionReport> {
+    const repoRoot = opts?.repoRoot
+        ? path.resolve(opts.repoRoot)
+        : path.resolve(__dirname, '../..')
+    const lib = opts?.libraryBus ?? (globalThis as any).LIBRARY
+    const updateAction =
+        opts?.consoleAction ?? '[Console action] Update Console'
+
+    const logs: string[] = []
+    const emit = async (src: string) => {
+        const clean = String(src || '')
+            .replace(/[^\x20-\x7E]/g, '')
+            .trim()
+        logs.push(clean)
+        if (lib && typeof lib.hunt === 'function') {
+            try {
+                await lib.hunt(updateAction, { idx: 'cns00', src: clean })
+            } catch {
+                // Fail-closed telemetry guard
+            }
+        }
+    }
+
+    const canonPayloads: DetectedCanonPayloadSummary[] = []
+    const spatialReceipts: DetectedSpatialReceiptSummary[] = []
+    const canonRegistry: Record<string, any> = {}
+    const spatialRegistry: Record<string, any[]> = {}
+
+    // 1. Scan compiled/<slug>/bible-state.json
+    const compiledDir = path.join(repoRoot, 'compiled')
+    if (fs.existsSync(compiledDir)) {
+        try {
+            const entries = fs
+                .readdirSync(compiledDir, { withFileTypes: true })
+                .filter(
+                    (e) =>
+                        e.isDirectory() &&
+                        !e.name.startsWith('.') &&
+                        !e.name.startsWith('_'),
+                )
+                .sort((a, b) => a.name.localeCompare(b.name))
+
+            for (const entry of entries) {
+                const manifestPath = path.join(
+                    compiledDir,
+                    entry.name,
+                    'bible-state.json',
+                )
+                if (!fs.existsSync(manifestPath)) continue
+
+                try {
+                    const stats = fs.statSync(manifestPath)
+                    const raw = fs.readFileSync(manifestPath, 'utf8')
+                    const parsed = JSON.parse(raw)
+                    if (!parsed || typeof parsed !== 'object') continue
+
+                    const seriesSlug = String(
+                        parsed.series_slug ||
+                            parsed.seriesSlug ||
+                            parsed.slug ||
+                            entry.name,
+                    )
+                    const merkleRootHex = String(
+                        parsed.root_merkle_hash ||
+                            parsed.merkleRootHex ||
+                            parsed.stateHash ||
+                            parsed._meta?.state_hash ||
+                            parsed._meta?.corpusHash ||
+                            '0'.repeat(64),
+                    ).toLowerCase()
+
+                    let entityCount = 0
+                    const ent = parsed.entities
+                    if (ent && typeof ent === 'object') {
+                        if (
+                            ent.characters ||
+                            ent.locations ||
+                            ent.possessions ||
+                            ent.items ||
+                            ent.grievances
+                        ) {
+                            entityCount += Object.keys(
+                                ent.characters || {},
+                            ).length
+                            entityCount += Object.keys(
+                                ent.locations || {},
+                            ).length
+                            entityCount += Object.keys(
+                                ent.possessions || ent.items || {},
+                            ).length
+                            entityCount += Object.keys(
+                                ent.grievances || {},
+                            ).length
+                        } else {
+                            entityCount = Object.keys(ent).length
+                        }
+                    }
+
+                    canonRegistry[seriesSlug] = parsed
+                    canonPayloads.push({
+                        seriesSlug,
+                        manifestPath,
+                        byteSize: stats.size,
+                        merkleRootHex,
+                        entityCount,
+                    })
+
+                    await emit(
+                        `>> [ENGINE:INGEST] [OK] Auto-detected incoming canon payload '${seriesSlug}' (${entityCount} entities, root=${merkleRootHex.slice(0, 12)}...)`,
+                    )
+                } catch (err: any) {
+                    await emit(
+                        `:: [WARN] [ENGINE:INGEST] Malformed bible-state.json in ${entry.name}: ${err?.message || String(err)}`,
+                    )
+                }
+            }
+        } catch (err: any) {
+            await emit(
+                `:: [WARN] [ENGINE:INGEST] Failed to scan compiled/: ${err?.message || String(err)}`,
+            )
+        }
+    }
+
+    // 2. Scan data/spatial/<slug>/*.json for staged spatial receipts
+    const spatialRoot = path.join(repoRoot, 'data', 'spatial')
+    if (fs.existsSync(spatialRoot)) {
+        try {
+            const slugDirs = fs
+                .readdirSync(spatialRoot, { withFileTypes: true })
+                .filter((e) => e.isDirectory() && !e.name.startsWith('.'))
+                .sort((a, b) => a.name.localeCompare(b.name))
+
+            for (const slugDir of slugDirs) {
+                const slugPath = path.join(spatialRoot, slugDir.name)
+                const files = fs
+                    .readdirSync(slugPath)
+                    .filter((f) => f.endsWith('.json'))
+                    .sort((a, b) => a.localeCompare(b))
+
+                for (const file of files) {
+                    const receiptPath = path.join(slugPath, file)
+                    try {
+                        const raw = fs.readFileSync(receiptPath, 'utf8')
+                        const parsed = JSON.parse(raw)
+                        if (!parsed || typeof parsed !== 'object') continue
+
+                        const quad = parsed.spatial_audit_quadruple || {}
+                        const receiptHash = String(
+                            quad.receipt_hash ||
+                                parsed.receiptHash ||
+                                '0'.repeat(64),
+                        )
+                        const queryHash = String(
+                            quad.query_hash ||
+                                parsed.queryHash ||
+                                '0'.repeat(64),
+                        )
+                        const modality = String(
+                            parsed.percept_candidate?.evidence?.modality ||
+                                parsed.modality ||
+                                'PATH',
+                        )
+                        const feasible = Boolean(
+                            parsed.feasible !== undefined
+                                ? parsed.feasible
+                                : true,
+                        )
+
+                        if (!spatialRegistry[slugDir.name]) {
+                            spatialRegistry[slugDir.name] = []
+                        }
+                        spatialRegistry[slugDir.name].push(parsed)
+
+                        spatialReceipts.push({
+                            seriesSlug: slugDir.name,
+                            receiptPath,
+                            receiptHash,
+                            queryHash,
+                            modality,
+                            feasible,
+                        })
+                    } catch {
+                        // Ignore malformed receipt files fail-closed
+                    }
+                }
+
+                const countForSlug = spatialRegistry[slugDir.name]?.length || 0
+                if (countForSlug > 0) {
+                    await emit(
+                        `>> [ENGINE:SPATIAL] [OK] Auto-detected ${countForSlug} staged spatial receipt(s) for '${slugDir.name}'`,
+                    )
+                }
+            }
+        } catch {
+            // Ignore missing or unreadable spatial directory
+        }
+    }
+
+    ;(globalThis as any).INGESTED_BIBLE_STATES = canonRegistry
+    ;(globalThis as any).STAGED_SPATIAL_PROOFS = spatialRegistry
+
+    // Prefer gotham-trinity-crisis if present, otherwise first discovered canon payload
+    const preferred =
+        canonPayloads.find((p) => p.seriesSlug === 'gotham-trinity-crisis') ||
+        canonPayloads[0] ||
+        null
+
+    if (preferred) {
+        ;(globalThis as any).ACTIVE_BIBLE_STATE =
+            canonRegistry[preferred.seriesSlug]
+        ;(globalThis as any).ACTIVE_SERIES_SLUG = preferred.seriesSlug
+    }
+
+    return {
+        canonPayloads,
+        spatialReceipts,
+        activeCanonSlug: preferred ? preferred.seriesSlug : null,
+        logs,
+    }
+}
 
 export function mountSimulationEngineMenu(lib: any): void {
     lib.hunt('[Route action] Route Menu', {
@@ -278,6 +542,13 @@ const init = async () => {
         await LIBRARY.hunt(CONSOLE_ACTION_LIBRARY.UPDATE_CONSOLE, {
             idx: 'cns00',
             src: '>> [OK] Master Bus Initialized',
+        })
+
+        // [Task 1.3.1] Auto-detect incoming bible-state.json payload drops and staged spatial receipts
+        await detectIncomingCanonPayloads({
+            repoRoot: path.resolve(__dirname, '../..'),
+            libraryBus: LIBRARY,
+            consoleAction: CONSOLE_ACTION_LIBRARY.UPDATE_CONSOLE,
         })
 
         // 3. Dynamic Package Injection & Bus Wiring
@@ -1682,13 +1953,6 @@ const main = async () => {
         formatCompilationFeedback(rawOutput)
         process.exit(1)
     }
-}
-
-const isDirectExecution = () => {
-    if (!process.argv[1]) return false
-    const entry = path.resolve(process.argv[1]).toLowerCase()
-    const current = path.resolve(fileURLToPath(import.meta.url)).toLowerCase()
-    return entry === current || entry.endsWith('run.ts')
 }
 
 if (isDirectExecution()) {

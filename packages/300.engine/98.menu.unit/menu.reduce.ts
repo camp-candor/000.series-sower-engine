@@ -56,6 +56,27 @@ export function reducer(
                 state,
             )
 
+        case Act.STAGE_FOUNTAIN_SCREENPLAY_EDITOR:
+            return Buzz.stageSpatialHeaderWithFountainEditor(
+                clone(model),
+                act.bale,
+                state,
+            ).then(() => clone(model))
+
+        case Act.COMPILE_FULL_FOUNTAIN_DRAFT:
+            return Buzz.compileFullFountainDraftToAst(
+                clone(model),
+                act.bale,
+                state,
+            ).then(() => clone(model))
+
+        case Act.EXPORT_TO_CONDUCTOR:
+            return Buzz.exportFountainAndAstToConductor(
+                clone(model),
+                act.bale,
+                state,
+            ).then(() => clone(model))
+
         default:
             return model
     }
