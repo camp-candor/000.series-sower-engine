@@ -1,7 +1,5 @@
 import type { EdgeSpatialProofQuadruple } from './spatial.js'
 
-import type { EdgeSpatialProofQuadruple } from './spatial.js'
-
 export interface Env {
     SOWER_SESSION: DurableObjectNamespace
     CANON_DB?: D1Database
@@ -24,18 +22,6 @@ export interface EdgeBootResponseReceipt {
     bootedAtMs: number
     storageBackend: 'DO_SQLITE'
     spatialProofSchemaActive: boolean
-    spatialProofSchemaActive: boolean
-}
-
-export interface EdgeSpatialEventRecord {
-    sequenceNumber: number
-    eventId: string
-    tick: number
-    eventType: string
-    actorId?: string
-    payloadJson: string
-    proof: EdgeSpatialProofQuadruple
-    timestampMs: number
 }
 
 export interface EdgeSpatialEventRecord {

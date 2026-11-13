@@ -20,6 +20,7 @@ import {
     handleMenuSelection,
     openSpatialProbeMenuBuzz,
     dispatchSpatialProbeBuzz,
+    dispatchEdgeSyncProbeBuzz,
     testSpatialWorkCeilingBuzz,
 } from './buz/00.menu.buzz.js'
 import { deepFreezePayload } from './buz/deepFreeze.buzz.js'
@@ -1141,5 +1142,77 @@ describe('98.menu.unit - Blessed Terminal Spatial Probe Switchboard Battery', ()
 
         expect(ceilingPass).toBe(true)
         expect(model.totalProbesDispatched).toBe(1)
+    })
+
+    it('dispatches Phase 8 edge sync probe and streams isolate telemetry headless', async () => {
+        const lines: string[] = []
+        const libBackup = (globalThis as any).LIBRARY
+        ;(globalThis as any).LIBRARY = {
+            hunt: async (action: string, bale: any) => {
+                if (
+                    action === '[Console action] Update Console' &&
+                    typeof bale?.src === 'string'
+                ) {
+                    lines.push(bale.src)
+                }
+                return {}
+            },
+        }
+        try {
+            let edgePass = false
+            let telemetryResult: any = null
+            await dispatchEdgeSyncProbeBuzz(
+                model,
+                {
+                    idx: 'edge-sync-test',
+                    dat: { seriesSlug: 'wiregrass-basin' },
+                    slv: (res: any) => {
+                        edgePass = res.mnuBit.val === 1
+                        telemetryResult = res.mnuBit.dat?.probeTelemetry
+                    },
+                } as any,
+                undefined,
+            )
+
+            expect(edgePass).toBe(true)
+            expect(telemetryResult).toBeDefined()
+            expect(telemetryResult.feasible).toBe(true)
+            expect(telemetryResult.traversalCostUnits).toBe(150)
+            expect(telemetryResult.cellsExpanded).toBe(4)
+            expect(model.totalProbesDispatched).toBe(1)
+            const blob = lines.join('\n')
+            expect(blob).toContain(
+                '>> [EDGE] Routing spatial query to SowerSessionDO [wiregrass-basin]...',
+            )
+            expect(blob).toContain(
+                '>> [DO:SPATIAL] InProcessSpatialAdapter active (Kernel: 1.0.0-inproc-hardened)',
+            )
+            expect(blob).toContain(
+                '>> [PATH:RESULT] Route feasible: 2 hops | Cost: 150 units | Expanded: 4 cells [OK]',
+            )
+            expect(blob).toContain(
+                '>> [D1:MIGRATE] Verified 4-column spatial proof schema on edge_event_log',
+            )
+            expect(blob).toContain('>> [PROOF:QUAD] Query: 7f83b2...')
+            expect(blob).toContain('[SEALED]')
+            for (const line of lines) {
+                expect(line.charCodeAt(0) < 128).toBe(true)
+                for (const ch of line) {
+                    expect(ch.charCodeAt(0) <= 127).toBe(true)
+                }
+            }
+        } finally {
+            if (libBackup === undefined) {
+                delete (globalThis as any).LIBRARY
+            } else {
+                ;(globalThis as any).LIBRARY = libBackup
+            }
+        }
+    })
+
+    it('declares [05] edge persistence sync in the spatial probe catalog', () => {
+        expect(SPATIAL_PROBE_CHOICES).toContain(
+            '[05] TEST EDGE PERSISTENCE SYNC (SowerSessionDO Isolate)',
+        )
     })
 })

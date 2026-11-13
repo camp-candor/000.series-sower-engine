@@ -46,6 +46,9 @@ export function reducer(
         case Act.DISPATCH_SPATIAL_PROBE:
             return Buzz.dispatchSpatialProbeBuzz(clone(model), act.bale, state)
 
+        case Act.DISPATCH_EDGE_SYNC_PROBE:
+            return Buzz.dispatchEdgeSyncProbeBuzz(clone(model), act.bale, state)
+
         case Act.TEST_SPATIAL_WORK_CEILING:
             return Buzz.testSpatialWorkCeilingBuzz(
                 clone(model),

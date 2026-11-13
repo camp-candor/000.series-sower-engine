@@ -10,6 +10,7 @@ export {
     MENU_CHOICES,
     openSpatialProbeMenuBuzz,
     dispatchSpatialProbeBuzz,
+    dispatchEdgeSyncProbeBuzz,
     testSpatialWorkCeilingBuzz,
 } from './buz/00.menu.buzz.js'
 export { updateArithmeticMenu } from './buz/arithmetic-menu.buzz.js'

@@ -221,6 +221,12 @@ export class DispatchSpatialProbe implements Action {
     constructor(public bale?: MenuBit) {}
 }
 
+export const DISPATCH_EDGE_SYNC_PROBE = '[Menu action] Dispatch Edge Sync Probe'
+export class DispatchEdgeSyncProbe implements Action {
+    readonly type = DISPATCH_EDGE_SYNC_PROBE
+    constructor(public bale?: MenuBit) {}
+}
+
 export const TEST_SPATIAL_WORK_CEILING =
     '[Menu action] Test Spatial Work Ceiling'
 export class TestSpatialWorkCeiling implements Action {
@@ -261,4 +267,5 @@ export type Actions =
     | ExecuteArithmeticAuditAction
     | OpenSpatialProbeMenu
     | DispatchSpatialProbe
+    | DispatchEdgeSyncProbe
     | TestSpatialWorkCeiling

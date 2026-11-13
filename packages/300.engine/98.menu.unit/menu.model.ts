@@ -26,6 +26,7 @@ export const SPATIAL_PROBE_CHOICES: readonly string[] = Object.freeze([
     '[02] TEST OCCLUDED ROUTE (Locked Sluice Valve)',
     '[03] TEST WORK CEILING TRIPWIRE (512-Cell Exhaustion)',
     '[04] TEST SENSORY PERCEPTION SNR (Optical & Acoustic)',
+    '[05] TEST EDGE PERSISTENCE SYNC (SowerSessionDO Isolate)',
     '[ROOT MENU]',
 ])
 

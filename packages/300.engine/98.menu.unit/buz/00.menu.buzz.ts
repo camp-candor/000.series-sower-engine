@@ -40,6 +40,7 @@ import * as Color from '../../val/console-color.js'
 import {
     openSpatialProbeMenuBuzz,
     dispatchSpatialProbeBuzz,
+    dispatchEdgeSyncProbeBuzz,
     testSpatialWorkCeilingBuzz,
 } from './spatial-probe-menu.buzz.js'
 import { openGauntletMenu } from './gauntlet-menu.buzz.js'
@@ -1082,6 +1083,37 @@ export const handleMenuSelection = async (
                         await emitConsole(
                             ste,
                             `>> [SOMATIC:FILTER] Acoustic concussed (+1500 cdB floor): received=${acousticEval.received} reason=${acousticEval.rejectionReason ?? 'NONE'}`,
+                        )
+                    } else if (
+                        probePick.startsWith('[05] TEST EDGE PERSISTENCE SYNC')
+                    ) {
+                        const edgeAdapter = new InProcessSpatialAdapter()
+                        try {
+                            await ste.hunt(ActLoc.BIND_SPATIAL_PORT, {
+                                dat: { spatialPort: edgeAdapter },
+                            })
+                        } catch (err: any) {
+                            await emitConsole(
+                                ste,
+                                `:: [SPATIAL:PORT] Probe binding failed: ${err?.message ?? String(err)}`,
+                            )
+                            break
+                        }
+                        await dispatchEdgeSyncProbeBuzz(
+                            model,
+                            {
+                                idx: 'probe-edge-sync',
+                                dat: {
+                                    seriesSlug:
+                                        model.activeSeriesSlug ||
+                                        'wiregrass-basin',
+                                    originPacked: packAxial(0, 0),
+                                    destinationPacked: packAxial(2, -1),
+                                    maxBudgetCostUnits: 500,
+                                    workEnvelopeLimit: 512,
+                                },
+                            } as any,
+                            ste,
                         )
                     } else {
                         await emitConsole(
@@ -3981,5 +4013,6 @@ export const updateMenu = async (
 export {
     openSpatialProbeMenuBuzz,
     dispatchSpatialProbeBuzz,
+    dispatchEdgeSyncProbeBuzz,
     testSpatialWorkCeilingBuzz,
 } from './spatial-probe-menu.buzz.js'
