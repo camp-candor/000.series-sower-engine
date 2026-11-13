@@ -12,6 +12,13 @@
             },
         ],
     },
+    "d1_databases": [
+        {
+            "binding": "CANON_DB",
+            "database_name": "series-canon-db",
+            "database_id": "series-canon-db-id",
+        },
+    ],
     "migrations": [
         {
             "tag": "v1",
