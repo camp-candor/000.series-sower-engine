@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import app from '../../src/index.js'
 import {
+    EDGE_DO_SCHEMA_SQL,
+    evaluateEdgeSpatialRoute,
+} from '../../src/objects/SowerSessionDO.js'
+import {
     EdgeAxialCoordSchema,
     EdgeSpatialProofQuadrupleSchema,
 } from '../../src/types/spatial.js'
@@ -82,6 +86,11 @@ describe('apps/worker :: Edge Worker Persistence Synchronization Adapter (Phase 
             s: 0,
         })
         expect(nonInteger.success).toBe(false)
+        if (!nonInteger.success) {
+            expect(nonInteger.error.issues[0]?.message).toContain(
+                '[FLOAT_PROHIBITED]',
+            )
+        }
 
         const invariantBreach = EdgeAxialCoordSchema.safeParse({
             q: 1,
@@ -89,6 +98,11 @@ describe('apps/worker :: Edge Worker Persistence Synchronization Adapter (Phase 
             s: 1,
         })
         expect(invariantBreach.success).toBe(false)
+        if (!invariantBreach.success) {
+            expect(invariantBreach.error.issues[0]?.message).toContain(
+                '[CUBIC_INVARIANT_BREACH]',
+            )
+        }
     })
 
     it('routes spatial queries to isolated Durable Object instances via idFromName', async () => {
@@ -147,5 +161,84 @@ describe('apps/worker :: Edge Worker Persistence Synchronization Adapter (Phase 
         const body: any = await res.json()
         expect(body.seriesSlug).toBe('under-the-floorboards')
         expect(body.spatialProofSchemaActive).toBe(true)
+    })
+
+    it('isolates distinct series slugs via idFromName without cross-tenant leakage', async () => {
+        const reqA = new Request(
+            'http://localhost/series/wiregrass-basin/status',
+        )
+        const reqB = new Request(
+            'http://localhost/series/under-the-floorboards/status',
+        )
+        const [resA, resB] = await Promise.all([
+            app.fetch(reqA, mockEnv),
+            app.fetch(reqB, mockEnv),
+        ])
+        const bodyA: any = await resA.json()
+        const bodyB: any = await resB.json()
+        expect(bodyA.seriesSlug).toBe('wiregrass-basin')
+        expect(bodyB.seriesSlug).toBe('under-the-floorboards')
+        expect(mockDOInstances.has('wiregrass-basin')).toBe(true)
+        expect(mockDOInstances.has('under-the-floorboards')).toBe(true)
+    })
+
+    it('initializes edge_event_log with 4-part proof columns, immutability triggers, and sub-50ms governor checks', () => {
+        expect(EDGE_DO_SCHEMA_SQL).toContain('topology_hash TEXT NOT NULL')
+        expect(EDGE_DO_SCHEMA_SQL).toContain('overlay_hash TEXT NOT NULL')
+        expect(EDGE_DO_SCHEMA_SQL).toContain('query_hash TEXT NOT NULL')
+        expect(EDGE_DO_SCHEMA_SQL).toContain('receipt_hash TEXT NOT NULL')
+        expect(EDGE_DO_SCHEMA_SQL).toContain('trg_edge_event_log_no_update')
+        expect(EDGE_DO_SCHEMA_SQL).toContain('trg_edge_event_log_no_delete')
+        expect(EDGE_DO_SCHEMA_SQL).toContain('[IMMUTABILITY_VIOLATION]')
+
+        const topoHash = 'e'.repeat(64)
+        const overlayHash = 'f'.repeat(64)
+
+        const t0 = performance.now()
+        const okReceipt = evaluateEdgeSpatialRoute(
+            {
+                originPacked: 100,
+                destinationPacked: 200,
+                maxBudgetCostUnits: 500,
+                workEnvelopeLimit: 512,
+            },
+            topoHash,
+            overlayHash,
+        )
+        const elapsedMs = performance.now() - t0
+        expect(okReceipt.ok).toBe(true)
+        expect(elapsedMs).toBeLessThan(50)
+        expect(
+            EdgeSpatialProofQuadrupleSchema.safeParse(okReceipt.proofQuadruple)
+                .success,
+        ).toBe(true)
+
+        const workCapReceipt = evaluateEdgeSpatialRoute(
+            {
+                originPacked: 100,
+                destinationPacked: 200,
+                maxBudgetCostUnits: 500,
+                workEnvelopeLimit: 4,
+            },
+            topoHash,
+            overlayHash,
+        )
+        expect(workCapReceipt.ok).toBe(false)
+        expect(workCapReceipt.failureReason).toBe('BUDGET_EXCEEDED')
+        expect(workCapReceipt.path).toEqual([])
+
+        const costCapReceipt = evaluateEdgeSpatialRoute(
+            {
+                originPacked: 100,
+                destinationPacked: 200,
+                maxBudgetCostUnits: 100,
+                workEnvelopeLimit: 512,
+            },
+            topoHash,
+            overlayHash,
+        )
+        expect(costCapReceipt.ok).toBe(false)
+        expect(costCapReceipt.failureReason).toBe('BUDGET_EXCEEDED')
+        expect(costCapReceipt.path).toEqual([])
     })
 })

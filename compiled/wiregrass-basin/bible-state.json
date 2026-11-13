@@ -1,4 +1,7 @@
 {
+    "_meta": {
+        "applied_pardons": []
+    },
     "catalog_summary": {
         "characterCount": 3,
         "characters": 3,
@@ -12,7 +15,7 @@
         "possessionCount": 3,
         "totalEntities": 9
     },
-    "compiled_at": "2026-11-08T20:13:35.045Z",
+    "compiled_at": "2026-11-12T19:23:02.405Z",
     "compiler_duration_ms": 1,
     "entities": {
         "char_johnny_walkman": {
@@ -141,7 +144,7 @@
         "loc_dixie_starlight_diner": "809719bf375ab383d0f50853a864360bd0545776eda72fe38417377b4c81bf6b",
         "loc_dixie_starlight_lot": "5dcfca6bf1d90b77d843b1eae9ebc0f4386a8cf041d178cd0ef16d43b223d20b"
     },
-    "root_merkle_hash": "81d31614fa5a17080971e5573a31a75911711ab4c5446e5575a64eacf8c30c3b",
+    "root_merkle_hash": "dbbd52f74f58f28f976fe453650fe8be820c4ca3c91406c88729fda119ba1760",
     "schema_version": "1.0.0",
     "series_slug": "wiregrass-basin"
 }

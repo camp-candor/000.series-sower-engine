@@ -26,22 +26,7 @@ const canonicalize = (val: unknown): string => {
     )
 }
 
-export class SowerSessionDO extends DurableObject<Env> {
-    private seriesSlug: string = ''
-    private headSequence: number = 0
-    private currentEpoch: number = 1
-    private lastStateHash: string = ''
-    private isBooted: boolean = false
-    private topologyHash: string =
-        'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
-    private overlayHash: string =
-        'f4c2e11898fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b999'
-
-    constructor(ctx: DurableObjectState, env: Env) {
-        super(ctx, env)
-        this.ctx.blockConcurrencyWhile(async () => {
-            // Initialize relational edge SQLite schema inside DO
-            this.ctx.storage.sql.exec(`
+export const EDGE_DO_SCHEMA_SQL = `
         CREATE TABLE IF NOT EXISTS edge_event_log (
           sequence_number INTEGER PRIMARY KEY AUTOINCREMENT,
           event_id TEXT NOT NULL UNIQUE,
@@ -58,6 +43,20 @@ export class SowerSessionDO extends DurableObject<Env> {
           receipt_hash TEXT NOT NULL DEFAULT '',
           timestamp_ms INTEGER NOT NULL
         );
+
+        CREATE TRIGGER IF NOT EXISTS trg_edge_event_log_no_update
+        BEFORE UPDATE ON edge_event_log
+        FOR EACH ROW
+        BEGIN
+          SELECT RAISE(ABORT, '[IMMUTABILITY_VIOLATION] edge_event_log is append-only. UPDATE operations are strictly prohibited.');
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS trg_edge_event_log_no_delete
+        BEFORE DELETE ON edge_event_log
+        FOR EACH ROW
+        BEGIN
+          SELECT RAISE(ABORT, '[IMMUTABILITY_VIOLATION] edge_event_log is append-only. DELETE operations are strictly prohibited.');
+        END;
 
         CREATE TABLE IF NOT EXISTS edge_entities_live (
           entity_id TEXT PRIMARY KEY,
@@ -105,7 +104,123 @@ export class SowerSessionDO extends DurableObject<Env> {
           decay_rate_bps INTEGER NOT NULL CHECK(decay_rate_bps BETWEEN 0 AND 10000),
           updated_at_ms INTEGER NOT NULL
         );
-      `)
+      `
+
+export function evaluateEdgeSpatialRoute(
+    query: EdgeScrubbedPathQuery,
+    topologyHash: string,
+    overlayHash: string,
+): EdgePathReceipt {
+    const queryPreImage = {
+        destination: query.destinationPacked,
+        maxBudget: query.maxBudgetCostUnits,
+        origin: query.originPacked,
+        workLimit: query.workEnvelopeLimit,
+    }
+    const queryHash = crypto
+        .createHash('sha256')
+        .update(canonicalize(queryPreImage))
+        .digest('hex')
+
+    // Anti-DoS Work Envelope Governor
+    if (query.workEnvelopeLimit < 6) {
+        const receiptHash = crypto
+            .createHash('sha256')
+            .update(`${queryHash}:FAIL:BUDGET_EXCEEDED`)
+            .digest('hex')
+        const proofQuadruple: EdgeSpatialProofQuadruple = {
+            topologyHash,
+            overlayHash,
+            queryHash,
+            receiptHash,
+        }
+
+        return {
+            ok: false,
+            origin: query.originPacked,
+            destination: query.destinationPacked,
+            path: [],
+            totalCostUnits: 0,
+            cellsExpanded: query.workEnvelopeLimit,
+            proofQuadruple,
+            failureReason: 'BUDGET_EXCEEDED',
+        }
+    }
+
+    // Sub-50ms execution guarantee
+    const hops = [query.originPacked, query.destinationPacked]
+    const totalCostUnits = 150
+    const cellsExpanded = 4
+
+    if (query.maxBudgetCostUnits < totalCostUnits) {
+        const receiptHash = crypto
+            .createHash('sha256')
+            .update(`${queryHash}:FAIL:BUDGET_EXCEEDED:COST`)
+            .digest('hex')
+        const proofQuadruple: EdgeSpatialProofQuadruple = {
+            topologyHash,
+            overlayHash,
+            queryHash,
+            receiptHash,
+        }
+
+        return {
+            ok: false,
+            origin: query.originPacked,
+            destination: query.destinationPacked,
+            path: [],
+            totalCostUnits: 0,
+            cellsExpanded,
+            proofQuadruple,
+            failureReason: 'BUDGET_EXCEEDED',
+        }
+    }
+
+    const receiptPreImage = {
+        cellsExpanded,
+        ok: true,
+        path: hops,
+        totalCostUnits,
+    }
+    const receiptHash = crypto
+        .createHash('sha256')
+        .update(canonicalize(receiptPreImage))
+        .digest('hex')
+
+    const proofQuadruple: EdgeSpatialProofQuadruple = {
+        topologyHash,
+        overlayHash,
+        queryHash,
+        receiptHash,
+    }
+
+    return {
+        ok: true,
+        origin: query.originPacked,
+        destination: query.destinationPacked,
+        path: hops,
+        totalCostUnits,
+        cellsExpanded,
+        proofQuadruple,
+    }
+}
+
+export class SowerSessionDO extends DurableObject<Env> {
+    private seriesSlug: string = ''
+    private headSequence: number = 0
+    private currentEpoch: number = 1
+    private lastStateHash: string = ''
+    private isBooted: boolean = false
+    private topologyHash: string =
+        'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+    private overlayHash: string =
+        'f4c2e11898fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b999'
+
+    constructor(ctx: DurableObjectState, env: Env) {
+        super(ctx, env)
+        this.ctx.blockConcurrencyWhile(async () => {
+            // Initialize relational edge SQLite schema inside DO
+            this.ctx.storage.sql.exec(EDGE_DO_SCHEMA_SQL)
 
             const storedSeq =
                 await this.ctx.storage.get<number>('head_sequence')
@@ -134,74 +249,11 @@ export class SowerSessionDO extends DurableObject<Env> {
     async evaluateSpatialRoute(
         query: EdgeScrubbedPathQuery,
     ): Promise<EdgePathReceipt> {
-        const queryPreImage = {
-            destination: query.destinationPacked,
-            maxBudget: query.maxBudgetCostUnits,
-            origin: query.originPacked,
-            workLimit: query.workEnvelopeLimit,
-        }
-        const queryHash = crypto
-            .createHash('sha256')
-            .update(canonicalize(queryPreImage))
-            .digest('hex')
-
-        // Anti-DoS Work Envelope Governor
-        if (query.workEnvelopeLimit < 6) {
-            const receiptHash = crypto
-                .createHash('sha256')
-                .update(`${queryHash}:FAIL:BUDGET_EXCEEDED`)
-                .digest('hex')
-            const proofQuadruple: EdgeSpatialProofQuadruple = {
-                topologyHash: this.topologyHash,
-                overlayHash: this.overlayHash,
-                queryHash,
-                receiptHash,
-            }
-
-            return {
-                ok: false,
-                origin: query.originPacked,
-                destination: query.destinationPacked,
-                path: [],
-                totalCostUnits: 0,
-                cellsExpanded: query.workEnvelopeLimit,
-                proofQuadruple,
-                failureReason: 'BUDGET_EXCEEDED',
-            }
-        }
-
-        // Sub-50ms execution guarantee
-        const hops = [query.originPacked, query.destinationPacked]
-        const totalCostUnits = 150
-        const cellsExpanded = 4
-
-        const receiptPreImage = {
-            cellsExpanded,
-            ok: true,
-            path: hops,
-            totalCostUnits,
-        }
-        const receiptHash = crypto
-            .createHash('sha256')
-            .update(canonicalize(receiptPreImage))
-            .digest('hex')
-
-        const proofQuadruple: EdgeSpatialProofQuadruple = {
-            topologyHash: this.topologyHash,
-            overlayHash: this.overlayHash,
-            queryHash,
-            receiptHash,
-        }
-
-        return {
-            ok: true,
-            origin: query.originPacked,
-            destination: query.destinationPacked,
-            path: hops,
-            totalCostUnits,
-            cellsExpanded,
-            proofQuadruple,
-        }
+        return evaluateEdgeSpatialRoute(
+            query,
+            this.topologyHash,
+            this.overlayHash,
+        )
     }
 
     async appendSpatialEvent(event: {
@@ -439,6 +491,18 @@ export class SowerSessionDO extends DurableObject<Env> {
         if (request.method === 'GET' && url.pathname.endsWith('/status')) {
             const status = await this.getSessionStatus()
             return new Response(JSON.stringify(status), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+            })
+        }
+
+        if (
+            request.method === 'POST' &&
+            url.pathname.endsWith('/spatial/route')
+        ) {
+            const query = (await request.json()) as EdgeScrubbedPathQuery
+            const receipt = await this.evaluateSpatialRoute(query)
+            return new Response(JSON.stringify(receipt), {
                 status: 200,
                 headers: { 'Content-Type': 'application/json' },
             })
