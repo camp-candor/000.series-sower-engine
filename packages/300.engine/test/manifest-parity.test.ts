@@ -7,12 +7,12 @@ import * as ActClc from '../97.collect.unit/collect.action.js'
 import * as ActBus from '../99.bus.unit/bus.action.js'
 
 describe('Phase 1 Manifest Parity & Engine Synchronization Battery', () => {
-    it('registers exactly 25 units in BEE.list', () => {
+    it('registers exactly 26 units in BEE.list', () => {
         expect(Array.isArray(Import.list)).toBe(true)
-        expect(Import.list.length).toBe(25)
+        expect(Import.list.length).toBe(26)
     })
 
-    it('contains all 25 reducer handlers in BEE.reducer', () => {
+    it('contains all 26 reducer handlers in BEE.reducer', () => {
         const expectedKeys = [
             'engine',
             'actor',
@@ -25,6 +25,7 @@ describe('Phase 1 Manifest Parity & Engine Synchronization Battery', () => {
             'ledger',
             'leverage',
             'location',
+            'belief',
             'movement',
             'paranoia',
             'primordial',
@@ -44,12 +45,13 @@ describe('Phase 1 Manifest Parity & Engine Synchronization Battery', () => {
         for (const key of expectedKeys) {
             expect(typeof Import.reducer[key]).toBe('function')
         }
-        expect(Object.keys(Import.reducer).length).toBe(25)
+        expect(Object.keys(Import.reducer).length).toBe(26)
     })
 
-    it('instantiates all 25 unit models cleanly in UnitData', () => {
+    it('instantiates all 26 unit models cleanly in UnitData', () => {
         const data = new UnitData()
         expect(data.engine).toBeDefined()
+        expect(data.belief).toBeDefined()
         expect(data.arithmetic).toBeDefined()
         expect(data.compile).toBeDefined()
         expect(data.collect).toBeDefined()
