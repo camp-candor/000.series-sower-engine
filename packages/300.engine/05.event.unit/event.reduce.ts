@@ -31,6 +31,13 @@ export function reducer(
         case Act.UPCAST_EVENT:
             return Buzz.upcastEvent(clone(model), act.bale as any, state)
 
+        case Act.DETECT_SIGNIFICANT_EVENT:
+            return Buzz.detectSignificantEvent(
+                clone(model),
+                act.bale as any,
+                state,
+            )
+
         default:
             return model
     }

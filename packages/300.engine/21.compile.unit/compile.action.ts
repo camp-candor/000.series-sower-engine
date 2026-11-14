@@ -9,6 +9,13 @@ export const PASS2_TRAVERSE = '[Compile action] Pass 2 Relational Topology'
 export const PASS3_SEAL = '[Compile action] Pass 3 Deterministic Seal'
 export const GATE0_VERIFY = '[Compile action] Gate 0 Verification Audit'
 
+export const SYNTHESIZE_EVENT_FOUNTAIN =
+    '[Compile action] Synthesize Event Fountain'
+export class SynthesizeEventFountain implements Action {
+    readonly type = SYNTHESIZE_EVENT_FOUNTAIN
+    constructor(public bale: CompileBit) {}
+}
+
 // Action classes
 export class InitCompile implements Action {
     readonly type = INIT_COMPILE
@@ -47,3 +54,4 @@ export type Actions =
     | Pass2Traverse
     | Pass3Seal
     | Gate0Verify
+    | SynthesizeEventFountain

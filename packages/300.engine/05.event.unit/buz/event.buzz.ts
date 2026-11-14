@@ -415,3 +415,218 @@ export const streamEvents = async (
 
     return cpy
 }
+
+export const evaluateEventSignificance = (
+    candidate: {
+        readonly tick: number
+        readonly category:
+            | 'PARANOIA_TRIGGERED'
+            | 'GRIEVANCE_BREACH'
+            | 'SOMATIC_TRAUMA'
+            | 'INVENTORY_TRANSFER'
+            | 'EPISTEMIC_REVEAL'
+            | 'CHRONO_MILESTONE'
+        readonly severityBps: number
+        readonly triggerReason: string
+    },
+    config: {
+        readonly globalThresholdBps: number
+        readonly perCategoryThresholdBps?: Partial<Record<string, number>>
+        readonly enabledCategories?: Partial<Record<string, boolean>>
+        readonly cooldownTicks?: Partial<Record<string, number>>
+    },
+    cooldownState: Partial<Record<string, number>> = {},
+): {
+    readonly significant: boolean
+    readonly reason: string
+    readonly severityBps: number
+} => {
+    if (!Number.isInteger(candidate.severityBps)) {
+        throw new TypeError(
+            `[FLOAT_PROHIBITED] severityBps must be a discrete integer. Received: ${String(candidate.severityBps)}`,
+        )
+    }
+    if (candidate.severityBps < 0 || candidate.severityBps > 10000) {
+        throw new RangeError(
+            `[OUT_OF_BOUNDS] severityBps out of bounds [0, 10000]: ${String(candidate.severityBps)}`,
+        )
+    }
+    if (!Number.isInteger(config.globalThresholdBps)) {
+        throw new TypeError(
+            `[FLOAT_PROHIBITED] globalThresholdBps must be a discrete integer. Received: ${String(config.globalThresholdBps)}`,
+        )
+    }
+    if (config.globalThresholdBps < 0 || config.globalThresholdBps > 10000) {
+        throw new RangeError(
+            `[OUT_OF_BOUNDS] globalThresholdBps out of bounds [0, 10000]: ${String(config.globalThresholdBps)}`,
+        )
+    }
+    const perThreshold = config.perCategoryThresholdBps?.[candidate.category]
+    if (perThreshold !== undefined) {
+        if (!Number.isInteger(perThreshold)) {
+            throw new TypeError(
+                `[FLOAT_PROHIBITED] perCategoryThresholdBps must be a discrete integer. Received: ${String(perThreshold)}`,
+            )
+        }
+        if (perThreshold < 0 || perThreshold > 10000) {
+            throw new RangeError(
+                `[OUT_OF_BOUNDS] perCategoryThresholdBps out of bounds [0, 10000]: ${String(perThreshold)}`,
+            )
+        }
+    }
+    const cooldown = config.cooldownTicks?.[candidate.category] ?? 0
+    if (!Number.isInteger(cooldown) || cooldown < 0) {
+        throw new RangeError(
+            `[OUT_OF_BOUNDS] cooldown_ticks must be non-negative integer: ${String(cooldown)}`,
+        )
+    }
+    const enabled = config.enabledCategories?.[candidate.category]
+    if (enabled === false) {
+        return {
+            significant: false,
+            reason: `CATEGORY_DISABLED:${candidate.category}`,
+            severityBps: candidate.severityBps,
+        }
+    }
+    const threshold = perThreshold ?? config.globalThresholdBps
+    if (candidate.severityBps < threshold) {
+        return {
+            significant: false,
+            reason: `BELOW_THRESHOLD:${candidate.severityBps}<${threshold}`,
+            severityBps: candidate.severityBps,
+        }
+    }
+    const lastTick = cooldownState[candidate.category]
+    if (
+        lastTick !== undefined &&
+        Number.isInteger(lastTick) &&
+        candidate.tick - (lastTick as number) < cooldown
+    ) {
+        return {
+            significant: false,
+            reason: `COOLDOWN_ACTIVE:${candidate.category}@${String(lastTick)}`,
+            severityBps: candidate.severityBps,
+        }
+    }
+    return {
+        significant: true,
+        reason: `SIGNIFICANT:${candidate.category}:${candidate.severityBps}`,
+        severityBps: candidate.severityBps,
+    }
+}
+
+export const detectSignificantEvent = (
+    cpy: EventModel,
+    bal: EventBit,
+    _ste?: State,
+): EventModel => {
+    const dat = (bal as unknown as { dat?: Record<string, unknown> })?.dat
+    const candidate = dat?.['candidate'] as
+        | {
+              readonly tick: number
+              readonly category:
+                  | 'PARANOIA_TRIGGERED'
+                  | 'GRIEVANCE_BREACH'
+                  | 'SOMATIC_TRAUMA'
+                  | 'INVENTORY_TRANSFER'
+                  | 'EPISTEMIC_REVEAL'
+                  | 'CHRONO_MILESTONE'
+              readonly severityBps: number
+              readonly triggerReason: string
+              readonly actorsInvolved?: readonly string[]
+              readonly locationId?: string
+              readonly stateDeltaSummary?: string
+          }
+        | undefined
+    const config = dat?.['config'] as
+        | {
+              readonly globalThresholdBps: number
+              readonly perCategoryThresholdBps?: Partial<Record<string, number>>
+              readonly enabledCategories?: Partial<Record<string, boolean>>
+              readonly cooldownTicks?: Partial<Record<string, number>>
+          }
+        | undefined
+    const cooldownState = ((dat?.['cooldownState'] as Partial<
+        Record<string, number>
+    >) ?? {}) as Partial<Record<string, number>>
+    if (candidate == null || config == null) {
+        if (bal?.slv) {
+            bal.slv({
+                eventBit: {
+                    idx: 'detect-significant-fail',
+                    val: 0,
+                    dat: {
+                        error: '[INVALID_DETECT_PARAMS] Missing candidate or config',
+                    },
+                },
+            })
+        }
+        return cpy
+    }
+    try {
+        const verdict = evaluateEventSignificance(
+            candidate,
+            config,
+            cooldownState,
+        )
+        if (verdict.significant) {
+            const tracked = (
+                cpy as unknown as { detectedSignificant?: unknown[] }
+            ).detectedSignificant
+            const record = Object.freeze({
+                eventSequence: (dat?.['eventSequence'] as number) ?? 0,
+                tick: candidate.tick,
+                clockSnapshot: (dat?.['clockSnapshot'] as Record<
+                    string,
+                    string
+                >) ?? {
+                    isoDate: '2026-10-31',
+                    clockTimeHm: '21:00',
+                    clockTimeHms: '21:00:00',
+                    timecodeSmpte: '00:00:00:00',
+                    daypart: 'NIGHT',
+                },
+                category: candidate.category,
+                severityBps: candidate.severityBps,
+                triggerReason: candidate.triggerReason,
+                actorsInvolved: Object.freeze([
+                    ...(candidate.actorsInvolved ?? []),
+                ]),
+                locationId: candidate.locationId ?? 'loc_unknown',
+                stateDeltaSummary:
+                    candidate.stateDeltaSummary ?? candidate.triggerReason,
+                causalHash: `causal_${candidate.category}_${candidate.tick}_${candidate.severityBps}`,
+            })
+            ;(
+                cpy as unknown as { detectedSignificant?: unknown[] }
+            ).detectedSignificant = Object.freeze([
+                ...(tracked ?? []),
+                record,
+            ]) as unknown[]
+        }
+        if (bal?.slv) {
+            bal.slv({
+                eventBit: {
+                    idx: verdict.significant
+                        ? 'detect-significant-pass'
+                        : 'detect-significant-filtered',
+                    val: verdict.significant ? 1 : 0,
+                    dat: { verdict },
+                },
+            })
+        }
+    } catch (err: unknown) {
+        if (bal?.slv) {
+            bal.slv({
+                eventBit: {
+                    idx: 'detect-significant-fail',
+                    val: 0,
+                    dat: {
+                        error: err instanceof Error ? err.message : String(err),
+                    },
+                },
+            })
+        }
+    }
+    return cpy
+}

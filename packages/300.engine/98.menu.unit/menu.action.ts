@@ -254,6 +254,13 @@ export class ExportToConductor implements Action {
     constructor(public bale?: MenuBit) {}
 }
 
+export const RUN_AUTO_SCRIPT_SIMULATION =
+    '[Menu action] Run Auto-Script Simulation'
+export class RunAutoScriptSimulation implements Action {
+    readonly type = RUN_AUTO_SCRIPT_SIMULATION
+    constructor(public bale?: MenuBit) {}
+}
+
 export type Actions =
     | InitMenu
     | UpdateMenu
@@ -292,3 +299,4 @@ export type Actions =
     | StageFountainScreenplayEditor
     | CompileFullFountainDraft
     | ExportToConductor
+    | RunAutoScriptSimulation

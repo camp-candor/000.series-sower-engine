@@ -177,3 +177,69 @@ export default interface Event {
     lastEventHash: string
     registry: EventUpcasterRegistry
 }
+
+export type SignificantEventCategory =
+    | 'PARANOIA_TRIGGERED'
+    | 'GRIEVANCE_BREACH'
+    | 'SOMATIC_TRAUMA'
+    | 'INVENTORY_TRANSFER'
+    | 'EPISTEMIC_REVEAL'
+    | 'CHRONO_MILESTONE'
+
+export interface SignificantEventRecord {
+    readonly eventSequence: number
+    readonly tick: number
+    readonly clockSnapshot: {
+        readonly isoDate: string
+        readonly clockTimeHm: string
+        readonly clockTimeHms: string
+        readonly timecodeSmpte: string
+        readonly daypart: string
+    }
+    readonly category: SignificantEventCategory
+    readonly severityBps: number
+    readonly triggerReason: string
+    readonly actorsInvolved: readonly string[]
+    readonly locationId: string
+    readonly stateDeltaSummary: string
+    readonly causalHash: string
+}
+
+export interface EventDetectorRuleConfig {
+    readonly globalThresholdBps: number
+    readonly perCategoryThresholdBps?: Partial<
+        Record<SignificantEventCategory, number>
+    >
+    readonly enabledCategories?: Partial<
+        Record<SignificantEventCategory, boolean>
+    >
+    readonly cooldownTicks?: Partial<Record<SignificantEventCategory, number>>
+}
+
+export interface SignificantEventCandidate {
+    readonly tick: number
+    readonly category: SignificantEventCategory
+    readonly severityBps: number
+    readonly triggerReason: string
+    readonly actorsInvolved?: readonly string[]
+    readonly locationId?: string
+    readonly stateDeltaSummary?: string
+}
+
+export interface EventSignificanceVerdict {
+    readonly significant: boolean
+    readonly reason: string
+    readonly severityBps: number
+}
+
+export type SignificanceCooldownState = Partial<
+    Record<SignificantEventCategory, number>
+>
+
+export const DEFAULT_SIGNIFICANCE_CONFIG: EventDetectorRuleConfig =
+    Object.freeze({
+        globalThresholdBps: 3000,
+        perCategoryThresholdBps: Object.freeze({}),
+        enabledCategories: Object.freeze({}),
+        cooldownTicks: Object.freeze({}),
+    })

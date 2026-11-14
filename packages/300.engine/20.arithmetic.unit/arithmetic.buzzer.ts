@@ -1,5 +1,14 @@
 export { arithmeticBuzz } from './buz/arithmetic.buzz.js'
 export {
+    fnv1a32,
+    mulberry32Step,
+    deriveDeterministicUint32,
+    deriveDeterministicSeedInt,
+    nextDeterministicRoll,
+    rollDeterministic2d6,
+    pickDeterministicIndex,
+} from './buz/arithmetic.buzz.js'
+export {
     assertBasisPoint,
     assertBigIntBasisPoint,
     toBasisPoint,

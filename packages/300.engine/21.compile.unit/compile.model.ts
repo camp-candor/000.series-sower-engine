@@ -2,6 +2,7 @@ import Compile, {
     CompilationStatus,
     CompileCatalogSummary,
     CompileValidationReport,
+    SynthesizedEventScreenplay,
 } from './fce/compile.interface.js'
 
 export class CompileModel implements Compile {
@@ -15,4 +16,5 @@ export class CompileModel implements Compile {
     catalogSummary?: CompileCatalogSummary
     validationReport?: CompileValidationReport
     lastError?: string
+    lastSynthesizedScreenplay?: SynthesizedEventScreenplay
 }

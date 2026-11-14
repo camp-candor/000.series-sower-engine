@@ -28,6 +28,13 @@ export function reducer(
         case Act.GATE0_VERIFY:
             return Buzz.gate0Verify(clone(model, true), act.bale, state)
 
+        case Act.SYNTHESIZE_EVENT_FOUNTAIN:
+            return Buzz.synthesizeEventFountain(
+                clone(model, true),
+                act.bale,
+                state,
+            )
+
         default:
             return model
     }

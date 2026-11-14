@@ -32,6 +32,7 @@ import {
 } from '../../02.database.unit/buz/database.buzz.js'
 
 import type { MenuModel } from '../menu.model.js'
+import { MenuModel as MenuModelClass } from '../menu.model.js'
 import type MenuBit from '../fce/menu.bit.js'
 import type State from '../../99.core/state.js'
 
@@ -153,8 +154,12 @@ const UPDATE_GRID = '[Grid action] Update Grid'
 const WRITE_CONSOLE = '[Write action] Write Console'
 const UPDATE_CONSOLE = '[Console action] Update Console'
 const OPEN_CHOICE = '[Open action] Open Choice'
+const OPEN_INPUT = '[Open action] Open Input'
 const CLOSE_TERMINAL = '[Close action] Close Terminal'
 const PRINT_MENU = '[Render action] Print Menu'
+
+export const AUTO_SCRIPT_MENU_LABEL =
+    '[22] RUN UNATTENDED AUTO-SCREENPLAY SIMULATION'
 
 export const MENU_CHOICES: readonly string[] = Object.freeze([
     '[01] BOOT ENGINE & ENSURE SCHEMA',
@@ -171,6 +176,7 @@ export const MENU_CHOICES: readonly string[] = Object.freeze([
     '[18] STAGE SPATIAL HEADER WITH FOUNTAIN SCREENPLAY EDITOR',
     '[20] COMPILE FULL FOUNTAIN DRAFT TO DIALOGUE AST',
     '[21] EXPORT TO CONDUCTOR',
+    '[22] RUN UNATTENDED AUTO-SCREENPLAY SIMULATION',
     '[ROOT MENU]',
 ])
 
@@ -1176,6 +1182,16 @@ export const handleMenuSelection = async (
                 )
                 break
             }
+
+            case '[22] RUN UNATTENDED AUTO-SCREENPLAY SIMULATION':
+            case 'RUN UNATTENDED AUTO-SCREENPLAY SIMULATION': {
+                await openAutoScriptCockpitMenu(
+                    model ?? new MenuModelClass(),
+                    { dat: { baseDir } } as any,
+                    ste,
+                )
+                break
+            }
         }
     } finally {
         menuDispatchBusy = false
@@ -1475,6 +1491,301 @@ export function calculateSubmenuSpan(candidateCount: number): number {
     return Math.min(12, Math.max(6, candidateCount + 2))
 }
 
+function isValidAutoDate(value: string): boolean {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+    if (m == null || m[1] == null || m[2] == null || m[3] == null) return false
+    const year = Number(m[1])
+    const month = Number(m[2])
+    const day = Number(m[3])
+    if (month < 1 || month > 12 || day < 1 || day > 31) return false
+    const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
+    const dim =
+        month === 2
+            ? leap
+                ? 29
+                : 28
+            : month === 4 || month === 6 || month === 9 || month === 11
+              ? 30
+              : 31
+    return day <= dim
+}
+
+function isValidAutoTime(value: string): boolean {
+    const m = /^(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(value)
+    if (m == null || m[1] == null || m[2] == null) return false
+    const hh = Number(m[1])
+    const mm = Number(m[2])
+    const ss = m[3] != null ? Number(m[3]) : 0
+    return hh >= 0 && hh <= 23 && mm >= 0 && mm <= 59 && ss >= 0 && ss <= 59
+}
+
+export const openAutoScriptCockpitMenu = async (
+    cpy: MenuModel,
+    bal?: MenuBit,
+    ste?: State,
+): Promise<MenuModel> => {
+    const dat = (bal as unknown as { dat?: Record<string, unknown> })?.dat ?? {}
+    const rawAction = dat['action']
+    const programmatic =
+        typeof rawAction === 'string' ? rawAction.toLowerCase() : undefined
+    const lib =
+        (globalThis as unknown as { LIBRARY?: { hunt?: Function } }).LIBRARY ??
+        (typeof global !== 'undefined'
+            ? (global as unknown as { LIBRARY?: { hunt?: Function } }).LIBRARY
+            : undefined)
+
+    const runLaunch = async (
+        overrides?: Record<string, unknown>,
+    ): Promise<void> => {
+        const merged = {
+            ...(dat as Record<string, unknown>),
+            ...(overrides ?? {}),
+        }
+        const seriesSlug = String(merged['seriesSlug'] ?? 'wiregrass-basin')
+        const startDate = String(merged['startDate'] ?? '2026-10-31')
+        const startTime = String(merged['startTime'] ?? '21:00:00')
+        if (!isValidAutoDate(startDate) || !isValidAutoTime(startTime)) {
+            await emitConsole(
+                ste,
+                `:: [AUTO:ERR] Invalid start date/time: ${startDate} ${startTime}`,
+            )
+            return
+        }
+        const totalTicks = Number(merged['totalTicks'] ?? 24)
+        const masterSeed = String(
+            merged['masterSeed'] ?? `auto_${seriesSlug}_seed01`,
+        )
+        const { runUnattendedAutoScriptSimulation } = await import(
+            './autoScriptRunner.buzz.js'
+        )
+        const receipt = await runUnattendedAutoScriptSimulation(
+            {
+                seriesSlug,
+                startDate,
+                startTime,
+                totalTicks: Number.isInteger(totalTicks) ? totalTicks : 24,
+                masterSeed,
+                maxScripts: Number(merged['maxScripts'] ?? 64),
+                outputDir: merged['outputDir'] as string | undefined,
+                repoRoot: merged['repoRoot'] as string | undefined,
+            },
+            ste,
+        )
+        await emitConsole(
+            ste,
+            `>> [AUTO:MENU] Stacked ${receipt.stackedCount} screenplays into ${receipt.outputDir}`,
+        )
+    }
+
+    const runAudit = async (): Promise<void> => {
+        const { verifyAutoScriptReplayDeterminism } = await import(
+            './autoScriptRunner.buzz.js'
+        )
+        const seriesSlug = String(
+            (dat as Record<string, unknown>)['seriesSlug'] ?? 'wiregrass-basin',
+        )
+        const verdict = await verifyAutoScriptReplayDeterminism(
+            {
+                seriesSlug,
+                startDate: String(
+                    (dat as Record<string, unknown>)['startDate'] ??
+                        '2026-10-31',
+                ),
+                startTime: String(
+                    (dat as Record<string, unknown>)['startTime'] ?? '21:00:00',
+                ),
+                totalTicks: Number(
+                    (dat as Record<string, unknown>)['totalTicks'] ?? 24,
+                ),
+                masterSeed: String(
+                    (dat as Record<string, unknown>)['masterSeed'] ??
+                        `auto_${seriesSlug}_seed01`,
+                ),
+                outputDir: (dat as Record<string, unknown>)['outputDir'] as
+                    | string
+                    | undefined,
+                repoRoot: (dat as Record<string, unknown>)['repoRoot'] as
+                    | string
+                    | undefined,
+            },
+            ste,
+        )
+        await emitConsole(
+            ste,
+            `>> [AUTO:MENU] Replay deterministic=${verdict.deterministic} files=${verdict.fileCount}`,
+        )
+    }
+
+    const runExport = async (): Promise<void> => {
+        const { exportAutoScriptBatchToConductor } = await import(
+            './autoScriptRunner.buzz.js'
+        )
+        const seriesSlug = String(
+            (dat as Record<string, unknown>)['seriesSlug'] ?? 'wiregrass-basin',
+        )
+        const result = await exportAutoScriptBatchToConductor(
+            {
+                seriesSlug,
+                outputDir: (dat as Record<string, unknown>)['outputDir'] as
+                    | string
+                    | undefined,
+                repoRoot: (dat as Record<string, unknown>)['repoRoot'] as
+                    | string
+                    | undefined,
+                conductorIngressDir: (dat as Record<string, unknown>)[
+                    'conductorIngressDir'
+                ] as string | undefined,
+            },
+            ste,
+        )
+        await emitConsole(
+            ste,
+            `>> [AUTO:MENU] Exported ${result.copiedCount} artifacts to ${result.destinationDir}`,
+        )
+    }
+
+    if (programmatic != null) {
+        if (programmatic === 'launch' || programmatic === 'configure') {
+            await runLaunch()
+        } else if (programmatic === 'audit') {
+            await runAudit()
+        } else if (programmatic === 'export') {
+            await runExport()
+        } else if (programmatic === 'bad-date') {
+            await emitConsole(
+                ste,
+                `:: [AUTO:ERR] Invalid start date/time: 2025-02-29 25:99`,
+            )
+        }
+        if (bal?.slv) {
+            bal.slv({
+                mnuBit: {
+                    idx: 'auto-script-menu-pass',
+                    val: 1,
+                    src: programmatic,
+                },
+            })
+        }
+        return cpy
+    }
+
+    if (lib == null || typeof (lib as { hunt?: unknown }).hunt !== 'function') {
+        if (bal?.slv) {
+            bal.slv({ mnuBit: { idx: 'auto-script-menu-headless', val: 0 } })
+        }
+        return cpy
+    }
+
+    const hunt = (
+        lib as { hunt: (t: string, b: unknown) => Promise<unknown> }
+    ).hunt.bind(lib)
+    try {
+        const consoleGrid: unknown = await hunt(UPDATE_GRID, {
+            x: 4,
+            y: 0,
+            xSpan: 8,
+            ySpan: 12,
+        })
+        await hunt(WRITE_CONSOLE, {
+            idx: 'cns00',
+            dat: {
+                net: (consoleGrid as { grdBit?: { dat?: unknown } })?.grdBit
+                    ?.dat,
+                src: 'alligator0',
+            },
+        })
+        await hunt(UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: '>> [AUTO:MENU] Unattended auto-screenplay cockpit online.',
+        })
+    } catch {
+        // headless fallback continues below
+    }
+
+    const submenu = [
+        '[1] LAUNCH WITH CANON CHRONOLOGY DEFAULTS',
+        '[2] SET START DATE TIME TICKS SEED',
+        '[3] RUN WIPE-RESET DETERMINISM AUDIT',
+        '[4] EXPORT STACKED SCRIPTS TO CONDUCTOR',
+        '[<] RETURN TO ENGINE MENU',
+    ]
+    let gridChoice: unknown = null
+    try {
+        gridChoice = await hunt(UPDATE_GRID, { x: 0, y: 4, xSpan: 4, ySpan: 8 })
+    } catch {
+        gridChoice = null
+    }
+    let picked = ''
+    try {
+        const choiceRes = (await hunt(OPEN_CHOICE, {
+            dat: { clr0: 'black', clr1: 'green' },
+            src: Align.VERTICAL,
+            lst: submenu,
+            net: (gridChoice as { grdBit?: { dat?: unknown } } | null)?.grdBit
+                ?.dat,
+        })) as { chcBit?: { src?: string } }
+        picked = choiceRes?.chcBit?.src ?? ''
+    } catch {
+        picked = ''
+    }
+    if (picked === '') {
+        const fallback = (dat as Record<string, unknown>)['fallbackPick'] as
+            | string
+            | undefined
+        picked = fallback ?? '[1] LAUNCH WITH CANON CHRONOLOGY DEFAULTS'
+    }
+
+    if (
+        picked.startsWith('[1]') ||
+        picked === AUTO_SCRIPT_MENU_LABEL ||
+        picked === '[22] RUN UNATTENDED AUTO-SCREENPLAY SIMULATION'
+    ) {
+        await runLaunch()
+    } else if (picked.startsWith('[2]')) {
+        const dateInput = String(
+            (dat as Record<string, unknown>)['startDate'] ?? '2026-10-31',
+        )
+        const timeInput = String(
+            (dat as Record<string, unknown>)['startTime'] ?? '21:00:00',
+        )
+        if (!isValidAutoDate(dateInput) || !isValidAutoTime(timeInput)) {
+            await emitConsole(
+                ste,
+                `:: [AUTO:ERR] Invalid start date/time: ${dateInput} ${timeInput}`,
+            )
+        } else {
+            await runLaunch({ startDate: dateInput, startTime: timeInput })
+        }
+        try {
+            const inputGrid: unknown = await hunt(UPDATE_GRID, {
+                x: 0,
+                y: 4,
+                xSpan: 4,
+                ySpan: 8,
+            })
+            await hunt(OPEN_INPUT, {
+                dat: { prompt: 'Start Date YYYY-MM-DD' },
+                net: (inputGrid as { grdBit?: { dat?: unknown } } | null)
+                    ?.grdBit?.dat,
+            })
+        } catch {
+            // input modal optional in headless harnesses
+        }
+    } else if (picked.startsWith('[3]')) {
+        await runAudit()
+    } else if (picked.startsWith('[4]')) {
+        await runExport()
+    }
+
+    cpy.activeSelection = picked
+    if (bal?.slv) {
+        bal.slv({
+            mnuBit: { idx: 'auto-script-menu-pass', val: 1, src: picked },
+        })
+    }
+    return cpy
+}
+
 export async function promptAirlockUniverseSelection(
     ste?: State,
     baseDir?: string,
@@ -1664,6 +1975,13 @@ export const updateMenu = async (
     bal?: MenuBit,
     ste?: State,
 ): Promise<MenuModel> => {
+    if (
+        bal?.src === AUTO_SCRIPT_MENU_LABEL &&
+        (bal as unknown as { dat?: { action?: unknown } })?.dat?.action != null
+    ) {
+        return await openAutoScriptCockpitMenu(cpy, bal, ste)
+    }
+
     const lib = (globalThis as any).LIBRARY || (global as any).LIBRARY
     const isRuntime = cpy.flightDeckMode === 'RUNTIME'
 
@@ -1769,6 +2087,7 @@ export const updateMenu = async (
         '[18] STAGE SPATIAL HEADER WITH FOUNTAIN SCREENPLAY EDITOR',
         '[20] COMPILE FULL FOUNTAIN DRAFT TO DIALOGUE AST',
         '[21] EXPORT TO CONDUCTOR',
+        '[22] RUN UNATTENDED AUTO-SCREENPLAY SIMULATION',
         '[ROOT MENU]',
     ]
 
@@ -1787,6 +2106,8 @@ export const updateMenu = async (
             'Sanitize Fountain draft, run multi-turn 01.actor.unit & 11.belief.unit gates, verify verbatim parity, and write drafts/dialogue_ast.json.',
         '[21] EXPORT TO CONDUCTOR':
             'Export finalized .fountain screenplay and dialogue_ast.json to 000.series-sower-conductor.',
+        '[22] RUN UNATTENDED AUTO-SCREENPLAY SIMULATION':
+            'Run unattended auto-screenplay simulation stacking Fountain scripts in drafts/auto-script.',
         'RUN SIM GAUNTLET':
             'Dispatch autonomous continuous multi-tick batch execution in host RAM.',
         'INSPECT 4-VECTOR STATE':
@@ -1947,6 +2268,7 @@ export const updateMenu = async (
         '[18] STAGE SPATIAL HEADER WITH FOUNTAIN SCREENPLAY EDITOR',
         '[20] COMPILE FULL FOUNTAIN DRAFT TO DIALOGUE AST',
         '[21] EXPORT TO CONDUCTOR',
+        '[22] RUN UNATTENDED AUTO-SCREENPLAY SIMULATION',
     ]
 
     // NOTE: '[03]' runs through the dedicated TUI case below via direct unit
@@ -2004,6 +2326,11 @@ export const updateMenu = async (
         case '[20] COMPILE FULL FOUNTAIN DRAFT TO DIALOGUE AST':
         case '[21] EXPORT TO CONDUCTOR':
             break
+
+        case '[22] RUN UNATTENDED AUTO-SCREENPLAY SIMULATION': {
+            await openAutoScriptCockpitMenu(cpy, bal, ste)
+            break
+        }
 
         case '[03] AUDIT SIMULATION INVARIANTS': {
             await lib.hunt(UPDATE_CONSOLE, {

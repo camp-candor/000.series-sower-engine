@@ -5,6 +5,7 @@ export {
     pass2Traverse,
     pass3Seal,
     gate0Verify,
+    synthesizeEventFountain,
     canonicalizeJcs,
     sha256Hex,
 } from './buz/compile.buzz.js'

@@ -48,3 +48,31 @@ export default interface Compile {
     validationReport?: CompileValidationReport
     lastError?: string
 }
+
+export interface SynthesizedEventScreenplay {
+    readonly fountainText: string
+    readonly contentSha256: string
+    readonly sceneSummaryAst: {
+        readonly seriesSlug: string
+        readonly eventSequence: number
+        readonly tick: number
+        readonly category: string
+        readonly isoDate: string
+        readonly clockTimeHm: string
+        readonly daypart: string
+        readonly triggerReason: string
+        readonly severityBps: number
+    }
+}
+
+export interface SixCategoryScreenplayAudit {
+    readonly hasSlugline: boolean
+    readonly hasActionLines: boolean
+    readonly hasCharacterCue: boolean
+    readonly hasParenthetical: boolean
+    readonly hasDialogue: boolean
+    readonly hasTransition: boolean
+    readonly hasDateHeader: boolean
+    readonly hasStartTimeHm: boolean
+    readonly allValid: boolean
+}

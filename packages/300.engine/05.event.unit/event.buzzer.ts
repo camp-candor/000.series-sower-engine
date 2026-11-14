@@ -8,6 +8,8 @@ export {
     upcastEvent,
     appendEvent,
     streamEvents,
+    evaluateEventSignificance,
+    detectSignificantEvent,
 } from './buz/event.buzz.js'
 export { createDefaultUpcasterRegistry } from './event.model.js'
 export type {

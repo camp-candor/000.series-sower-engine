@@ -40,6 +40,13 @@ export class UpcastEvent implements Action {
     constructor(public bale?: EventBit) {}
 }
 
+export const DETECT_SIGNIFICANT_EVENT =
+    '[Event action] Detect Significant Event'
+export class DetectSignificantEvent implements Action {
+    readonly type = DETECT_SIGNIFICANT_EVENT
+    constructor(public bale?: EventBit) {}
+}
+
 export type Actions =
     | InitEvent
     | UpdateEvent
@@ -47,3 +54,4 @@ export type Actions =
     | StreamEvents
     | RegisterUpcaster
     | UpcastEvent
+    | DetectSignificantEvent

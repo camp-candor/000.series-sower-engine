@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { CompileModel } from '../compile.model.js'
+import { synthesizeEventFountainScreenplay } from './eventFountainSynth.buzz.js'
 import CompileBit, {
     CompileCorpusPayload,
     CompileResultPayload,
@@ -563,4 +564,72 @@ export const gate0Verify = (
 export const runCompile = (cpy: CompileModel, bal: CompileBit, ste?: State) => {
     void ste
     return executeFullPipeline(cpy, bal, 'run-compile')
+}
+
+export const synthesizeEventFountain = (
+    cpy: CompileModel,
+    bal: CompileBit,
+    _ste?: State,
+) => {
+    void _ste
+    const input = (bal as unknown as { dat?: Record<string, unknown> })?.dat?.[
+        'synthesizeParams'
+    ] as
+        | import('./eventFountainSynth.buzz.js').SynthesizeEventScreenplayInput
+        | undefined
+    if (input == null) {
+        if (bal.slv) {
+            bal.slv({
+                cmpBit: { idx: 'synthesize-event-fountain-fail', val: 0 },
+                errBit: {
+                    code: 'MISSING_SYNTHESIZE_PARAMS',
+                    message:
+                        'Missing synthesizeParams for event fountain synthesis.',
+                },
+            })
+        }
+        return cpy
+    }
+    try {
+        const receipt = synthesizeEventFountainScreenplay(input)
+        ;(
+            cpy as unknown as { lastSynthesizedScreenplay?: unknown }
+        ).lastSynthesizedScreenplay = receipt
+        if (bal.slv) {
+            bal.slv({
+                cmpBit: {
+                    idx: 'synthesize-event-fountain-pass',
+                    src: receipt.contentSha256,
+                    val: 1,
+                },
+                resBit: {
+                    seriesSlug: input.seriesSlug,
+                    rootMerkleHash: receipt.contentSha256,
+                    entityHashes: {},
+                    canonicalPath: `drafts/auto-script/${input.seriesSlug}/${receipt.sceneSummaryAst.eventSequence}.fountain`,
+                    archivePath: `drafts/auto-script/${input.seriesSlug}/${receipt.sceneSummaryAst.eventSequence}.fountain`,
+                    catalogSummary: {
+                        characterCount: 0,
+                        locationCount: 0,
+                        possessionCount: 0,
+                        grievanceCount: 0,
+                        totalEntities: 0,
+                    },
+                    executionDurationMs: 0,
+                    cleanExit: true,
+                },
+            })
+        }
+    } catch (err: unknown) {
+        if (bal.slv) {
+            bal.slv({
+                cmpBit: { idx: 'synthesize-event-fountain-fail', val: 0 },
+                errBit: {
+                    code: 'SYNTHESIZE_FAILED',
+                    message: err instanceof Error ? err.message : String(err),
+                },
+            })
+        }
+    }
+    return cpy
 }

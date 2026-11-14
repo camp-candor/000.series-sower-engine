@@ -1666,3 +1666,643 @@ export const resetEngine = async (
 
     return cpy
 }
+
+export interface AutonomousSimEntity {
+    readonly id: string
+    readonly paranoiaBp: number
+    readonly strainBp: number
+    readonly locationId: string
+    readonly heldItems?: readonly string[]
+}
+
+export interface AutonomousSimGrievance {
+    readonly id: string
+    readonly instigatorId: string
+    readonly victimId: string
+    readonly intensityBps: number
+    readonly status: string
+}
+
+export interface AutonomousSimClock {
+    readonly id: string
+    readonly entityId: string
+    readonly valueBps: number
+    readonly thresholdBps: number
+    readonly isTriggered: boolean
+}
+
+export interface AutonomousSimState {
+    readonly tick: number
+    readonly masterSeed: string
+    readonly clock: SimulationClockState
+    readonly entities: readonly AutonomousSimEntity[]
+    readonly grievances: readonly AutonomousSimGrievance[]
+    readonly clocks: readonly AutonomousSimClock[]
+    readonly detectorConfig: {
+        readonly globalThresholdBps: number
+        readonly perCategoryThresholdBps?: Partial<Record<string, number>>
+        readonly enabledCategories?: Partial<Record<string, boolean>>
+        readonly cooldownTicks?: Partial<Record<string, number>>
+    }
+    readonly lastEmittedTickByCategory: Readonly<Record<string, number>>
+    readonly emittedEventsCount: number
+}
+
+export interface AutonomousTickReceipt {
+    readonly nextState: AutonomousSimState
+    readonly committedEvents: readonly string[]
+    readonly significantEvents: readonly {
+        readonly eventSequence: number
+        readonly tick: number
+        readonly clockSnapshot: {
+            readonly isoDate: string
+            readonly clockTimeHm: string
+            readonly clockTimeHms: string
+            readonly timecodeSmpte: string
+            readonly daypart: string
+        }
+        readonly category:
+            | 'PARANOIA_TRIGGERED'
+            | 'GRIEVANCE_BREACH'
+            | 'SOMATIC_TRAUMA'
+            | 'INVENTORY_TRANSFER'
+            | 'EPISTEMIC_REVEAL'
+            | 'CHRONO_MILESTONE'
+        readonly severityBps: number
+        readonly triggerReason: string
+        readonly actorsInvolved: readonly string[]
+        readonly locationId: string
+        readonly stateDeltaSummary: string
+        readonly causalHash: string
+    }[]
+}
+
+function autoFnvHex(input: string): string {
+    let hash = 0x811c9dc5
+    for (let i = 0; i < input.length; i += 1) {
+        hash ^= input.charCodeAt(i)
+        hash = Math.imul(hash, 0x01000193)
+    }
+    const unsigned = hash >>> 0
+    const hex = unsigned.toString(16)
+    let padded = hex
+    while (padded.length < 8) padded = `0${padded}`
+    return `${padded}${padded}${padded}${padded}${padded}${padded}${padded}${padded}`.slice(
+        0,
+        64,
+    )
+}
+
+function autoUint32(masterSeed: string, tick: number, salt: string): number {
+    let hash = 0x811c9dc5
+    const input = `${masterSeed}:${tick}:${salt}`
+    for (let i = 0; i < input.length; i += 1) {
+        hash ^= input.charCodeAt(i)
+        hash = Math.imul(hash, 0x01000193)
+    }
+    let t = ((hash >>> 0) + 0x6d2b79f5) >>> 0
+    t = Math.imul(t ^ (t >>> 15), t | 1)
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+    return (t ^ (t >>> 14)) >>> 0
+}
+
+function autoRoll2d6(
+    masterSeed: string,
+    tick: number,
+    salt: string,
+): { dieA: number; dieB: number; total: number } {
+    const dieA = (autoUint32(masterSeed, tick, `${salt}:A`) % 6) + 1
+    const dieB = (autoUint32(masterSeed, tick, `${salt}:B`) % 6) + 1
+    return { dieA, dieB, total: dieA + dieB }
+}
+
+function autoAssertBps(value: number, label: string): void {
+    if (!Number.isInteger(value)) {
+        throw new TypeError(
+            `[FLOAT_PROHIBITED] ${label} must be a discrete integer. Received: ${String(value)}`,
+        )
+    }
+    if (value < 0 || value > 10000) {
+        throw new RangeError(
+            `[OUT_OF_BOUNDS] ${label} out of bounds [0, 10000]: ${String(value)}`,
+        )
+    }
+}
+
+function autoEvaluate(
+    category:
+        | 'PARANOIA_TRIGGERED'
+        | 'GRIEVANCE_BREACH'
+        | 'SOMATIC_TRAUMA'
+        | 'INVENTORY_TRANSFER'
+        | 'EPISTEMIC_REVEAL'
+        | 'CHRONO_MILESTONE',
+    severityBps: number,
+    tick: number,
+    config: AutonomousSimState['detectorConfig'],
+    cooldownState: Readonly<Record<string, number>>,
+): boolean {
+    autoAssertBps(severityBps, 'severityBps')
+    const enabled = config.enabledCategories?.[category]
+    if (enabled === false) return false
+    const per = config.perCategoryThresholdBps?.[category]
+    const threshold = per ?? config.globalThresholdBps
+    autoAssertBps(threshold, 'globalThresholdBps')
+    if (severityBps < threshold) return false
+    const cooldown = config.cooldownTicks?.[category] ?? 0
+    const last = cooldownState[category]
+    if (
+        last !== undefined &&
+        Number.isInteger(last) &&
+        tick - (last as number) < cooldown
+    ) {
+        return false
+    }
+    return true
+}
+
+function buildDefaultEntities(): AutonomousSimEntity[] {
+    return [
+        {
+            id: 'char_bog',
+            paranoiaBp: 1200,
+            strainBp: 800,
+            locationId: 'loc_culvert',
+            heldItems: Object.freeze(['item_torch']),
+        },
+        {
+            id: 'char_wart',
+            paranoiaBp: 3400,
+            strainBp: 1500,
+            locationId: 'loc_warm_pipe',
+            heldItems: Object.freeze(['item_knife']),
+        },
+    ]
+}
+
+function advanceAutonomousClock(
+    clock: SimulationClockState,
+    tickSeconds: number,
+): SimulationClockState {
+    const totalSeconds = clock.totalElapsedSeconds + tickSeconds
+    let second = clock.second
+    let minute = clock.minute
+    let hour = clock.hour
+    let year = clock.year
+    let month = clock.month
+    let day = clock.day
+    let carry = tickSeconds
+    const secTotal = second + (carry % 60)
+    second = secTotal % 60
+    carry = Math.floor(carry / 60) + (secTotal >= 60 ? 0 : 0)
+    // Recompute cleanly: add tickSeconds via minute/hour/day cascade
+    let addMin = Math.floor((clock.second + tickSeconds) / 60)
+    second = (clock.second + tickSeconds) % 60
+    let addHr = Math.floor((clock.minute + addMin) / 60)
+    minute = (clock.minute + addMin) % 60
+    let addDay = Math.floor((clock.hour + addHr) / 24)
+    hour = (clock.hour + addHr) % 24
+    const monthDays = (y: number, m: number): number => {
+        if (m === 2) {
+            const leap = y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0)
+            return leap ? 29 : 28
+        }
+        if (m === 4 || m === 6 || m === 9 || m === 11) return 30
+        return 31
+    }
+    while (addDay > 0) {
+        const dim = monthDays(year, month)
+        if (day + 1 > dim) {
+            day = 1
+            if (month === 12) {
+                month = 1
+                year += 1
+            } else {
+                month += 1
+            }
+        } else {
+            day += 1
+        }
+        addDay -= 1
+    }
+    const pad2 = (v: number): string => (v < 10 ? `0${v}` : `${v}`)
+    const isoDate = `${String(year).padStart(4, '0')}-${pad2(month)}-${pad2(day)}`
+    const clockTimeHm = `${pad2(hour)}:${pad2(minute)}`
+    const clockTimeHms = `${pad2(hour)}:${pad2(minute)}:${pad2(second)}`
+    const daypart =
+        hour >= 5 && hour <= 6
+            ? 'DAWN'
+            : hour >= 7 && hour <= 11
+              ? 'MORNING'
+              : hour >= 12 && hour <= 16
+                ? 'AFTERNOON'
+                : hour >= 17 && hour <= 19
+                  ? 'DUSK'
+                  : 'NIGHT'
+    const fps = clock.framesPerSecond > 0 ? clock.framesPerSecond : 24
+    const totalFrames = Math.floor(totalSeconds * fps)
+    const frames = totalFrames % fps
+    const totalSec = Math.floor(totalFrames / fps)
+    const secs = totalSec % 60
+    const mins = Math.floor(totalSec / 60) % 60
+    const hrs = Math.floor(totalSec / 3600) % 24
+    const timecodeSmpte = `${pad2(hrs)}:${pad2(mins)}:${pad2(secs)}:${pad2(frames)}`
+    return Object.freeze({
+        calendarSystem: 'GREGORIAN_24H',
+        year,
+        month,
+        day,
+        hour,
+        minute,
+        second,
+        centisecond: 0,
+        tickSeconds: clock.tickSeconds,
+        framesPerSecond: clock.framesPerSecond,
+        totalElapsedSeconds: totalSeconds,
+        totalFrames,
+        isoDate,
+        clockTimeHm,
+        clockTimeHms,
+        timecodeSmpte,
+        daypart,
+        timezoneLabel: clock.timezoneLabel,
+        eraLabel: clock.eraLabel,
+    }) as SimulationClockState
+}
+
+export const createInitialAutonomousSimState = (
+    masterSeed: string,
+    clock: SimulationClockState,
+    overrides?: Partial<AutonomousSimState>,
+): AutonomousSimState => {
+    return Object.freeze({
+        tick: 0,
+        masterSeed,
+        clock,
+        entities: Object.freeze(
+            buildDefaultEntities(),
+        ) as readonly AutonomousSimEntity[],
+        grievances: Object.freeze([
+            {
+                id: 'grv_bog_wart_01',
+                instigatorId: 'char_bog',
+                victimId: 'char_wart',
+                intensityBps: 2500,
+                status: 'ACTIVE',
+            },
+        ]) as readonly AutonomousSimGrievance[],
+        clocks: Object.freeze([
+            {
+                id: 'clk_bog_dread',
+                entityId: 'char_bog',
+                valueBps: 1200,
+                thresholdBps: 7000,
+                isTriggered: false,
+            },
+            {
+                id: 'clk_wart_dread',
+                entityId: 'char_wart',
+                valueBps: 3400,
+                thresholdBps: 7000,
+                isTriggered: false,
+            },
+        ]) as readonly AutonomousSimClock[],
+        detectorConfig: Object.freeze({
+            globalThresholdBps: 3000,
+            perCategoryThresholdBps: Object.freeze({}),
+            enabledCategories: Object.freeze({}),
+            cooldownTicks: Object.freeze({}),
+        }),
+        lastEmittedTickByCategory: Object.freeze({}),
+        emittedEventsCount: 0,
+        ...(overrides ?? {}),
+    }) as AutonomousSimState
+}
+
+export const stepAutonomousSimulationTick = (
+    stateInput: AutonomousSimState,
+): AutonomousTickReceipt => {
+    if (!Number.isInteger(stateInput.tick) || stateInput.tick < 0) {
+        throw new RangeError(
+            `[OUT_OF_BOUNDS] Autonomous tick must be non-negative integer: ${String(stateInput.tick)}`,
+        )
+    }
+    const nextTick = stateInput.tick + 1
+    const masterSeed = stateInput.masterSeed
+    const tickSeconds =
+        stateInput.clock.tickSeconds > 0 ? stateInput.clock.tickSeconds : 60
+    const prevClock = stateInput.clock
+    const nextClock = advanceAutonomousClock(prevClock, tickSeconds)
+
+    const baseEntities =
+        stateInput.entities.length > 0
+            ? stateInput.entities
+            : buildDefaultEntities()
+    const nextEntities: AutonomousSimEntity[] = baseEntities.map((entity) => {
+        const paranoiaDelta =
+            autoUint32(masterSeed, nextTick, `${entity.id}:paranoia`) % 900
+        const strainDelta =
+            autoUint32(masterSeed, nextTick, `${entity.id}:strain`) % 500
+        const nextParanoia = Math.min(10000, entity.paranoiaBp + paranoiaDelta)
+        const nextStrain = Math.min(10000, entity.strainBp + strainDelta)
+        return Object.freeze({
+            id: entity.id,
+            paranoiaBp: nextParanoia,
+            strainBp: nextStrain,
+            locationId: entity.locationId,
+            heldItems: entity.heldItems
+                ? Object.freeze([...entity.heldItems])
+                : Object.freeze([]),
+        })
+    })
+
+    const baseClocks =
+        stateInput.clocks.length > 0
+            ? stateInput.clocks
+            : ([
+                  {
+                      id: 'clk_bog_dread',
+                      entityId: 'char_bog',
+                      valueBps: 1200,
+                      thresholdBps: 7000,
+                      isTriggered: false,
+                  },
+              ] as AutonomousSimClock[])
+    const nextClocks: AutonomousSimClock[] = baseClocks.map((clock) => {
+        const delta = autoUint32(masterSeed, nextTick, `${clock.id}:tick`) % 900
+        const nextValue = Math.min(10000, clock.valueBps + delta)
+        return Object.freeze({
+            id: clock.id,
+            entityId: clock.entityId,
+            valueBps: nextValue,
+            thresholdBps: clock.thresholdBps,
+            isTriggered: nextValue >= clock.thresholdBps,
+        })
+    })
+
+    const baseGrievances =
+        stateInput.grievances.length > 0
+            ? stateInput.grievances
+            : ([
+                  {
+                      id: 'grv_bog_wart_01',
+                      instigatorId: 'char_bog',
+                      victimId: 'char_wart',
+                      intensityBps: 2500,
+                      status: 'ACTIVE',
+                  },
+              ] as AutonomousSimGrievance[])
+    const nextGrievances: AutonomousSimGrievance[] = baseGrievances.map(
+        (grievance) => {
+            const roll = autoRoll2d6(
+                masterSeed,
+                nextTick,
+                `grievance:${grievance.id}`,
+            )
+            const delta = (roll.total - 7) * 250
+            const nextIntensity = Math.max(
+                0,
+                Math.min(10000, grievance.intensityBps + delta),
+            )
+            let nextStatus = grievance.status
+            if (roll.total >= 10) nextStatus = 'ESCALATED'
+            else if (roll.total <= 3 && grievance.status === 'ESCALATED')
+                nextStatus = 'ACTIVE'
+            return Object.freeze({
+                id: grievance.id,
+                instigatorId: grievance.instigatorId,
+                victimId: grievance.victimId,
+                intensityBps: nextIntensity,
+                status: nextStatus,
+            })
+        },
+    )
+
+    const committedEvents: string[] = [`SIMULATION_TICK_COMMITTED:${nextTick}`]
+
+    type Candidate = {
+        readonly category:
+            | 'PARANOIA_TRIGGERED'
+            | 'GRIEVANCE_BREACH'
+            | 'SOMATIC_TRAUMA'
+            | 'INVENTORY_TRANSFER'
+            | 'EPISTEMIC_REVEAL'
+            | 'CHRONO_MILESTONE'
+        readonly severityBps: number
+        readonly triggerReason: string
+        readonly actorsInvolved: readonly string[]
+        readonly locationId: string
+        readonly stateDeltaSummary: string
+    }
+    const candidates: Candidate[] = []
+
+    for (const clock of nextClocks) {
+        const prev = baseClocks.find((c) => c.id === clock.id)
+        const wasTriggered = prev?.isTriggered ?? false
+        if (clock.isTriggered && !wasTriggered) {
+            candidates.push({
+                category: 'PARANOIA_TRIGGERED',
+                severityBps: clock.valueBps,
+                triggerReason: `Paranoia clock ${clock.id} crossed threshold ${clock.thresholdBps} bps at value ${clock.valueBps} bps`,
+                actorsInvolved: Object.freeze([clock.entityId]),
+                locationId:
+                    nextEntities.find((e) => e.id === clock.entityId)
+                        ?.locationId ?? 'loc_culvert',
+                stateDeltaSummary: `paranoia ${prev?.valueBps ?? 0} -> ${clock.valueBps} bps TRIGGERED`,
+            })
+            committedEvents.push(`PARANOIA_CLOCK_TICKED:${clock.id}`)
+        }
+    }
+
+    baseGrievances.forEach((prev, index) => {
+        const next = nextGrievances[index]
+        if (next == null) return
+        if (next.status !== prev.status || next.intensityBps >= 7000) {
+            const severity = Math.max(next.intensityBps, 5000)
+            candidates.push({
+                category: 'GRIEVANCE_BREACH',
+                severityBps: severity,
+                triggerReason: `Grievance ${next.id} status ${prev.status} -> ${next.status} intensity ${next.intensityBps} bps`,
+                actorsInvolved: Object.freeze([
+                    next.instigatorId,
+                    next.victimId,
+                ]),
+                locationId: 'loc_culvert',
+                stateDeltaSummary: `grievance ${prev.status}:${prev.intensityBps} -> ${next.status}:${next.intensityBps}`,
+            })
+            committedEvents.push(`GRIEVANCE_ESCALATED:${next.id}`)
+        } else {
+            const roll = autoRoll2d6(
+                masterSeed,
+                nextTick,
+                `grievance:${next.id}`,
+            )
+            if (roll.total >= 11) {
+                candidates.push({
+                    category: 'GRIEVANCE_BREACH',
+                    severityBps: Math.max(next.intensityBps, 4500),
+                    triggerReason: `Grievance ${next.id} duel roll ${roll.dieA}+${roll.dieB}=${roll.total} forces breach`,
+                    actorsInvolved: Object.freeze([
+                        next.instigatorId,
+                        next.victimId,
+                    ]),
+                    locationId: 'loc_culvert',
+                    stateDeltaSummary: `duel ${roll.total} intensity ${next.intensityBps} bps`,
+                })
+                committedEvents.push(`GRIEVANCE_ESCALATED:${next.id}`)
+            }
+        }
+    })
+
+    nextEntities.forEach((entity, index) => {
+        const prev = baseEntities[index] ?? entity
+        const roll = autoRoll2d6(masterSeed, nextTick, `somatic:${entity.id}`)
+        const traumaDelta = entity.strainBp - prev.strainBp
+        if (roll.total <= 4 || traumaDelta >= 400 || entity.strainBp >= 8000) {
+            const severity = Math.min(
+                10000,
+                5500 + traumaDelta + (6 - roll.total) * 200,
+            )
+            candidates.push({
+                category: 'SOMATIC_TRAUMA',
+                severityBps: severity,
+                triggerReason: `Somatic strain ${prev.strainBp} -> ${entity.strainBp} bps roll ${roll.total} locomotion degradation`,
+                actorsInvolved: Object.freeze([entity.id]),
+                locationId: entity.locationId,
+                stateDeltaSummary: `strain ${prev.strainBp} -> ${entity.strainBp} bps pain escalation`,
+            })
+            committedEvents.push(`SOMATIC_TRAUMA_APPLIED:${entity.id}`)
+        }
+    })
+
+    const transferRoll = autoUint32(masterSeed, nextTick, 'inventory:transfer')
+    if (transferRoll % 7 === 0) {
+        const holder =
+            nextEntities[transferRoll % nextEntities.length] ?? nextEntities[0]
+        if (holder != null) {
+            candidates.push({
+                category: 'INVENTORY_TRANSFER',
+                severityBps: 5000 + (transferRoll % 2000),
+                triggerReason: `Critical held item ownership changed hands for ${holder.id}`,
+                actorsInvolved: Object.freeze([holder.id]),
+                locationId: holder.locationId,
+                stateDeltaSummary: `heldItems transfer at tick ${nextTick}`,
+            })
+            committedEvents.push(`INVENTORY_TRANSFERRED:${holder.id}`)
+        }
+    }
+
+    const epistemicRoll = autoUint32(masterSeed, nextTick, 'epistemic:reveal')
+    if (epistemicRoll % 9 === 0) {
+        const witness =
+            nextEntities[nextTick % nextEntities.length] ?? nextEntities[0]
+        if (witness != null) {
+            candidates.push({
+                category: 'EPISTEMIC_REVEAL',
+                severityBps: 4500 + (epistemicRoll % 2500),
+                triggerReason: `Actor ${witness.id} recorded contradicted false belief with high salience discovery`,
+                actorsInvolved: Object.freeze([witness.id]),
+                locationId: witness.locationId,
+                stateDeltaSummary: `false belief contradicted salience ${(epistemicRoll % 2500) + 4500} bps`,
+            })
+            committedEvents.push(`BELIEF_RECORDED:${witness.id}`)
+        }
+    }
+
+    if (
+        prevClock.daypart !== nextClock.daypart ||
+        prevClock.isoDate !== nextClock.isoDate
+    ) {
+        candidates.push({
+            category: 'CHRONO_MILESTONE',
+            severityBps: 3000,
+            triggerReason: `Chronology milestone ${prevClock.daypart} -> ${nextClock.daypart} date ${prevClock.isoDate} -> ${nextClock.isoDate}`,
+            actorsInvolved: Object.freeze(nextEntities.map((e) => e.id)),
+            locationId: 'loc_culvert',
+            stateDeltaSummary: `daypart ${prevClock.daypart} -> ${nextClock.daypart} date ${prevClock.isoDate} -> ${nextClock.isoDate}`,
+        })
+        committedEvents.push(`CHRONO_MILESTONE:${nextClock.isoDate}`)
+    }
+
+    const significantEvents: Array<{
+        readonly eventSequence: number
+        readonly tick: number
+        readonly clockSnapshot: {
+            readonly isoDate: string
+            readonly clockTimeHm: string
+            readonly clockTimeHms: string
+            readonly timecodeSmpte: string
+            readonly daypart: string
+        }
+        readonly category:
+            | 'PARANOIA_TRIGGERED'
+            | 'GRIEVANCE_BREACH'
+            | 'SOMATIC_TRAUMA'
+            | 'INVENTORY_TRANSFER'
+            | 'EPISTEMIC_REVEAL'
+            | 'CHRONO_MILESTONE'
+        readonly severityBps: number
+        readonly triggerReason: string
+        readonly actorsInvolved: readonly string[]
+        readonly locationId: string
+        readonly stateDeltaSummary: string
+        readonly causalHash: string
+    }> = []
+    const nextCooldowns: Record<string, number> = {
+        ...(stateInput.lastEmittedTickByCategory ?? {}),
+    }
+    let sequence = stateInput.emittedEventsCount
+    for (const candidate of candidates) {
+        const passed = autoEvaluate(
+            candidate.category,
+            candidate.severityBps,
+            nextTick,
+            stateInput.detectorConfig,
+            nextCooldowns,
+        )
+        if (!passed) continue
+        sequence += 1
+        const snapshot = {
+            isoDate: nextClock.isoDate,
+            clockTimeHm: nextClock.clockTimeHm,
+            clockTimeHms: nextClock.clockTimeHms,
+            timecodeSmpte: nextClock.timecodeSmpte,
+            daypart: nextClock.daypart,
+        }
+        significantEvents.push(
+            Object.freeze({
+                eventSequence: sequence,
+                tick: nextTick,
+                clockSnapshot: snapshot,
+                category: candidate.category,
+                severityBps: candidate.severityBps,
+                triggerReason: candidate.triggerReason,
+                actorsInvolved: candidate.actorsInvolved,
+                locationId: candidate.locationId,
+                stateDeltaSummary: candidate.stateDeltaSummary,
+                causalHash: autoFnvHex(
+                    `${masterSeed}:${nextTick}:${candidate.category}:${candidate.severityBps}:${sequence}`,
+                ),
+            }),
+        )
+        nextCooldowns[candidate.category] = nextTick
+    }
+
+    const nextState: AutonomousSimState = Object.freeze({
+        tick: nextTick,
+        masterSeed,
+        clock: nextClock,
+        entities: Object.freeze(nextEntities),
+        grievances: Object.freeze(nextGrievances),
+        clocks: Object.freeze(nextClocks),
+        detectorConfig: stateInput.detectorConfig,
+        lastEmittedTickByCategory: Object.freeze({ ...nextCooldowns }),
+        emittedEventsCount: sequence,
+    })
+
+    return Object.freeze({
+        nextState,
+        committedEvents: Object.freeze([...committedEvents]),
+        significantEvents: Object.freeze([...significantEvents]),
+    }) as AutonomousTickReceipt
+}
