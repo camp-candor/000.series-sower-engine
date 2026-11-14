@@ -1,4 +1,11 @@
-export { arithmeticBuzz } from './buz/arithmetic.buzz.js'
+export {
+    arithmeticBuzz,
+    computeCombinedPacingMultiplierBps,
+    computeHorizonProgressBps,
+    computeSolarDayProgressBps,
+    resolveThreeActStage,
+} from './buz/arithmetic.buzz.js'
+export type { PacingActStageLocal } from './buz/arithmetic.buzz.js'
 export {
     fnv1a32,
     mulberry32Step,

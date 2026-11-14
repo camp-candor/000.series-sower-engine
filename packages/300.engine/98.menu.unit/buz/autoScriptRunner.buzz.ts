@@ -20,6 +20,12 @@ export interface AutoScriptRunParams {
     readonly bibleState?: Record<string, unknown>
     readonly cleanOutputDir?: boolean
     readonly repoRoot?: string
+    readonly minTicksBetweenScenes?: number
+    readonly maxDrySpellTicks?: number
+    readonly actWindowMode?: string
+    readonly actIMultiplierBps?: number
+    readonly actIIMultiplierBps?: number
+    readonly actIIIMultiplierBps?: number
 }
 
 export interface AutoScriptStackEntry {
@@ -248,13 +254,52 @@ export const runUnattendedAutoScriptSimulation = async (
         `>> [AUTO:START] series=${slug} ticks=${totalTicks} seed=${masterSeed}`,
     )
 
+    const pacingOverrides: Record<string, unknown> = {}
+    if (params.minTicksBetweenScenes !== undefined) {
+        pacingOverrides['min_ticks_between_scenes'] =
+            params.minTicksBetweenScenes
+    }
+    if (params.maxDrySpellTicks !== undefined) {
+        pacingOverrides['max_dry_spell_ticks'] = params.maxDrySpellTicks
+    }
+    if (params.actWindowMode !== undefined) {
+        pacingOverrides['act_window_mode'] = params.actWindowMode
+    }
+    if (params.actIMultiplierBps !== undefined) {
+        pacingOverrides['act_i_multiplier_bps'] = params.actIMultiplierBps
+    }
+    if (params.actIIMultiplierBps !== undefined) {
+        pacingOverrides['act_ii_multiplier_bps'] = params.actIIMultiplierBps
+    }
+    if (params.actIIIMultiplierBps !== undefined) {
+        pacingOverrides['act_iii_multiplier_bps'] = params.actIIIMultiplierBps
+    }
     let simState = createInitialAutonomousSimState(masterSeed, clock)
+    if (Object.keys(pacingOverrides).length > 0) {
+        const basePolicy = simState.pacingPolicy
+        if (basePolicy != null) {
+            simState = Object.freeze({
+                ...simState,
+                pacingPolicy: Object.freeze({
+                    ...basePolicy,
+                    ...pacingOverrides,
+                }),
+            })
+        }
+    }
     const entries: AutoScriptStackEntry[] = []
     let stacked = 0
+    const actCounts = { ACT_I: 0, ACT_II: 0, ACT_III: 0 }
+    let maxDrySpellObservedTicks = 0
+    let lastSceneTickSeen: number | null = null
+    const sceneSpacingTicks: number[] = []
+    let prevAct: string | null = null
+    let prevCooldownSuppressions = 0
     for (let tick = 1; tick <= totalTicks; tick += 1) {
         const receipt = stepAutonomousSimulationTick(simState)
         simState = receipt.nextState
         const nextClock = receipt.nextState.clock
+        const policy = simState.pacingPolicy
         await emitCns00(
             ste,
             `>> [AUTO:TIMECODE] ${nextClock.isoDate} ${nextClock.clockTimeHms} | TC ${nextClock.timecodeSmpte} | DAYPART: ${nextClock.daypart} | TICK ${tick}/${totalTicks}`,
@@ -263,12 +308,57 @@ export const runUnattendedAutoScriptSimulation = async (
             ste,
             `>> [AUTO:TICK] tick=${tick} events=${receipt.significantEvents.length}`,
         )
+        const currentSuppressions = simState.cooldownSuppressions ?? 0
+        if (currentSuppressions > prevCooldownSuppressions) {
+            await emitCns00(
+                ste,
+                `>> [PACING:COOLDOWN] Suppressed ${currentSuppressions - prevCooldownSuppressions} sub-critical scene(s) at tick ${tick} window=${policy?.min_ticks_between_scenes ?? 3}t`,
+            )
+        }
+        prevCooldownSuppressions = currentSuppressions
+        const currentAct = simState.currentAct ?? 'ACT_I'
+        if (prevAct == null || prevAct !== currentAct) {
+            await emitCns00(
+                ste,
+                `>> [PACING:ACT] Transitioned to ${currentAct} at ${nextClock.isoDate} ${nextClock.clockTimeHms}`,
+            )
+            prevAct = currentAct
+        }
         for (const evt of receipt.significantEvents) {
             if (stacked >= maxScripts) break
             await emitCns00(
                 ste,
                 `>> [AUTO:EVENT] #${evt.eventSequence} ${evt.category} tick=${evt.tick}`,
             )
+            const paced = evt as unknown as {
+                actStage?: 'ACT_I' | 'ACT_II' | 'ACT_III'
+                actMultiplierBps?: number
+                diurnalWeightBps?: number
+                droughtBreaker?: boolean
+                ticksSinceLastScene?: number
+            }
+            const evtAct = paced.actStage ?? currentAct ?? 'ACT_I'
+            if (
+                evtAct === 'ACT_I' ||
+                evtAct === 'ACT_II' ||
+                evtAct === 'ACT_III'
+            ) {
+                actCounts[evtAct] += 1
+            }
+            const droughtTicks = paced.ticksSinceLastScene ?? 0
+            if (droughtTicks > maxDrySpellObservedTicks) {
+                maxDrySpellObservedTicks = droughtTicks
+            }
+            if (lastSceneTickSeen != null) {
+                sceneSpacingTicks.push(evt.tick - lastSceneTickSeen)
+            }
+            lastSceneTickSeen = evt.tick
+            if (paced.droughtBreaker === true) {
+                await emitCns00(
+                    ste,
+                    `>> [PACING:DROUGHT_BREAK] Recovered quiet stretch (${droughtTicks}t) at ${nextClock.clockTimeHms}`,
+                )
+            }
             const prevClock = tick > 1 ? receipt.nextState.clock : clock
             void prevClock
             const screenplay = synthesizeEventFountainScreenplay({
@@ -286,6 +376,14 @@ export const runUnattendedAutoScriptSimulation = async (
                     locationId: evt.locationId,
                     stateDeltaSummary: evt.stateDeltaSummary,
                     causalHash: evt.causalHash,
+                },
+                pacing: {
+                    actStage: evtAct,
+                    actMultiplierBps: paced.actMultiplierBps ?? 10000,
+                    diurnalWeightBps: paced.diurnalWeightBps ?? 10000,
+                    droughtTicks,
+                    droughtBreaker: paced.droughtBreaker ?? false,
+                    cooldownWindowTicks: policy?.min_ticks_between_scenes ?? 3,
                 },
                 clockBefore: {
                     isoDate: evt.clockSnapshot.isoDate,
@@ -315,6 +413,13 @@ export const runUnattendedAutoScriptSimulation = async (
                 '\n',
             )
             fs.writeFileSync(fountainPath, normalizedFountain, 'utf8')
+            const pacedAst = evt as unknown as {
+                actStage?: string
+                actMultiplierBps?: number
+                diurnalWeightBps?: number
+                droughtBreaker?: boolean
+                ticksSinceLastScene?: number
+            }
             const astPayload = {
                 seriesSlug: slug,
                 eventSequence: evt.eventSequence,
@@ -329,6 +434,13 @@ export const runUnattendedAutoScriptSimulation = async (
                     isoDate: evt.clockSnapshot.isoDate,
                     clockTimeHm: evt.clockSnapshot.clockTimeHm,
                     daypart: evt.clockSnapshot.daypart,
+                    pacing: {
+                        actStage: pacedAst.actStage ?? 'ACT_I',
+                        actMultiplierBps: pacedAst.actMultiplierBps ?? 10000,
+                        diurnalWeightBps: pacedAst.diurnalWeightBps ?? 10000,
+                        droughtTicks: pacedAst.ticksSinceLastScene ?? 0,
+                        droughtBreaker: pacedAst.droughtBreaker ?? false,
+                    },
                 },
             }
             fs.writeFileSync(
@@ -364,6 +476,17 @@ export const runUnattendedAutoScriptSimulation = async (
               ? 1
               : 0,
     )
+    const finalPolicy = simState.pacingPolicy
+    const pacingSummary = {
+        actWindowMode: finalPolicy?.act_window_mode ?? 'MULTI_DAY_ARC',
+        minTicksBetweenScenes: finalPolicy?.min_ticks_between_scenes ?? 3,
+        maxDrySpellTicks: finalPolicy?.max_dry_spell_ticks ?? 8,
+        actCounts: { ...actCounts },
+        maxDrySpellObservedTicks,
+        cooldownSuppressionsCount: simState.cooldownSuppressions ?? 0,
+        droughtBreakersCount: simState.droughtBreakersCount ?? 0,
+        sceneSpacingTicks: [...sceneSpacingTicks],
+    }
     const indexPayload = {
         seriesSlug: slug,
         masterSeed,
@@ -373,6 +496,7 @@ export const runUnattendedAutoScriptSimulation = async (
         totalTicks,
         stackedCount: sorted.length,
         entries: sorted,
+        pacingSummary,
     }
     const indexPath = path.join(outputDir, 'index.json')
     fs.writeFileSync(
@@ -544,4 +668,168 @@ export const exportAutoScriptBatchToConductor = async (
         `>> [EXPORT:BATCH] Exported ${copiedCount} artifacts to Conductor ingress`,
     )
     return { copiedCount, destinationDir, verified: true }
+}
+
+export interface PacingDistributionAuditReceipt {
+    readonly seriesSlug: string
+    readonly totalTicks: number
+    readonly tickSeconds: number
+    readonly stackedCount: number
+    readonly actCounts: {
+        readonly ACT_I: number
+        readonly ACT_II: number
+        readonly ACT_III: number
+    }
+    readonly maxDrySpellObservedTicks: number
+    readonly minSpacingObservedTicks: number
+    readonly averageSpacingTicks: number
+    readonly stackDigestSha256: string
+    readonly replayMismatches: number
+    readonly noClusterViolation: boolean
+    readonly noDrySpellViolation: boolean
+    readonly escalatingClimaxCadence: boolean
+    readonly deterministic: boolean
+    readonly fileCount: number
+    readonly midnightRollover: boolean
+    readonly daypartsSeen: readonly string[]
+}
+
+export const auditThreeActPacingSimulation = async (
+    params: AutoScriptRunParams,
+    ste?: unknown,
+): Promise<PacingDistributionAuditReceipt> => {
+    const totalTicks = params.totalTicks ?? 96
+    const tickSeconds = params.tickSeconds ?? 900
+    const startDate = params.startDate ?? '2026-10-31'
+    const startTime = params.startTime ?? '08:00'
+    const seriesSlug = params.seriesSlug
+    const merged: AutoScriptRunParams = {
+        ...params,
+        totalTicks,
+        tickSeconds,
+        startDate,
+        startTime,
+    }
+    const replay = await verifyAutoScriptReplayDeterminism(merged, ste)
+    const outputDir = resolveOutputDir(merged)
+    const indexPath = path.join(outputDir, 'index.json')
+    const indexRaw = JSON.parse(fs.readFileSync(indexPath, 'utf8')) as {
+        entries: Array<{ tick: number; fountainFile: string }>
+        pacingSummary: {
+            actWindowMode: string
+            minTicksBetweenScenes: number
+            maxDrySpellTicks: number
+            actCounts: { ACT_I: number; ACT_II: number; ACT_III: number }
+            maxDrySpellObservedTicks: number
+            cooldownSuppressionsCount: number
+            droughtBreakersCount: number
+            sceneSpacingTicks: number[]
+        }
+        stackedCount: number
+    }
+    const pacingSummary = indexRaw.pacingSummary
+    const entries = [...indexRaw.entries].sort((a, b) => a.tick - b.tick)
+    const spacing = pacingSummary.sceneSpacingTicks ?? []
+    let minSpacingObservedTicks = Number.MAX_SAFE_INTEGER
+    for (const gap of spacing) {
+        if (gap < minSpacingObservedTicks) minSpacingObservedTicks = gap
+    }
+    if (minSpacingObservedTicks === Number.MAX_SAFE_INTEGER) {
+        minSpacingObservedTicks = totalTicks
+    }
+    const averageSpacingTicks =
+        spacing.length > 0
+            ? spacing.reduce((a, b) => a + b, 0) / spacing.length
+            : totalTicks
+    const minTicks = pacingSummary.minTicksBetweenScenes ?? 3
+    let noClusterViolation = true
+    const astSeverities: number[] = []
+    const astCategories: string[] = []
+    for (const entry of entries) {
+        try {
+            const astPath = path.join(
+                outputDir,
+                entry.fountainFile.replace(/\.fountain$/, '.ast.json'),
+            )
+            const ast = JSON.parse(fs.readFileSync(astPath, 'utf8')) as {
+                sceneSummaryAst?: { severityBps?: number; category?: string }
+                category?: string
+            }
+            const sev = ast.sceneSummaryAst?.severityBps
+            astSeverities.push(typeof sev === 'number' ? sev : 3000)
+            const cat =
+                ast.sceneSummaryAst?.category ?? ast.category ?? 'UNKNOWN'
+            astCategories.push(String(cat))
+        } catch {
+            astSeverities.push(3000)
+            astCategories.push('UNKNOWN')
+        }
+    }
+    for (let i = 1; i < entries.length; i += 1) {
+        const prev = entries[i - 1] as { tick: number }
+        const curr = entries[i] as { tick: number }
+        const gap = curr.tick - prev.tick
+        const currSev = astSeverities[i] ?? 3000
+        const prevCat = astCategories[i - 1] ?? 'UNKNOWN'
+        const currCat = astCategories[i] ?? 'UNKNOWN'
+        const isOverride = currSev >= 8500
+        const isChronoPair =
+            prevCat === 'CHRONO_MILESTONE' || currCat === 'CHRONO_MILESTONE'
+        if (!isOverride && !isChronoPair && gap < minTicks) {
+            noClusterViolation = false
+            break
+        }
+    }
+    const maxDry = pacingSummary.maxDrySpellObservedTicks ?? 0
+    const maxAllowed = pacingSummary.maxDrySpellTicks ?? 8
+    const noDrySpellViolation =
+        maxAllowed >= totalTicks ? true : maxDry <= maxAllowed
+    const actCounts = pacingSummary.actCounts ?? {
+        ACT_I: 0,
+        ACT_II: 0,
+        ACT_III: 0,
+    }
+    const escalatingClimaxCadence =
+        actCounts.ACT_III >= actCounts.ACT_I ||
+        actCounts.ACT_II + actCounts.ACT_III >= actCounts.ACT_I
+    const dayparts = new Set<string>()
+    let midnightRollover = false
+    for (const entry of entries) {
+        try {
+            const fountainPath = path.join(outputDir, entry.fountainFile)
+            const text = fs.readFileSync(fountainPath, 'utf8')
+            const dateMatch = /^Date:\s*(\d{4}-\d{2}-\d{2})/m.exec(text)
+            if (dateMatch?.[1] && dateMatch[1] !== startDate) {
+                midnightRollover = true
+            }
+            const dayMatch = /^Daypart:\s*(\S+)/m.exec(text)
+            if (dayMatch?.[1]) dayparts.add(dayMatch[1].trim())
+        } catch {
+            // ignore unreadable artifact
+        }
+    }
+    const daypartsSeen = [...dayparts].sort()
+    await emitCns00(
+        ste,
+        `>> [PACING:AUDIT24H] ActI=${actCounts.ACT_I} ActII=${actCounts.ACT_II} ActIII=${actCounts.ACT_III} MaxDry=${maxDry}t ReplayMismatches=${replay.mismatchedFiles.length}`,
+    )
+    return Object.freeze({
+        seriesSlug,
+        totalTicks,
+        tickSeconds,
+        stackedCount: indexRaw.stackedCount,
+        actCounts: Object.freeze({ ...actCounts }),
+        maxDrySpellObservedTicks: maxDry,
+        minSpacingObservedTicks,
+        averageSpacingTicks,
+        stackDigestSha256: replay.stackDigestSha256,
+        replayMismatches: replay.mismatchedFiles.length,
+        noClusterViolation,
+        noDrySpellViolation,
+        escalatingClimaxCadence,
+        deterministic: replay.deterministic,
+        fileCount: replay.fileCount,
+        midnightRollover,
+        daypartsSeen: Object.freeze(daypartsSeen),
+    })
 }

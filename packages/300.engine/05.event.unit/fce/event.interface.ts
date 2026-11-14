@@ -203,6 +203,12 @@ export interface SignificantEventRecord {
     readonly locationId: string
     readonly stateDeltaSummary: string
     readonly causalHash: string
+    readonly actStage?: PacingActStage
+    readonly actMultiplierBps?: number
+    readonly diurnalWeightBps?: number
+    readonly droughtBoostBps?: number
+    readonly droughtBreaker?: boolean
+    readonly ticksSinceLastScene?: number
 }
 
 export interface EventDetectorRuleConfig {
@@ -243,3 +249,86 @@ export const DEFAULT_SIGNIFICANCE_CONFIG: EventDetectorRuleConfig =
         enabledCategories: Object.freeze({}),
         cooldownTicks: Object.freeze({}),
     })
+
+export type PacingActStage = 'ACT_I' | 'ACT_II' | 'ACT_III'
+
+export type ActWindowMode =
+    | 'HORIZON_PERCENT'
+    | 'SOLAR_24H_CYCLE'
+    | 'MULTI_DAY_ARC'
+
+export interface DiurnalTensionWeights {
+    readonly DAWN: number
+    readonly MORNING: number
+    readonly AFTERNOON: number
+    readonly DUSK: number
+    readonly NIGHT: number
+}
+
+export interface PacingBudgetPolicy {
+    readonly enabled: boolean
+    readonly act_window_mode: ActWindowMode
+    readonly min_ticks_between_scenes: number
+    readonly min_minutes_between_scenes: number
+    readonly max_dry_spell_ticks: number
+    readonly critical_override_bps: number
+    readonly max_drought_boost_bps: number
+    readonly drought_boost_bps_per_tick: number
+    readonly act_i_end_bps: number
+    readonly act_ii_end_bps: number
+    readonly act_i_multiplier_bps: number
+    readonly act_ii_multiplier_bps: number
+    readonly act_iii_multiplier_bps: number
+    readonly diurnal_weights_bps: DiurnalTensionWeights
+}
+
+export interface PacingBudgetState {
+    readonly lastSceneTick: number | null
+    readonly lastSceneElapsedSeconds: number | null
+    readonly currentAct: PacingActStage
+    readonly droughtPressureBps: number
+    readonly ticksSinceLastScene: number
+    readonly elapsedSeconds: number
+}
+
+export interface PacingGateDecision {
+    readonly suppressedByCooldown: boolean
+    readonly criticalOverrideApplied: boolean
+    readonly actStage: PacingActStage
+    readonly actMultiplierBps: number
+    readonly diurnalWeightBps: number
+    readonly combinedMultiplierBps: number
+    readonly droughtBoostBps: number
+    readonly effectiveScoreBps: number
+    readonly progressBps: number
+    readonly ticksSinceLastScene: number
+    readonly droughtBreaker: boolean
+    readonly significant: boolean
+    readonly reason: string
+}
+
+export const DEFAULT_DIURNAL_TENSION_WEIGHTS: DiurnalTensionWeights =
+    Object.freeze({
+        DAWN: 9000,
+        MORNING: 10000,
+        AFTERNOON: 11000,
+        DUSK: 12500,
+        NIGHT: 10000,
+    })
+
+export const DEFAULT_PACING_BUDGET_POLICY: PacingBudgetPolicy = Object.freeze({
+    enabled: true,
+    act_window_mode: 'MULTI_DAY_ARC',
+    min_ticks_between_scenes: 3,
+    min_minutes_between_scenes: 30,
+    max_dry_spell_ticks: 8,
+    critical_override_bps: 8500,
+    max_drought_boost_bps: 4000,
+    drought_boost_bps_per_tick: 500,
+    act_i_end_bps: 3000,
+    act_ii_end_bps: 7000,
+    act_i_multiplier_bps: 8000,
+    act_ii_multiplier_bps: 10000,
+    act_iii_multiplier_bps: 14500,
+    diurnal_weights_bps: DEFAULT_DIURNAL_TENSION_WEIGHTS,
+})

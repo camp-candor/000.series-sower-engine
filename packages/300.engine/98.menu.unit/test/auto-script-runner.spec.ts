@@ -52,8 +52,26 @@ describe('Unattended Auto-Script Runner', () => {
             fs.readFileSync(path.join(outputDir, 'index.json'), 'utf8'),
         ) as {
             entries: Array<{ fountainFile: string }>
+            pacingSummary?: {
+                actCounts?: { ACT_I: number; ACT_II: number; ACT_III: number }
+                maxDrySpellObservedTicks?: number
+                cooldownSuppressionsCount?: number
+                droughtBreakersCount?: number
+                sceneSpacingTicks?: number[]
+            }
         }
         expect(index.entries.map((e) => e.fountainFile)).toEqual(sorted)
+        expect(index.pacingSummary).toBeDefined()
+        expect(index.pacingSummary?.actCounts).toBeDefined()
+        expect(typeof index.pacingSummary?.maxDrySpellObservedTicks).toBe(
+            'number',
+        )
+        expect(typeof index.pacingSummary?.cooldownSuppressionsCount).toBe(
+            'number',
+        )
+        expect(typeof index.pacingSummary?.droughtBreakersCount).toBe('number')
+        expect(Array.isArray(index.pacingSummary?.sceneSpacingTicks)).toBe(true)
+        expect(seen.some((s) => s.includes('>> [PACING:ACT]'))).toBe(true)
         expect(seen.some((s) => s.includes('[AUTO:TICK]'))).toBe(true)
         expect(seen.some((s) => s.includes('[AUTO:STACKED]'))).toBe(true)
         expect(seen.some((s) => s.includes('[AUTO:DONE]'))).toBe(true)

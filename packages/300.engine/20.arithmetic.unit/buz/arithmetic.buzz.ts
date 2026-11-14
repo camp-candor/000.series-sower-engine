@@ -80,3 +80,144 @@ export const pickDeterministicIndex = (
     }
     return deriveDeterministicUint32(masterSeed, tick, salt) % length
 }
+
+export const computeHorizonProgressBps = (
+    tick: number,
+    totalTicks: number,
+): number => {
+    if (
+        !Number.isInteger(tick) ||
+        !Number.isInteger(totalTicks) ||
+        totalTicks <= 0 ||
+        tick < 0
+    ) {
+        throw new RangeError(
+            '[INVALID_HORIZON_PROGRESS] tick and positive totalTicks must be integers',
+        )
+    }
+    const clampedTick = Math.min(tick, totalTicks)
+    return Number((BigInt(clampedTick) * 10000n) / BigInt(totalTicks))
+}
+
+export const computeSolarDayProgressBps = (
+    hourOrElapsed: number,
+    minuteOrDuration = 86400,
+    second = 0,
+    elapsedSolarStartSeconds?: number,
+): number => {
+    const DAY_SECONDS = 86400
+    if (elapsedSolarStartSeconds !== undefined) {
+        const hour = hourOrElapsed
+        const minute = minuteOrDuration
+        if (
+            !Number.isInteger(hour) ||
+            !Number.isInteger(minute) ||
+            !Number.isInteger(second) ||
+            !Number.isInteger(elapsedSolarStartSeconds) ||
+            hour < 0 ||
+            hour > 23 ||
+            minute < 0 ||
+            minute > 59 ||
+            second < 0 ||
+            second > 59 ||
+            elapsedSolarStartSeconds < 0
+        ) {
+            throw new RangeError(
+                '[INVALID_SOLAR_SECONDS] hour/minute/second and elapsedSolarStartSeconds must be valid integers',
+            )
+        }
+        const clockSeconds = hour * 3600 + minute * 60 + second
+        const wrapped = (clockSeconds + elapsedSolarStartSeconds) % DAY_SECONDS
+        return Number((BigInt(wrapped) * 10000n) / BigInt(DAY_SECONDS))
+    }
+    if (minuteOrDuration === 86400 && second === 0) {
+        const elapsedSeconds = hourOrElapsed
+        const dayDurationSeconds = minuteOrDuration
+        if (
+            !Number.isInteger(elapsedSeconds) ||
+            elapsedSeconds < 0 ||
+            !Number.isInteger(dayDurationSeconds) ||
+            dayDurationSeconds <= 0
+        ) {
+            throw new RangeError(
+                '[INVALID_SOLAR_SECONDS] elapsedSeconds must be non-negative integer',
+            )
+        }
+        const wrapped = elapsedSeconds % dayDurationSeconds
+        return Number((BigInt(wrapped) * 10000n) / BigInt(dayDurationSeconds))
+    }
+    const hour = hourOrElapsed
+    const minute = minuteOrDuration
+    if (
+        !Number.isInteger(hour) ||
+        !Number.isInteger(minute) ||
+        !Number.isInteger(second) ||
+        hour < 0 ||
+        hour > 23 ||
+        minute < 0 ||
+        minute > 59 ||
+        second < 0 ||
+        second > 59
+    ) {
+        throw new RangeError(
+            '[INVALID_SOLAR_SECONDS] hour/minute/second must be valid clock integers',
+        )
+    }
+    const clockSeconds = hour * 3600 + minute * 60 + second
+    const wrapped = clockSeconds % DAY_SECONDS
+    return Number((BigInt(wrapped) * 10000n) / BigInt(DAY_SECONDS))
+}
+
+export type PacingActStageLocal = 'ACT_I' | 'ACT_II' | 'ACT_III'
+
+export const resolveThreeActStage = (
+    progressBps: number,
+    actIEndBps: number,
+    actIIEndBps: number,
+): PacingActStageLocal => {
+    if (
+        !Number.isInteger(progressBps) ||
+        !Number.isInteger(actIEndBps) ||
+        !Number.isInteger(actIIEndBps)
+    ) {
+        throw new TypeError(
+            '[INVALID_ACT_BOUNDS] progress and act bounds must be integers',
+        )
+    }
+    if (
+        actIEndBps < 0 ||
+        actIEndBps > 10000 ||
+        actIIEndBps < 0 ||
+        actIIEndBps > 10000
+    ) {
+        throw new RangeError(
+            '[INVALID_ACT_BOUNDS] act bounds must sit inside [0, 10000]',
+        )
+    }
+    if (actIEndBps >= actIIEndBps) {
+        throw new RangeError(
+            '[INVALID_ACT_BOUNDS] actIEndBps must be strictly below actIIEndBps',
+        )
+    }
+    const clamped = Math.min(10000, Math.max(0, progressBps))
+    if (clamped < actIEndBps) return 'ACT_I'
+    if (clamped < actIIEndBps) return 'ACT_II'
+    return 'ACT_III'
+}
+
+export const computeCombinedPacingMultiplierBps = (
+    actMultBps: number,
+    diurnalMultBps: number,
+): number => {
+    if (!Number.isInteger(actMultBps) || !Number.isInteger(diurnalMultBps)) {
+        throw new TypeError(
+            '[INVALID_PACING_MULTIPLIER] multipliers must be integers',
+        )
+    }
+    if (actMultBps < 0 || diurnalMultBps < 0) {
+        throw new RangeError(
+            '[INVALID_PACING_MULTIPLIER] multipliers must be non-negative',
+        )
+    }
+    return Number((BigInt(actMultBps) * BigInt(diurnalMultBps)) / 10000n)
+}

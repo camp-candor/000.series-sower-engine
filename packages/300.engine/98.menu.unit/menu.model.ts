@@ -7,6 +7,7 @@ import type {
     AirlockState,
     FlightDeckMode,
     MenuMode,
+    PacingOverrideState,
     SpatialProbeTelemetry,
 } from './fce/menu.interface.js'
 import type MenuBit from './fce/menu.bit.js'
@@ -44,6 +45,7 @@ export class MenuModel implements Menu {
     lastActionTimestamp = 1700000000000
     isHeadless = false
     menuBits: Record<string, MenuBit> = {}
+    pacingOverrides?: PacingOverrideState
     activeMenuMode: MenuMode = 'ROOT'
     totalInteractions: number = 0
     spatialProbeActive: boolean = false

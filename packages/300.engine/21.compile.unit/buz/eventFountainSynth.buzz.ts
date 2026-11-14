@@ -13,10 +13,20 @@ export type EventCategoryInput =
     | 'EPISTEMIC_REVEAL'
     | 'CHRONO_MILESTONE'
 
+export interface PacingContextStamp {
+    readonly actStage?: 'ACT_I' | 'ACT_II' | 'ACT_III'
+    readonly actMultiplierBps?: number
+    readonly diurnalWeightBps?: number
+    readonly droughtTicks?: number
+    readonly droughtBreaker?: boolean
+    readonly cooldownWindowTicks?: number
+}
+
 export interface SynthesizeEventScreenplayInput {
     readonly seriesSlug: string
     readonly displayName?: string
     readonly masterSeed: string
+    readonly pacing?: PacingContextStamp
     readonly significantEvent: {
         readonly eventSequence: number
         readonly tick: number
@@ -374,6 +384,19 @@ export const synthesizeEventFountainScreenplay = (
     lines.push(`Event-Category: ${evt.category}`)
     lines.push(`Master-Seed: ${input.masterSeed}`)
     lines.push(`Causal-Hash: ${evt.causalHash}`)
+    const pacing = input.pacing
+    const actStage = pacing?.actStage ?? 'ACT_I'
+    const actMult = pacing?.actMultiplierBps ?? 10000
+    const diurnalW = pacing?.diurnalWeightBps ?? 10000
+    const droughtTicks = pacing?.droughtTicks ?? 0
+    const cooldownWindow = pacing?.cooldownWindowTicks ?? 0
+    const isBreaker = pacing?.droughtBreaker === true
+    lines.push(`Act: ${actStage}`)
+    lines.push(`Pacing-Multiplier-Bps: ${actMult}`)
+    lines.push(`Diurnal-Weight-Bps: ${diurnalW}`)
+    lines.push(`Drought-Ticks: ${droughtTicks}`)
+    lines.push(`Drought-Breaker: ${isBreaker ? 'TRUE' : 'FALSE'}`)
+    lines.push(`Cooldown-Window-Ticks: ${cooldownWindow}`)
     lines.push('')
     lines.push(
         `/* [SPATIAL_STAGE_HEADER] ${locName} q=${spatial?.coordsQ ?? 0} r=${spatial?.coordsR ?? 0} lum=${spatial?.luminanceBps ?? 3000}bps noise=${spatial?.noiseCdB ?? 1500}cdB */`,
@@ -404,11 +427,27 @@ export const synthesizeEventFountainScreenplay = (
     const transitionPick =
         localUint32(input.masterSeed, evt.tick, `${evt.category}:transition`) %
         3
-    const transitions = [
+    const actITransitions = [
+        `DISSOLVE TO:`,
+        `> CUT TO:`,
+        `TIME CUT: ${after.isoDate} ${after.clockTimeHm} (${after.daypart})`,
+    ]
+    const actIIITransitions = [
+        `SMASH CUT TO:`,
+        `MATCH CUT TO:`,
+        `TIME CUT: ${after.isoDate} ${after.clockTimeHm} (${after.daypart})`,
+    ]
+    const defaultTransitions = [
         `> CUT TO:`,
         `SMASH CUT TO:`,
         `TIME CUT: ${after.isoDate} ${after.clockTimeHm} (${after.daypart})`,
     ]
+    const transitions =
+        actStage === 'ACT_I'
+            ? actITransitions
+            : actStage === 'ACT_III' || isBreaker
+              ? actIIITransitions
+              : defaultTransitions
     lines.push(pickFrom(transitions, transitionPick))
     lines.push('')
     lines.push('FADE OUT.')
@@ -429,6 +468,14 @@ export const synthesizeEventFountainScreenplay = (
         daypart: after.daypart,
         triggerReason: evt.triggerReason,
         severityBps: evt.severityBps,
+        pacing: {
+            actStage,
+            actMultiplierBps: actMult,
+            diurnalWeightBps: diurnalW,
+            droughtTicks,
+            droughtBreaker: isBreaker,
+            cooldownWindowTicks: cooldownWindow,
+        },
     }
     return { fountainText, contentSha256, sceneSummaryAst }
 }

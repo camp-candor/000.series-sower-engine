@@ -28,6 +28,21 @@ import {
 } from '../../17.tick.unit/fce/tick.interface.js'
 import { extractLoreChronology } from '../../17.tick.unit/tick.reduce.js'
 import { assertBasisPoint } from '../../20.arithmetic.unit/fce/arithmetic.interface.js'
+import type {
+    PacingBudgetPolicy,
+    ActWindowMode,
+    DiurnalTensionWeights,
+} from '../../05.event.unit/fce/event.interface.js'
+import { DEFAULT_PACING_BUDGET_POLICY } from '../../05.event.unit/fce/event.interface.js'
+import type { PacingActStage } from '../../05.event.unit/fce/event.interface.js'
+import {
+    evaluatePacingTensionGate,
+    selectDeterministicDroughtBreaker,
+} from '../../05.event.unit/buz/event.buzz.js'
+import {
+    computeHorizonProgressBps,
+    resolveThreeActStage,
+} from '../../20.arithmetic.unit/buz/arithmetic.buzz.js'
 import { ArithmeticModel } from '../../20.arithmetic.unit/arithmetic.model.js'
 import {
     evaluateScalingDivision,
@@ -1706,6 +1721,14 @@ export interface AutonomousSimState {
     }
     readonly lastEmittedTickByCategory: Readonly<Record<string, number>>
     readonly emittedEventsCount: number
+    readonly pacingPolicy?: PacingBudgetPolicy
+    readonly lastSceneTick?: number | null
+    readonly lastSceneElapsedSeconds?: number | null
+    readonly currentAct?: import('../../05.event.unit/fce/event.interface.js').PacingActStage
+    readonly droughtPressureBps?: number
+    readonly cooldownSuppressions?: number
+    readonly droughtBreakersCount?: number
+    readonly droughtBreakersTriggered?: number
 }
 
 export interface AutonomousTickReceipt {
@@ -1975,6 +1998,14 @@ export const createInitialAutonomousSimState = (
         }),
         lastEmittedTickByCategory: Object.freeze({}),
         emittedEventsCount: 0,
+        pacingPolicy: DEFAULT_PACING_BUDGET_POLICY,
+        lastSceneTick: null,
+        lastSceneElapsedSeconds: null,
+        currentAct: 'ACT_I',
+        droughtPressureBps: 0,
+        cooldownSuppressions: 0,
+        droughtBreakersCount: 0,
+        droughtBreakersTriggered: 0,
         ...(overrides ?? {}),
     }) as AutonomousSimState
 }
@@ -2252,7 +2283,66 @@ export const stepAutonomousSimulationTick = (
         ...(stateInput.lastEmittedTickByCategory ?? {}),
     }
     let sequence = stateInput.emittedEventsCount
+    const pacingPolicy = stateInput.pacingPolicy ?? DEFAULT_PACING_BUDGET_POLICY
+    const prevLastSceneTick =
+        stateInput.lastSceneTick === undefined ? null : stateInput.lastSceneTick
+    const prevLastElapsed =
+        stateInput.lastSceneElapsedSeconds === undefined
+            ? null
+            : stateInput.lastSceneElapsedSeconds
+    let cooldownSuppressions = stateInput.cooldownSuppressions ?? 0
+    let droughtBreakersCount = stateInput.droughtBreakersCount ?? 0
+    const prevDroughtTriggered = stateInput.droughtBreakersTriggered ?? 0
+    const pacingBaseState = {
+        lastSceneTick: prevLastSceneTick,
+        lastSceneElapsedSeconds: prevLastElapsed,
+        currentAct: (stateInput.currentAct ?? 'ACT_I') as PacingActStage,
+        droughtPressureBps: stateInput.droughtPressureBps ?? 0,
+        ticksSinceLastScene:
+            prevLastSceneTick == null ? nextTick : nextTick - prevLastSceneTick,
+        elapsedSeconds: nextClock.totalElapsedSeconds,
+    }
+    let lastActStage: PacingActStage = pacingBaseState.currentAct
+    let lastDroughtBoost = 0
+    let runningLastTick: number | null = prevLastSceneTick
+    let runningLastElapsed: number | null = prevLastElapsed
     for (const candidate of candidates) {
+        const runningState = {
+            lastSceneTick: runningLastTick,
+            lastSceneElapsedSeconds: runningLastElapsed,
+            currentAct: lastActStage,
+            droughtPressureBps: 0,
+            ticksSinceLastScene:
+                runningLastTick == null ? nextTick : nextTick - runningLastTick,
+            elapsedSeconds: nextClock.totalElapsedSeconds,
+        }
+        const gateCandidate = {
+            tick: nextTick,
+            category: candidate.category,
+            severityBps: candidate.severityBps,
+            triggerReason: candidate.triggerReason,
+            actorsInvolved: candidate.actorsInvolved,
+            locationId: candidate.locationId,
+            stateDeltaSummary: candidate.stateDeltaSummary,
+        }
+        let gate
+        try {
+            gate = evaluatePacingTensionGate(
+                gateCandidate as never,
+                runningState,
+                pacingPolicy,
+                nextClock,
+                96,
+            )
+        } catch {
+            continue
+        }
+        lastActStage = gate.actStage
+        lastDroughtBoost = gate.droughtBoostBps
+        if (gate.suppressedByCooldown) {
+            cooldownSuppressions += 1
+            continue
+        }
         const passed = autoEvaluate(
             candidate.category,
             candidate.severityBps,
@@ -2283,11 +2373,143 @@ export const stepAutonomousSimulationTick = (
                 causalHash: autoFnvHex(
                     `${masterSeed}:${nextTick}:${candidate.category}:${candidate.severityBps}:${sequence}`,
                 ),
-            }),
+                actStage: gate.actStage,
+                actMultiplierBps: gate.actMultiplierBps,
+                diurnalWeightBps: gate.diurnalWeightBps,
+                droughtBoostBps: gate.droughtBoostBps,
+                droughtBreaker: false,
+                ticksSinceLastScene: gate.ticksSinceLastScene,
+            } as never),
         )
         nextCooldowns[candidate.category] = nextTick
+        runningLastTick = nextTick
+        runningLastElapsed = nextClock.totalElapsedSeconds
+    }
+    if (significantEvents.length === 0 && pacingPolicy.enabled) {
+        const ticksSince =
+            prevLastSceneTick != null ? nextTick - prevLastSceneTick : nextTick
+        if (ticksSince >= pacingPolicy.max_dry_spell_ticks) {
+            const breakerPick = selectDeterministicDroughtBreaker(
+                candidates.map((c) => ({
+                    tick: nextTick,
+                    category: c.category,
+                    severityBps: c.severityBps,
+                    triggerReason: c.triggerReason,
+                    actorsInvolved: c.actorsInvolved,
+                    locationId: c.locationId,
+                    stateDeltaSummary: c.stateDeltaSummary,
+                })) as never,
+                masterSeed,
+                nextTick,
+            )
+            const fallbackChrono = {
+                tick: nextTick,
+                category: 'CHRONO_MILESTONE' as const,
+                severityBps: 3000,
+                triggerReason: `Drought recovery quiet stretch ${String(ticksSince)}t at ${nextClock.clockTimeHms}`,
+                actorsInvolved: Object.freeze(
+                    nextEntities.map((e) => e.id),
+                ) as readonly string[],
+                locationId: 'loc_culvert',
+                stateDeltaSummary: `dry spell ${String(ticksSince)} ticks recovered`,
+            }
+            const picked =
+                (breakerPick as unknown as typeof fallbackChrono | null) ??
+                fallbackChrono
+            const gate = evaluatePacingTensionGate(
+                picked as never,
+                pacingBaseState,
+                pacingPolicy,
+                nextClock,
+                96,
+            )
+            sequence += 1
+            const snapshot = {
+                isoDate: nextClock.isoDate,
+                clockTimeHm: nextClock.clockTimeHm,
+                clockTimeHms: nextClock.clockTimeHms,
+                timecodeSmpte: nextClock.timecodeSmpte,
+                daypart: nextClock.daypart,
+            }
+            significantEvents.push(
+                Object.freeze({
+                    eventSequence: sequence,
+                    tick: nextTick,
+                    clockSnapshot: snapshot,
+                    category: (picked as unknown as { category: never })
+                        .category,
+                    severityBps: (picked as unknown as { severityBps: number })
+                        .severityBps,
+                    triggerReason: (
+                        picked as unknown as { triggerReason: string }
+                    ).triggerReason,
+                    actorsInvolved: ((
+                        picked as unknown as {
+                            actorsInvolved?: readonly string[]
+                        }
+                    ).actorsInvolved ?? []) as readonly string[],
+                    locationId:
+                        (picked as unknown as { locationId?: string })
+                            .locationId ?? 'loc_culvert',
+                    stateDeltaSummary: (
+                        picked as unknown as { stateDeltaSummary?: string }
+                    ).stateDeltaSummary,
+                    causalHash: autoFnvHex(
+                        `${masterSeed}:${nextTick}:${(picked as unknown as { category: string }).category}:${String((picked as unknown as { severityBps: number }).severityBps)}:${sequence}:drought`,
+                    ),
+                    actStage: gate.actStage,
+                    actMultiplierBps: gate.actMultiplierBps,
+                    diurnalWeightBps: gate.diurnalWeightBps,
+                    droughtBoostBps: gate.droughtBoostBps,
+                    droughtBreaker: true,
+                    ticksSinceLastScene: ticksSince,
+                } as never),
+            )
+            droughtBreakersCount += 1
+            lastActStage = gate.actStage
+            lastDroughtBoost = gate.droughtBoostBps
+            nextCooldowns[
+                (picked as unknown as { category: string }).category
+            ] = nextTick
+        }
     }
 
+    const emittedThisTick = significantEvents.length > 0
+    const nextLastSceneTick = emittedThisTick ? nextTick : prevLastSceneTick
+    const nextLastElapsed = emittedThisTick
+        ? nextClock.totalElapsedSeconds
+        : prevLastElapsed
+    let resolvedAct = lastActStage
+    if (!emittedThisTick) {
+        try {
+            const progress = computeHorizonProgressBps(
+                Math.min(nextTick, 96),
+                96,
+            )
+            resolvedAct = resolveThreeActStage(
+                progress,
+                pacingPolicy.act_i_end_bps,
+                pacingPolicy.act_ii_end_bps,
+            )
+        } catch {
+            resolvedAct = (stateInput.currentAct ?? 'ACT_I') as PacingActStage
+        }
+    }
+    const droughtPressureBps = emittedThisTick
+        ? 0
+        : Math.min(
+              pacingPolicy.max_drought_boost_bps,
+              Math.max(
+                  0,
+                  ((nextLastSceneTick == null
+                      ? nextTick
+                      : nextTick - nextLastSceneTick) -
+                      pacingPolicy.max_dry_spell_ticks +
+                      1) *
+                      pacingPolicy.drought_boost_bps_per_tick,
+              ),
+          )
+    void lastDroughtBoost
     const nextState: AutonomousSimState = Object.freeze({
         tick: nextTick,
         masterSeed,
@@ -2298,6 +2520,16 @@ export const stepAutonomousSimulationTick = (
         detectorConfig: stateInput.detectorConfig,
         lastEmittedTickByCategory: Object.freeze({ ...nextCooldowns }),
         emittedEventsCount: sequence,
+        pacingPolicy,
+        lastSceneTick: nextLastSceneTick,
+        lastSceneElapsedSeconds: nextLastElapsed,
+        currentAct: resolvedAct,
+        droughtPressureBps,
+        cooldownSuppressions,
+        droughtBreakersCount,
+        droughtBreakersTriggered:
+            prevDroughtTriggered +
+            (droughtBreakersCount - (stateInput.droughtBreakersCount ?? 0)),
     })
 
     return Object.freeze({
@@ -2305,4 +2537,158 @@ export const stepAutonomousSimulationTick = (
         committedEvents: Object.freeze([...committedEvents]),
         significantEvents: Object.freeze([...significantEvents]),
     }) as AutonomousTickReceipt
+}
+
+const isValidActWindowMode = (value: unknown): value is ActWindowMode => {
+    return (
+        value === 'HORIZON_PERCENT' ||
+        value === 'SOLAR_24H_CYCLE' ||
+        value === 'MULTI_DAY_ARC'
+    )
+}
+
+const toNonNegativeInt = (value: unknown, fallback: number): number => {
+    return Number.isInteger(value) && (value as number) >= 0
+        ? (value as number)
+        : fallback
+}
+
+const toBps = (value: unknown, fallback: number): number => {
+    return Number.isInteger(value) &&
+        (value as number) >= 0 &&
+        (value as number) <= 50000
+        ? (value as number)
+        : fallback
+}
+
+const toProgressBps = (value: unknown, fallback: number): number => {
+    return Number.isInteger(value) &&
+        (value as number) >= 0 &&
+        (value as number) <= 10000
+        ? (value as number)
+        : fallback
+}
+
+export const extractPacingBudgetFromBible = (
+    bibleState: unknown,
+): PacingBudgetPolicy => {
+    const fallback = DEFAULT_PACING_BUDGET_POLICY
+    try {
+        if (bibleState == null || typeof bibleState !== 'object') {
+            return fallback
+        }
+        const root = bibleState as Record<string, unknown>
+        const bundle = root['auto_script_bundle'] as
+            | Record<string, unknown>
+            | undefined
+        const config = (
+            bundle != null && typeof bundle === 'object'
+                ? (bundle['config'] as Record<string, unknown> | undefined)
+                : (root['config'] as Record<string, unknown> | undefined)
+        ) as Record<string, unknown> | undefined
+        const raw = (
+            config != null && typeof config === 'object'
+                ? (config['pacing_budget'] as
+                      | Record<string, unknown>
+                      | undefined)
+                : undefined
+        ) as Record<string, unknown> | undefined
+        if (raw == null || typeof raw !== 'object') {
+            const direct = root['pacing_budget'] as
+                | Record<string, unknown>
+                | undefined
+            if (direct == null || typeof direct !== 'object') return fallback
+            return sanitizePacingBudgetPolicy(direct, fallback)
+        }
+        return sanitizePacingBudgetPolicy(raw, fallback)
+    } catch {
+        return fallback
+    }
+}
+
+const sanitizeDiurnalWeights = (
+    raw: unknown,
+    fallback: DiurnalTensionWeights,
+): DiurnalTensionWeights => {
+    if (raw == null || typeof raw !== 'object') return fallback
+    const rec = raw as Record<string, unknown>
+    const pick = (key: string, fb: number): number => toBps(rec[key], fb)
+    return Object.freeze({
+        DAWN: pick('DAWN', fallback.DAWN),
+        MORNING: pick('MORNING', fallback.MORNING),
+        AFTERNOON: pick('AFTERNOON', fallback.AFTERNOON),
+        DUSK: pick('DUSK', fallback.DUSK),
+        NIGHT: pick('NIGHT', fallback.NIGHT),
+    })
+}
+
+const sanitizePacingBudgetPolicy = (
+    raw: Record<string, unknown>,
+    fallback: PacingBudgetPolicy,
+): PacingBudgetPolicy => {
+    const actWindowMode: ActWindowMode = isValidActWindowMode(
+        raw['act_window_mode'],
+    )
+        ? (raw['act_window_mode'] as ActWindowMode)
+        : fallback.act_window_mode
+    const enabled =
+        typeof raw['enabled'] === 'boolean'
+            ? (raw['enabled'] as boolean)
+            : fallback.enabled
+    const actIEnd = toProgressBps(raw['act_i_end_bps'], fallback.act_i_end_bps)
+    const actIIEnd = toProgressBps(
+        raw['act_ii_end_bps'],
+        fallback.act_ii_end_bps,
+    )
+    const safeActIEnd = actIEnd < actIIEnd ? actIEnd : fallback.act_i_end_bps
+    const safeActIIEnd = actIEnd < actIIEnd ? actIIEnd : fallback.act_ii_end_bps
+    return Object.freeze({
+        enabled,
+        act_window_mode: actWindowMode,
+        min_ticks_between_scenes: toNonNegativeInt(
+            raw['min_ticks_between_scenes'],
+            fallback.min_ticks_between_scenes,
+        ),
+        min_minutes_between_scenes: toNonNegativeInt(
+            raw['min_minutes_between_scenes'],
+            fallback.min_minutes_between_scenes,
+        ),
+        max_dry_spell_ticks: Math.max(
+            1,
+            toNonNegativeInt(
+                raw['max_dry_spell_ticks'],
+                fallback.max_dry_spell_ticks,
+            ),
+        ),
+        critical_override_bps: toProgressBps(
+            raw['critical_override_bps'],
+            fallback.critical_override_bps,
+        ),
+        max_drought_boost_bps: toBps(
+            raw['max_drought_boost_bps'],
+            fallback.max_drought_boost_bps,
+        ),
+        drought_boost_bps_per_tick: toBps(
+            raw['drought_boost_bps_per_tick'],
+            fallback.drought_boost_bps_per_tick,
+        ),
+        act_i_end_bps: safeActIEnd,
+        act_ii_end_bps: safeActIIEnd,
+        act_i_multiplier_bps: toBps(
+            raw['act_i_multiplier_bps'],
+            fallback.act_i_multiplier_bps,
+        ),
+        act_ii_multiplier_bps: toBps(
+            raw['act_ii_multiplier_bps'],
+            fallback.act_ii_multiplier_bps,
+        ),
+        act_iii_multiplier_bps: toBps(
+            raw['act_iii_multiplier_bps'],
+            fallback.act_iii_multiplier_bps,
+        ),
+        diurnal_weights_bps: sanitizeDiurnalWeights(
+            raw['diurnal_weights_bps'],
+            fallback.diurnal_weights_bps,
+        ),
+    })
 }

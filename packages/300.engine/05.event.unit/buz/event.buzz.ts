@@ -9,7 +9,21 @@ import type { EventLogRecord } from '../../02.database.unit/fce/database.interfa
 import {
     CURRENT_EVENT_VERSIONS,
     type CanonicalSimulationEventType,
+    type PacingActStage,
+    type ActWindowMode,
+    type PacingBudgetPolicy,
+    type PacingBudgetState,
+    type PacingGateDecision,
+    type SignificantEventCandidate,
+    DEFAULT_PACING_BUDGET_POLICY,
 } from '../fce/event.interface.js'
+import {
+    computeCombinedPacingMultiplierBps,
+    computeHorizonProgressBps,
+    computeSolarDayProgressBps,
+    resolveThreeActStage,
+} from '../../20.arithmetic.unit/buz/arithmetic.buzz.js'
+import type { SimulationClockState } from '../../17.tick.unit/fce/tick.interface.js'
 import * as ActEnv from '../../04.envelope.unit/envelope.action.js'
 import * as ActSeq from '../../14.sequence.unit/sequence.action.js'
 import * as ActDbs from '../../02.database.unit/database.action.js'
@@ -629,4 +643,162 @@ export const detectSignificantEvent = (
         }
     }
     return cpy
+}
+
+const resolveDiurnalWeightBps = (
+    policy: PacingBudgetPolicy,
+    daypart: string,
+): number => {
+    const weights = policy.diurnal_weights_bps as unknown as Record<
+        string,
+        unknown
+    >
+    const raw = weights?.[daypart]
+    return Number.isInteger(raw) && (raw as number) >= 0
+        ? (raw as number)
+        : 10000
+}
+
+const resolveActMultiplierBps = (
+    policy: PacingBudgetPolicy,
+    stage: PacingActStage,
+): number => {
+    if (stage === 'ACT_I') return policy.act_i_multiplier_bps
+    if (stage === 'ACT_II') return policy.act_ii_multiplier_bps
+    return policy.act_iii_multiplier_bps
+}
+
+export const evaluatePacingTensionGate = (
+    candidate: SignificantEventCandidate,
+    pacingState: PacingBudgetState,
+    policy: PacingBudgetPolicy = DEFAULT_PACING_BUDGET_POLICY,
+    clockState?: SimulationClockState,
+    totalTicks = 96,
+): PacingGateDecision => {
+    if (!Number.isInteger(candidate.tick) || candidate.tick < 0) {
+        throw new RangeError(
+            '[INVALID_PACING_TICK] candidate tick must be non-negative integer',
+        )
+    }
+    if (
+        !Number.isInteger(candidate.severityBps) ||
+        candidate.severityBps < 0 ||
+        candidate.severityBps > 10000
+    ) {
+        throw new RangeError(
+            '[OUT_OF_BOUNDS] severityBps out of bounds [0, 10000]',
+        )
+    }
+    const safeTotal =
+        Number.isInteger(totalTicks) && totalTicks > 0 ? totalTicks : 96
+    const mode: ActWindowMode = policy.act_window_mode
+    let progressBps: number
+    if (mode === 'SOLAR_24H_CYCLE' && clockState != null) {
+        const elapsed =
+            clockState.hour * 3600 + clockState.minute * 60 + clockState.second
+        progressBps = computeSolarDayProgressBps(elapsed)
+    } else if (mode === 'HORIZON_PERCENT') {
+        progressBps = computeHorizonProgressBps(candidate.tick, safeTotal)
+    } else {
+        progressBps = computeHorizonProgressBps(
+            candidate.tick,
+            Math.max(safeTotal, 1),
+        )
+    }
+    const actStage = resolveThreeActStage(
+        progressBps,
+        policy.act_i_end_bps,
+        policy.act_ii_end_bps,
+    )
+    const actMultiplierBps = resolveActMultiplierBps(policy, actStage)
+    const daypart =
+        clockState != null && typeof clockState.daypart === 'string'
+            ? clockState.daypart
+            : 'NIGHT'
+    const diurnalWeightBps = resolveDiurnalWeightBps(policy, daypart)
+    const combinedMultiplierBps = computeCombinedPacingMultiplierBps(
+        actMultiplierBps,
+        diurnalWeightBps,
+    )
+    const lastTick = pacingState.lastSceneTick
+    const ticksSinceLastScene =
+        lastTick == null ? candidate.tick : candidate.tick - lastTick
+    const safeTicksSince =
+        Number.isInteger(ticksSinceLastScene) && ticksSinceLastScene >= 0
+            ? ticksSinceLastScene
+            : candidate.tick
+    const lastElapsed = pacingState.lastSceneElapsedSeconds
+    const currentElapsed =
+        clockState != null
+            ? clockState.totalElapsedSeconds
+            : candidate.tick * 60
+    const minutesSince =
+        lastElapsed == null
+            ? Number.MAX_SAFE_INTEGER
+            : Math.floor((currentElapsed - lastElapsed) / 60)
+    const inCooldown =
+        (lastTick != null &&
+            safeTicksSince < policy.min_ticks_between_scenes) ||
+        (lastElapsed != null &&
+            minutesSince < policy.min_minutes_between_scenes)
+    const criticalOverrideApplied =
+        candidate.severityBps >= policy.critical_override_bps
+    const isChronoMilestone = candidate.category === 'CHRONO_MILESTONE'
+    const suppressedByCooldown =
+        !isChronoMilestone &&
+        inCooldown &&
+        !criticalOverrideApplied &&
+        policy.enabled
+    let droughtBoostBps = 0
+    if (policy.enabled && safeTicksSince >= policy.max_dry_spell_ticks) {
+        const over = safeTicksSince - policy.max_dry_spell_ticks + 1
+        const raw = over * policy.drought_boost_bps_per_tick
+        droughtBoostBps = Math.min(policy.max_drought_boost_bps, raw)
+    }
+    const scaled = Number(
+        (BigInt(candidate.severityBps) * BigInt(combinedMultiplierBps)) /
+            10000n,
+    )
+    const effectiveScoreBps = scaled + droughtBoostBps
+    const significant = !suppressedByCooldown
+    return Object.freeze({
+        suppressedByCooldown,
+        criticalOverrideApplied,
+        actStage,
+        actMultiplierBps,
+        diurnalWeightBps,
+        combinedMultiplierBps,
+        droughtBoostBps,
+        effectiveScoreBps,
+        progressBps,
+        ticksSinceLastScene: safeTicksSince,
+        droughtBreaker: false,
+        significant,
+        reason: suppressedByCooldown
+            ? `COOLDOWN_SUPPRESSED:${String(safeTicksSince)}t`
+            : `PACING_PASS:${actStage}:${String(effectiveScoreBps)}`,
+    })
+}
+
+export const selectDeterministicDroughtBreaker = (
+    candidates: readonly SignificantEventCandidate[],
+    masterSeed: string,
+    tick: number,
+): SignificantEventCandidate | null => {
+    if (candidates.length === 0) return null
+    let best = candidates[0] as SignificantEventCandidate
+    let bestKey = `${String(best.severityBps).padStart(5, '0')}:${best.category}:${best.triggerReason}`
+    for (const candidate of candidates.slice(1)) {
+        const key = `${String(candidate.severityBps).padStart(5, '0')}:${candidate.category}:${candidate.triggerReason}`
+        if (
+            candidate.severityBps > best.severityBps ||
+            (candidate.severityBps === best.severityBps && key > bestKey)
+        ) {
+            best = candidate
+            bestKey = key
+        }
+    }
+    void masterSeed
+    void tick
+    return best
 }

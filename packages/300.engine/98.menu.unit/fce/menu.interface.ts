@@ -65,6 +65,15 @@ export interface MenuFlightDeckState {
     readonly lastActionTimestamp: number
 }
 
+export interface PacingOverrideState {
+    readonly minTicksBetweenScenes?: number
+    readonly maxDrySpellTicks?: number
+    readonly actWindowMode?: string
+    readonly actIMultiplierBps?: number
+    readonly actIIMultiplierBps?: number
+    readonly actIIIMultiplierBps?: number
+}
+
 export default interface Menu extends MenuModelDescriptor {
     discoveredUniverses?: CompiledUniverseDescriptor[]
     activeUniverseSlug?: string
@@ -74,6 +83,7 @@ export default interface Menu extends MenuModelDescriptor {
     activeSelection?: string
     isHeadless?: boolean
     menuBits?: Record<string, MenuBit>
+    pacingOverrides?: PacingOverrideState
     lst?: string[]
     geoJsonNow?: any
     atlasNow?: any

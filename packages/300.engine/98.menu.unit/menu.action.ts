@@ -261,6 +261,13 @@ export class RunAutoScriptSimulation implements Action {
     constructor(public bale?: MenuBit) {}
 }
 
+export const CONFIGURE_ENGINE_PACING_BUDGET =
+    '[Menu action] Configure Engine Pacing Budget'
+export class ConfigureEnginePacingBudget implements Action {
+    readonly type = CONFIGURE_ENGINE_PACING_BUDGET
+    constructor(public bale?: MenuBit) {}
+}
+
 export type Actions =
     | InitMenu
     | UpdateMenu
@@ -300,3 +307,4 @@ export type Actions =
     | CompileFullFountainDraft
     | ExportToConductor
     | RunAutoScriptSimulation
+    | ConfigureEnginePacingBudget

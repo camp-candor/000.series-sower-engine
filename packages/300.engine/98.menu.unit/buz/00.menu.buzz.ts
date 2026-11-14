@@ -1558,8 +1558,10 @@ export const openAutoScriptCockpitMenu = async (
         const { runUnattendedAutoScriptSimulation } = await import(
             './autoScriptRunner.buzz.js'
         )
+        const savedOverrides = cpy.pacingOverrides ?? {}
         const receipt = await runUnattendedAutoScriptSimulation(
             {
+                ...savedOverrides,
                 seriesSlug,
                 startDate,
                 startTime,
@@ -1644,11 +1646,195 @@ export const openAutoScriptCockpitMenu = async (
         )
     }
 
+    const isValidPacingOverride = (
+        value: unknown,
+        min: number,
+        max: number,
+    ): boolean => {
+        return (
+            Number.isInteger(value) &&
+            (value as number) >= min &&
+            (value as number) <= max
+        )
+    }
+
+    const runPacingConfigure = async (
+        overrides?: Record<string, unknown>,
+    ): Promise<boolean> => {
+        const merged = {
+            ...(dat as Record<string, unknown>),
+            ...(overrides ?? {}),
+        }
+        const pick = (keys: string[]): unknown => {
+            for (const key of keys) {
+                if (merged[key] !== undefined) return merged[key]
+            }
+            return undefined
+        }
+        const minTicks = pick([
+            'minTicksBetweenScenes',
+            'min_ticks_between_scenes',
+        ])
+        const maxDry = pick(['maxDrySpellTicks', 'max_dry_spell_ticks'])
+        const windowMode = pick(['actWindowMode', 'act_window_mode'])
+        const actI = pick(['actIMultiplierBps', 'act_i_multiplier_bps'])
+        const actII = pick(['actIIMultiplierBps', 'act_ii_multiplier_bps'])
+        const actIII = pick(['actIIIMultiplierBps', 'act_iii_multiplier_bps'])
+        const failures: string[] = []
+        if (
+            minTicks !== undefined &&
+            !isValidPacingOverride(minTicks, 0, 10000)
+        ) {
+            failures.push(`min_ticks_between_scenes=${String(minTicks)}`)
+        }
+        if (maxDry !== undefined && !isValidPacingOverride(maxDry, 1, 10000)) {
+            failures.push(`max_dry_spell_ticks=${String(maxDry)}`)
+        }
+        if (
+            windowMode !== undefined &&
+            windowMode !== 'HORIZON_PERCENT' &&
+            windowMode !== 'SOLAR_24H_CYCLE' &&
+            windowMode !== 'MULTI_DAY_ARC'
+        ) {
+            failures.push(`act_window_mode=${String(windowMode)}`)
+        }
+        for (const [label, val] of [
+            ['act_i_multiplier_bps', actI],
+            ['act_ii_multiplier_bps', actII],
+            ['act_iii_multiplier_bps', actIII],
+        ] as const) {
+            if (val !== undefined && !isValidPacingOverride(val, 0, 50000)) {
+                failures.push(`${label}=${String(val)}`)
+            }
+        }
+        if (failures.length > 0) {
+            await emitConsole(
+                ste,
+                `:: [PACING:ERR] Rejected pacing override [${failures.join(', ')}]`,
+            )
+            return false
+        }
+        const nextOverrides = {
+            ...(cpy.pacingOverrides ?? {}),
+            ...(minTicks !== undefined
+                ? { minTicksBetweenScenes: minTicks as number }
+                : {}),
+            ...(maxDry !== undefined
+                ? { maxDrySpellTicks: maxDry as number }
+                : {}),
+            ...(windowMode !== undefined
+                ? { actWindowMode: windowMode as string }
+                : {}),
+            ...(actI !== undefined
+                ? { actIMultiplierBps: actI as number }
+                : {}),
+            ...(actII !== undefined
+                ? { actIIMultiplierBps: actII as number }
+                : {}),
+            ...(actIII !== undefined
+                ? { actIIIMultiplierBps: actIII as number }
+                : {}),
+        }
+        cpy.pacingOverrides = Object.freeze(nextOverrides)
+        if (ste != null && typeof ste === 'object') {
+            const steMenu = (
+                ste as unknown as { menu?: { pacingOverrides?: unknown } }
+            ).menu
+            if (steMenu != null && typeof steMenu === 'object') {
+                steMenu.pacingOverrides = cpy.pacingOverrides
+            }
+        }
+        const applied: string[] = []
+        if (minTicks !== undefined)
+            applied.push(`min_ticks=${String(minTicks)}`)
+        if (maxDry !== undefined) applied.push(`max_dry=${String(maxDry)}`)
+        if (windowMode !== undefined) applied.push(`mode=${String(windowMode)}`)
+        if (actI !== undefined) applied.push(`actI=${String(actI)}`)
+        if (actII !== undefined) applied.push(`actII=${String(actII)}`)
+        if (actIII !== undefined) applied.push(`actIII=${String(actIII)}`)
+        await emitConsole(
+            ste,
+            `>> [PACING:OVERRIDE] Applied pacing override [${applied.join(', ') || 'defaults'}]`,
+        )
+        return true
+    }
+
+    const runPacingAudit24h = async (): Promise<void> => {
+        const { auditThreeActPacingSimulation } = await import(
+            './autoScriptRunner.buzz.js'
+        )
+        const savedOverrides = cpy.pacingOverrides ?? {}
+        const datRec = dat as Record<string, unknown>
+        const receipt = await auditThreeActPacingSimulation(
+            {
+                ...savedOverrides,
+                ...(datRec['minTicksBetweenScenes'] !== undefined
+                    ? {
+                          minTicksBetweenScenes: Number(
+                              datRec['minTicksBetweenScenes'],
+                          ),
+                      }
+                    : {}),
+                ...(datRec['maxDrySpellTicks'] !== undefined
+                    ? { maxDrySpellTicks: Number(datRec['maxDrySpellTicks']) }
+                    : {}),
+                ...(datRec['actWindowMode'] !== undefined
+                    ? { actWindowMode: String(datRec['actWindowMode']) }
+                    : {}),
+                seriesSlug: String(datRec['seriesSlug'] ?? 'wiregrass-basin'),
+                startDate: String(datRec['startDate'] ?? '2026-10-31'),
+                startTime: String(datRec['startTime'] ?? '08:00'),
+                totalTicks: Number(datRec['totalTicks'] ?? 96),
+                tickSeconds: Number(datRec['tickSeconds'] ?? 900),
+                masterSeed: String(
+                    datRec['masterSeed'] ??
+                        `auto_${String(datRec['seriesSlug'] ?? 'wiregrass-basin')}_seed01`,
+                ),
+                outputDir: datRec['outputDir'] as string | undefined,
+                repoRoot: datRec['repoRoot'] as string | undefined,
+            },
+            ste,
+        )
+        const bar = (count: number): string => {
+            const capped = Math.max(0, Math.min(40, count))
+            let s = ''
+            for (let i = 0; i < capped; i += 1) s += '#'
+            return s || '-'
+        }
+        await emitConsole(
+            ste,
+            `>> [PACING:AUDIT24H] ActI=${receipt.actCounts.ACT_I} ActII=${receipt.actCounts.ACT_II} ActIII=${receipt.actCounts.ACT_III} MaxDry=${receipt.maxDrySpellObservedTicks}t ReplayMismatches=${receipt.replayMismatches}`,
+        )
+        await emitConsole(
+            ste,
+            `ACT_I   [${bar(receipt.actCounts.ACT_I)}] count=${receipt.actCounts.ACT_I}`,
+        )
+        await emitConsole(
+            ste,
+            `ACT_II  [${bar(receipt.actCounts.ACT_II)}] count=${receipt.actCounts.ACT_II}`,
+        )
+        await emitConsole(
+            ste,
+            `ACT_III [${bar(receipt.actCounts.ACT_III)}] count=${receipt.actCounts.ACT_III}`,
+        )
+    }
+
     if (programmatic != null) {
-        if (programmatic === 'launch' || programmatic === 'configure') {
+        if (programmatic === 'launch') {
             await runLaunch()
+        } else if (
+            programmatic === 'configure' ||
+            programmatic === 'pacing-configure'
+        ) {
+            await runPacingConfigure()
         } else if (programmatic === 'audit') {
             await runAudit()
+        } else if (
+            programmatic === 'pacing-audit' ||
+            programmatic === 'audit24h' ||
+            programmatic === 'audit-24h'
+        ) {
+            await runPacingAudit24h()
         } else if (programmatic === 'export') {
             await runExport()
         } else if (programmatic === 'bad-date') {
@@ -1707,6 +1893,8 @@ export const openAutoScriptCockpitMenu = async (
         '[2] SET START DATE TIME TICKS SEED',
         '[3] RUN WIPE-RESET DETERMINISM AUDIT',
         '[4] EXPORT STACKED SCRIPTS TO CONDUCTOR',
+        '[5] CONFIGURE THREE-ACT PACING COOLDOWN',
+        '[6] RUN 24H PACING DISTRIBUTION AUDIT',
         '[<] RETURN TO ENGINE MENU',
     ]
     let gridChoice: unknown = null
@@ -1775,6 +1963,49 @@ export const openAutoScriptCockpitMenu = async (
         await runAudit()
     } else if (picked.startsWith('[4]')) {
         await runExport()
+    } else if (picked.startsWith('[5]')) {
+        const datRec = dat as Record<string, unknown>
+        const hasExplicitOverrides =
+            datRec['minTicksBetweenScenes'] !== undefined ||
+            datRec['maxDrySpellTicks'] !== undefined ||
+            datRec['actWindowMode'] !== undefined ||
+            datRec['actIMultiplierBps'] !== undefined ||
+            datRec['actIIMultiplierBps'] !== undefined ||
+            datRec['actIIIMultiplierBps'] !== undefined
+        const ok = hasExplicitOverrides ? await runPacingConfigure() : true
+        if (ok) {
+            try {
+                const inputGrid: unknown = await hunt(UPDATE_GRID, {
+                    x: 0,
+                    y: 4,
+                    xSpan: 4,
+                    ySpan: 8,
+                })
+                const inputRes = (await hunt(OPEN_INPUT, {
+                    dat: { prompt: 'Pacing Cooldown Ticks' },
+                    net: (inputGrid as { grdBit?: { dat?: unknown } } | null)
+                        ?.grdBit?.dat,
+                })) as { inpBit?: { src?: string } } | null
+                const rawInput = inputRes?.inpBit?.src?.trim()
+                if (rawInput !== undefined && rawInput.length > 0) {
+                    const parsed = Number(rawInput)
+                    if (!isValidPacingOverride(parsed, 0, 10000)) {
+                        await emitConsole(
+                            ste,
+                            `:: [PACING:ERR] Rejected pacing override [min_ticks_between_scenes=${rawInput}]`,
+                        )
+                    } else {
+                        await runPacingConfigure({
+                            minTicksBetweenScenes: parsed,
+                        })
+                    }
+                }
+            } catch {
+                // input modal optional in headless harnesses
+            }
+        }
+    } else if (picked.startsWith('[6]')) {
+        await runPacingAudit24h()
     }
 
     cpy.activeSelection = picked
