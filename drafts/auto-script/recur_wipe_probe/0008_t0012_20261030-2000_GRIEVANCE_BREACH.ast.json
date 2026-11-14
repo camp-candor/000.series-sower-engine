@@ -1,0 +1,41 @@
+{
+  "seriesSlug": "recur_wipe_probe",
+  "eventSequence": 8,
+  "tick": 12,
+  "category": "GRIEVANCE_BREACH",
+  "isoDate": "2026-10-30",
+  "startTimeHm": "20:00",
+  "daypart": "NIGHT",
+  "contentSha256": "71c9860eb127dd64b4ac258ae306eec59e0055f6c1342f327408a6f853607bbc",
+  "sceneSummaryAst": {
+    "seriesSlug": "recur_wipe_probe",
+    "eventSequence": 8,
+    "tick": 12,
+    "category": "GRIEVANCE_BREACH",
+    "isoDate": "2026-10-30",
+    "clockTimeHm": "20:00",
+    "daypart": "NIGHT",
+    "triggerReason": "Grievance grv_bog_wart_01 status ACTIVE -> ESCALATED intensity 1250 bps",
+    "severityBps": 5000,
+    "pacing": {
+      "actStage": "ACT_I",
+      "actMultiplierBps": 8000,
+      "diurnalWeightBps": 10000,
+      "droughtTicks": 3,
+      "droughtBreaker": false,
+      "cooldownWindowTicks": 3
+    }
+  },
+  "chronology": {
+    "isoDate": "2026-10-30",
+    "clockTimeHm": "20:00",
+    "daypart": "NIGHT",
+    "pacing": {
+      "actStage": "ACT_I",
+      "actMultiplierBps": 8000,
+      "diurnalWeightBps": 10000,
+      "droughtTicks": 3,
+      "droughtBreaker": false
+    }
+  }
+}

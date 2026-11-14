@@ -1,0 +1,58 @@
+{
+  "seriesSlug": "recur_wipe_probe",
+  "eventSequence": 3,
+  "tick": 1,
+  "category": "INVENTORY_TRANSFER",
+  "isoDate": "2026-10-30",
+  "startTimeHm": "09:00",
+  "daypart": "MORNING",
+  "contentSha256": "44957bdd2ae4a417a52752bca1029b3293ea897f6bbc8daa003278e425e264e0",
+  "sceneSummaryAst": {
+    "seriesSlug": "recur_wipe_probe",
+    "eventSequence": 3,
+    "tick": 1,
+    "category": "INVENTORY_TRANSFER",
+    "isoDate": "2026-10-30",
+    "clockTimeHm": "09:00",
+    "daypart": "MORNING",
+    "triggerReason": "Scheduled agenda supply_drop Supply Drop @ 2026-10-31 10:00",
+    "severityBps": 9000,
+    "chronology": {
+      "agenda": {
+        "agendaBeatId": "supply_drop",
+        "agendaTitle": "Supply Drop",
+        "scheduledIsoDate": "2026-10-31",
+        "scheduledTimeHm": "10:00",
+        "reserveHeldTicks": 0
+      }
+    },
+    "pacing": {
+      "actStage": "ACT_I",
+      "actMultiplierBps": 10000,
+      "diurnalWeightBps": 10000,
+      "droughtTicks": 0,
+      "droughtBreaker": false,
+      "cooldownWindowTicks": 3
+    }
+  },
+  "chronology": {
+    "isoDate": "2026-10-30",
+    "clockTimeHm": "09:00",
+    "daypart": "MORNING",
+    "agenda": {
+      "agendaBeatId": "supply_drop",
+      "agendaTitle": "Supply Drop",
+      "scheduledIsoDate": "2026-10-31",
+      "scheduledTimeHm": "10:00",
+      "scheduledTimestamp": "2026-10-31 10:00",
+      "reserveHeldTicks": 0
+    },
+    "pacing": {
+      "actStage": "ACT_I",
+      "actMultiplierBps": 10000,
+      "diurnalWeightBps": 10000,
+      "droughtTicks": 0,
+      "droughtBreaker": false
+    }
+  }
+}

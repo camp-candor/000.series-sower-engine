@@ -1,0 +1,58 @@
+{
+  "seriesSlug": "recur_wipe_probe",
+  "eventSequence": 2,
+  "tick": 1,
+  "category": "GRIEVANCE_BREACH",
+  "isoDate": "2026-10-30",
+  "startTimeHm": "09:00",
+  "daypart": "MORNING",
+  "contentSha256": "d7c0fd9f1dfc9ae4104d98a40ce3d8823ec7c4f7ca4ee40fa7d806b0d1bd7ed7",
+  "sceneSummaryAst": {
+    "seriesSlug": "recur_wipe_probe",
+    "eventSequence": 2,
+    "tick": 1,
+    "category": "GRIEVANCE_BREACH",
+    "isoDate": "2026-10-30",
+    "clockTimeHm": "09:00",
+    "daypart": "MORNING",
+    "triggerReason": "Scheduled agenda friday_court Friday Court @ 2026-10-30 09:00",
+    "severityBps": 9000,
+    "chronology": {
+      "agenda": {
+        "agendaBeatId": "friday_court",
+        "agendaTitle": "Friday Court",
+        "scheduledIsoDate": "2026-10-30",
+        "scheduledTimeHm": "09:00",
+        "reserveHeldTicks": 0
+      }
+    },
+    "pacing": {
+      "actStage": "ACT_I",
+      "actMultiplierBps": 10000,
+      "diurnalWeightBps": 10000,
+      "droughtTicks": 0,
+      "droughtBreaker": false,
+      "cooldownWindowTicks": 3
+    }
+  },
+  "chronology": {
+    "isoDate": "2026-10-30",
+    "clockTimeHm": "09:00",
+    "daypart": "MORNING",
+    "agenda": {
+      "agendaBeatId": "friday_court",
+      "agendaTitle": "Friday Court",
+      "scheduledIsoDate": "2026-10-30",
+      "scheduledTimeHm": "09:00",
+      "scheduledTimestamp": "2026-10-30 09:00",
+      "reserveHeldTicks": 0
+    },
+    "pacing": {
+      "actStage": "ACT_I",
+      "actMultiplierBps": 10000,
+      "diurnalWeightBps": 10000,
+      "droughtTicks": 0,
+      "droughtBreaker": false
+    }
+  }
+}

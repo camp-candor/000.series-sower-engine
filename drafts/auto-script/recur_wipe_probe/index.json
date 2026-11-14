@@ -1,0 +1,151 @@
+{
+  "seriesSlug": "recur_wipe_probe",
+  "masterSeed": "recur_seed_07",
+  "startDate": "2026-10-30",
+  "startTime": "08:00:00",
+  "tickSeconds": 3600,
+  "totalTicks": 24,
+  "stackedCount": 8,
+  "entries": [
+    {
+      "sequence": 1,
+      "tick": 1,
+      "isoDate": "2026-10-30",
+      "startTimeHm": "09:00",
+      "daypart": "MORNING",
+      "category": "SOMATIC_TRAUMA",
+      "fountainFile": "0001_t0001_20261030-0900_SOMATIC_TRAUMA.fountain",
+      "astFile": "0001_t0001_20261030-0900_SOMATIC_TRAUMA.ast.json",
+      "contentSha256": "3aa6a76f235abe50ef959ad91861484138735626d81768571cfe0e167ba58382",
+      "byteLength": 1484
+    },
+    {
+      "sequence": 2,
+      "tick": 1,
+      "isoDate": "2026-10-30",
+      "startTimeHm": "09:00",
+      "daypart": "MORNING",
+      "category": "GRIEVANCE_BREACH",
+      "fountainFile": "0002_t0001_20261030-0900_GRIEVANCE_BREACH.fountain",
+      "astFile": "0002_t0001_20261030-0900_GRIEVANCE_BREACH.ast.json",
+      "contentSha256": "d7c0fd9f1dfc9ae4104d98a40ce3d8823ec7c4f7ca4ee40fa7d806b0d1bd7ed7",
+      "byteLength": 1746
+    },
+    {
+      "sequence": 3,
+      "tick": 1,
+      "isoDate": "2026-10-30",
+      "startTimeHm": "09:00",
+      "daypart": "MORNING",
+      "category": "INVENTORY_TRANSFER",
+      "fountainFile": "0003_t0001_20261030-0900_INVENTORY_TRANSFER.fountain",
+      "astFile": "0003_t0001_20261030-0900_INVENTORY_TRANSFER.ast.json",
+      "contentSha256": "44957bdd2ae4a417a52752bca1029b3293ea897f6bbc8daa003278e425e264e0",
+      "byteLength": 1767
+    },
+    {
+      "sequence": 4,
+      "tick": 4,
+      "isoDate": "2026-10-30",
+      "startTimeHm": "12:00",
+      "daypart": "AFTERNOON",
+      "category": "SOMATIC_TRAUMA",
+      "fountainFile": "0004_t0004_20261030-1200_SOMATIC_TRAUMA.fountain",
+      "astFile": "0004_t0004_20261030-1200_SOMATIC_TRAUMA.ast.json",
+      "contentSha256": "9f261ea8b2b0fdd218115cc0518de05acdd0a47b736cba1c5857e7b07c63062d",
+      "byteLength": 1455
+    },
+    {
+      "sequence": 5,
+      "tick": 4,
+      "isoDate": "2026-10-30",
+      "startTimeHm": "12:00",
+      "daypart": "AFTERNOON",
+      "category": "CHRONO_MILESTONE",
+      "fountainFile": "0005_t0004_20261030-1200_CHRONO_MILESTONE.fountain",
+      "astFile": "0005_t0004_20261030-1200_CHRONO_MILESTONE.ast.json",
+      "contentSha256": "543c546880e68319a0b1dc6ed1081b7edb6930d133acc4d83ee015404d7c5ba6",
+      "byteLength": 1490
+    },
+    {
+      "sequence": 6,
+      "tick": 7,
+      "isoDate": "2026-10-30",
+      "startTimeHm": "15:00",
+      "daypart": "AFTERNOON",
+      "category": "SOMATIC_TRAUMA",
+      "fountainFile": "0006_t0007_20261030-1500_SOMATIC_TRAUMA.fountain",
+      "astFile": "0006_t0007_20261030-1500_SOMATIC_TRAUMA.ast.json",
+      "contentSha256": "e37d010f03f84ac7da6da45aa5430e4fb3dfa60d349f6fa26e6905feb336154c",
+      "byteLength": 1461
+    },
+    {
+      "sequence": 7,
+      "tick": 9,
+      "isoDate": "2026-10-30",
+      "startTimeHm": "17:00",
+      "daypart": "DUSK",
+      "category": "CHRONO_MILESTONE",
+      "fountainFile": "0007_t0009_20261030-1700_CHRONO_MILESTONE.fountain",
+      "astFile": "0007_t0009_20261030-1700_CHRONO_MILESTONE.ast.json",
+      "contentSha256": "b70bf8ab46d4c6db02be30961a036a26f3ae900c592fb635eefbd15f13465aac",
+      "byteLength": 1498
+    },
+    {
+      "sequence": 8,
+      "tick": 12,
+      "isoDate": "2026-10-30",
+      "startTimeHm": "20:00",
+      "daypart": "NIGHT",
+      "category": "GRIEVANCE_BREACH",
+      "fountainFile": "0008_t0012_20261030-2000_GRIEVANCE_BREACH.fountain",
+      "astFile": "0008_t0012_20261030-2000_GRIEVANCE_BREACH.ast.json",
+      "contentSha256": "71c9860eb127dd64b4ac258ae306eec59e0055f6c1342f327408a6f853607bbc",
+      "byteLength": 1499
+    }
+  ],
+  "pacingSummary": {
+    "actWindowMode": "MULTI_DAY_ARC",
+    "minTicksBetweenScenes": 3,
+    "maxDrySpellTicks": 8,
+    "actCounts": {
+      "ACT_I": 8,
+      "ACT_II": 0,
+      "ACT_III": 0
+    },
+    "maxDrySpellObservedTicks": 3,
+    "cooldownSuppressionsCount": 14,
+    "droughtBreakersCount": 0,
+    "sceneSpacingTicks": [
+      0,
+      0,
+      3,
+      0,
+      3,
+      2,
+      3
+    ]
+  },
+  "agendaSummary": {
+    "configuredCount": 2,
+    "triggeredCount": 2,
+    "triggeredBeatIds": [
+      "friday_court",
+      "supply_drop"
+    ],
+    "triggeredOccurrences": [
+      "friday_court@2026-10-30",
+      "supply_drop@2026-10-31"
+    ],
+    "droughtBreakersHeldByReserve": 0
+  },
+  "recurrenceSummary": {
+    "recurringScenesFired": 2,
+    "blackoutSkipsCount": 0,
+    "blackoutDeferralsCount": 0,
+    "occurrenceCountsByBeat": {
+      "friday_court": 1,
+      "supply_drop": 1
+    }
+  }
+}

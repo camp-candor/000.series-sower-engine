@@ -1,0 +1,41 @@
+{
+  "seriesSlug": "recur_wipe_probe",
+  "eventSequence": 4,
+  "tick": 4,
+  "category": "SOMATIC_TRAUMA",
+  "isoDate": "2026-10-30",
+  "startTimeHm": "12:00",
+  "daypart": "AFTERNOON",
+  "contentSha256": "9f261ea8b2b0fdd218115cc0518de05acdd0a47b736cba1c5857e7b07c63062d",
+  "sceneSummaryAst": {
+    "seriesSlug": "recur_wipe_probe",
+    "eventSequence": 4,
+    "tick": 4,
+    "category": "SOMATIC_TRAUMA",
+    "isoDate": "2026-10-30",
+    "clockTimeHm": "12:00",
+    "daypart": "AFTERNOON",
+    "triggerReason": "Somatic strain 1204 -> 1621 bps roll 7 locomotion degradation",
+    "severityBps": 5717,
+    "pacing": {
+      "actStage": "ACT_I",
+      "actMultiplierBps": 8000,
+      "diurnalWeightBps": 11000,
+      "droughtTicks": 3,
+      "droughtBreaker": false,
+      "cooldownWindowTicks": 3
+    }
+  },
+  "chronology": {
+    "isoDate": "2026-10-30",
+    "clockTimeHm": "12:00",
+    "daypart": "AFTERNOON",
+    "pacing": {
+      "actStage": "ACT_I",
+      "actMultiplierBps": 8000,
+      "diurnalWeightBps": 11000,
+      "droughtTicks": 3,
+      "droughtBreaker": false
+    }
+  }
+}

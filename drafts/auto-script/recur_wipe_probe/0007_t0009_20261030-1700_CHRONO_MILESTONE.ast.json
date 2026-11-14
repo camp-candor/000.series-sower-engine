@@ -1,0 +1,41 @@
+{
+  "seriesSlug": "recur_wipe_probe",
+  "eventSequence": 7,
+  "tick": 9,
+  "category": "CHRONO_MILESTONE",
+  "isoDate": "2026-10-30",
+  "startTimeHm": "17:00",
+  "daypart": "DUSK",
+  "contentSha256": "b70bf8ab46d4c6db02be30961a036a26f3ae900c592fb635eefbd15f13465aac",
+  "sceneSummaryAst": {
+    "seriesSlug": "recur_wipe_probe",
+    "eventSequence": 7,
+    "tick": 9,
+    "category": "CHRONO_MILESTONE",
+    "isoDate": "2026-10-30",
+    "clockTimeHm": "17:00",
+    "daypart": "DUSK",
+    "triggerReason": "Chronology milestone AFTERNOON -> DUSK date 2026-10-30 -> 2026-10-30",
+    "severityBps": 3000,
+    "pacing": {
+      "actStage": "ACT_I",
+      "actMultiplierBps": 8000,
+      "diurnalWeightBps": 12500,
+      "droughtTicks": 2,
+      "droughtBreaker": false,
+      "cooldownWindowTicks": 3
+    }
+  },
+  "chronology": {
+    "isoDate": "2026-10-30",
+    "clockTimeHm": "17:00",
+    "daypart": "DUSK",
+    "pacing": {
+      "actStage": "ACT_I",
+      "actMultiplierBps": 8000,
+      "diurnalWeightBps": 12500,
+      "droughtTicks": 2,
+      "droughtBreaker": false
+    }
+  }
+}

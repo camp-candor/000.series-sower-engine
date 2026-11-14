@@ -1,0 +1,41 @@
+{
+  "seriesSlug": "recur_wipe_probe",
+  "eventSequence": 5,
+  "tick": 4,
+  "category": "CHRONO_MILESTONE",
+  "isoDate": "2026-10-30",
+  "startTimeHm": "12:00",
+  "daypart": "AFTERNOON",
+  "contentSha256": "543c546880e68319a0b1dc6ed1081b7edb6930d133acc4d83ee015404d7c5ba6",
+  "sceneSummaryAst": {
+    "seriesSlug": "recur_wipe_probe",
+    "eventSequence": 5,
+    "tick": 4,
+    "category": "CHRONO_MILESTONE",
+    "isoDate": "2026-10-30",
+    "clockTimeHm": "12:00",
+    "daypart": "AFTERNOON",
+    "triggerReason": "Chronology milestone MORNING -> AFTERNOON date 2026-10-30 -> 2026-10-30",
+    "severityBps": 3000,
+    "pacing": {
+      "actStage": "ACT_I",
+      "actMultiplierBps": 8000,
+      "diurnalWeightBps": 11000,
+      "droughtTicks": 0,
+      "droughtBreaker": false,
+      "cooldownWindowTicks": 3
+    }
+  },
+  "chronology": {
+    "isoDate": "2026-10-30",
+    "clockTimeHm": "12:00",
+    "daypart": "AFTERNOON",
+    "pacing": {
+      "actStage": "ACT_I",
+      "actMultiplierBps": 8000,
+      "diurnalWeightBps": 11000,
+      "droughtTicks": 0,
+      "droughtBreaker": false
+    }
+  }
+}
