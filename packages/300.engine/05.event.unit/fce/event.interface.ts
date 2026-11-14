@@ -209,6 +209,13 @@ export interface SignificantEventRecord {
     readonly droughtBoostBps?: number
     readonly droughtBreaker?: boolean
     readonly ticksSinceLastScene?: number
+    readonly agendaScheduled?: boolean
+    readonly agendaBeatId?: string
+    readonly agendaTitle?: string
+    readonly scheduledIsoDate?: string
+    readonly scheduledTimeHm?: string
+    readonly scheduledTimestamp?: string
+    readonly reserveHeldTicks?: number
 }
 
 export interface EventDetectorRuleConfig {
@@ -293,6 +300,7 @@ export interface PacingBudgetState {
 
 export interface PacingGateDecision {
     readonly suppressedByCooldown: boolean
+    readonly suppressedByAgendaReserve?: boolean
     readonly criticalOverrideApplied: boolean
     readonly actStage: PacingActStage
     readonly actMultiplierBps: number

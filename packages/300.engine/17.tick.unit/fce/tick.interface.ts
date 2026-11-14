@@ -268,3 +268,49 @@ export default interface Tick {
     // tickBitList: TickBit[];
     // tickBits:any;
 }
+
+export type AgendaBeatCategory =
+    | 'PARANOIA_TRIGGERED'
+    | 'GRIEVANCE_BREACH'
+    | 'SOMATIC_TRAUMA'
+    | 'INVENTORY_TRANSFER'
+    | 'EPISTEMIC_REVEAL'
+    | 'CHRONO_MILESTONE'
+
+export interface ScheduledStoryBeat {
+    readonly beat_id: string
+    readonly title: string
+    readonly isoDate: string
+    readonly startTimeHm: string
+    readonly beatCategory: AgendaBeatCategory
+    readonly priorityBps: number
+    readonly reserveCooldownTicks: number
+    readonly toleranceTicks?: number
+    readonly recurringDaily?: boolean
+}
+
+export interface ResolvedAgendaBeatWindow {
+    readonly beat: ScheduledStoryBeat
+    readonly effectiveIsoDate: string
+    readonly occurrenceKey: string
+    readonly targetTick: number
+    readonly targetEpochSeconds: number
+    readonly deltaSeconds: number
+    readonly ticksUntilBeat: number
+}
+
+export interface ChronoAgendaWindowStatus {
+    readonly tick: number
+    readonly dueBeats: readonly ResolvedAgendaBeatWindow[]
+    readonly activeReserveLocks: readonly ResolvedAgendaBeatWindow[]
+}
+
+export function agendaOccurrenceKey(
+    beatId: string,
+    effectiveIsoDate: string,
+): string {
+    return `${beatId}@${effectiveIsoDate}`
+}
+
+export const computeAgendaOccurrenceKey = agendaOccurrenceKey
+export const resolveAgendaOccurrenceKey = agendaOccurrenceKey

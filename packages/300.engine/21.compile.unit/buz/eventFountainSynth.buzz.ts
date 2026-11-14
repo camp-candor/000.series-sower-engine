@@ -22,6 +22,15 @@ export interface PacingContextStamp {
     readonly cooldownWindowTicks?: number
 }
 
+export interface AgendaMetadataStamp {
+    readonly agendaBeatId?: string
+    readonly agendaTitle?: string
+    readonly scheduledIsoDate?: string
+    readonly scheduledTimeHm?: string
+    readonly reserveHeldTicks?: number
+    readonly agendaScheduled?: boolean
+}
+
 export interface SynthesizeEventScreenplayInput {
     readonly seriesSlug: string
     readonly displayName?: string
@@ -44,6 +53,13 @@ export interface SynthesizeEventScreenplayInput {
         readonly locationId: string
         readonly stateDeltaSummary: string
         readonly causalHash: string
+        readonly agendaScheduled?: boolean
+        readonly agendaBeatId?: string
+        readonly agendaTitle?: string
+        readonly scheduledIsoDate?: string
+        readonly scheduledTimeHm?: string
+        readonly scheduledTimestamp?: string
+        readonly reserveHeldTicks?: number
     }
     readonly clockBefore: {
         readonly isoDate: string
@@ -397,6 +413,19 @@ export const synthesizeEventFountainScreenplay = (
     lines.push(`Drought-Ticks: ${droughtTicks}`)
     lines.push(`Drought-Breaker: ${isBreaker ? 'TRUE' : 'FALSE'}`)
     lines.push(`Cooldown-Window-Ticks: ${cooldownWindow}`)
+    const isAgenda = evt.agendaScheduled === true
+    const agendaBeatId = evt.agendaBeatId ?? ''
+    const agendaTitle = evt.agendaTitle ?? ''
+    const agendaDate = evt.scheduledIsoDate ?? after.isoDate
+    const agendaTime = evt.scheduledTimeHm ?? after.clockTimeHm
+    const agendaReserve = Number.isInteger(evt.reserveHeldTicks)
+        ? (evt.reserveHeldTicks as number)
+        : 0
+    if (isAgenda) {
+        lines.push(`Agenda-Beat-Id: ${agendaBeatId}`)
+        lines.push(`Scheduled-Time: ${agendaDate} ${agendaTime}`)
+        lines.push(`Reserve-Held-Ticks: ${agendaReserve}`)
+    }
     lines.push('')
     lines.push(
         `/* [SPATIAL_STAGE_HEADER] ${locName} q=${spatial?.coordsQ ?? 0} r=${spatial?.coordsR ?? 0} lum=${spatial?.luminanceBps ?? 3000}bps noise=${spatial?.noiseCdB ?? 1500}cdB */`,
@@ -407,6 +436,12 @@ export const synthesizeEventFountainScreenplay = (
     lines.push('')
     lines.push(spatialLine)
     lines.push('')
+    if (isAgenda && agendaTitle.length > 0) {
+        lines.push(
+            `Scheduled appointment ${agendaTitle} arrives on clock as ${agendaDate} ${agendaTime} holds the room.`,
+        )
+        lines.push('')
+    }
     for (const beat of beats) {
         lines.push(beat)
         lines.push('')
@@ -468,6 +503,17 @@ export const synthesizeEventFountainScreenplay = (
         daypart: after.daypart,
         triggerReason: evt.triggerReason,
         severityBps: evt.severityBps,
+        chronology: isAgenda
+            ? {
+                  agenda: {
+                      agendaBeatId,
+                      agendaTitle,
+                      scheduledIsoDate: agendaDate,
+                      scheduledTimeHm: agendaTime,
+                      reserveHeldTicks: agendaReserve,
+                  },
+              }
+            : undefined,
         pacing: {
             actStage,
             actMultiplierBps: actMult,

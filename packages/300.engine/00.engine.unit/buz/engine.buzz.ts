@@ -33,12 +33,17 @@ import type {
     ActWindowMode,
     DiurnalTensionWeights,
 } from '../../05.event.unit/fce/event.interface.js'
+import type {
+    ScheduledStoryBeat,
+    AgendaBeatCategory,
+} from '../../17.tick.unit/fce/tick.interface.js'
 import { DEFAULT_PACING_BUDGET_POLICY } from '../../05.event.unit/fce/event.interface.js'
 import type { PacingActStage } from '../../05.event.unit/fce/event.interface.js'
 import {
     evaluatePacingTensionGate,
     selectDeterministicDroughtBreaker,
 } from '../../05.event.unit/buz/event.buzz.js'
+import { evaluateChronoAgendaWindow } from '../../17.tick.unit/buz/tick.buzz.js'
 import {
     computeHorizonProgressBps,
     resolveThreeActStage,
@@ -1729,6 +1734,10 @@ export interface AutonomousSimState {
     readonly cooldownSuppressions?: number
     readonly droughtBreakersCount?: number
     readonly droughtBreakersTriggered?: number
+    readonly scheduledBeats?: readonly ScheduledStoryBeat[]
+    readonly consumedAgendaKeys?: readonly string[]
+    readonly droughtBreakersHeldByReserve?: number
+    readonly triggeredAgendaBeats?: readonly string[]
 }
 
 export interface AutonomousTickReceipt {
@@ -2006,6 +2015,10 @@ export const createInitialAutonomousSimState = (
         cooldownSuppressions: 0,
         droughtBreakersCount: 0,
         droughtBreakersTriggered: 0,
+        scheduledBeats: Object.freeze([]),
+        consumedAgendaKeys: Object.freeze([]),
+        droughtBreakersHeldByReserve: 0,
+        triggeredAgendaBeats: Object.freeze([]),
         ...(overrides ?? {}),
     }) as AutonomousSimState
 }
@@ -2024,6 +2037,50 @@ export const stepAutonomousSimulationTick = (
         stateInput.clock.tickSeconds > 0 ? stateInput.clock.tickSeconds : 60
     const prevClock = stateInput.clock
     const nextClock = advanceAutonomousClock(prevClock, tickSeconds)
+    const scheduledBeats = stateInput.scheduledBeats ?? []
+    const consumedAgendaKeysInput = stateInput.consumedAgendaKeys ?? []
+    const triggeredAgendaInput = stateInput.triggeredAgendaBeats ?? []
+    const heldReserveInput = stateInput.droughtBreakersHeldByReserve ?? 0
+    let agendaStatus: {
+        readonly tick: number
+        readonly dueBeats: readonly {
+            readonly beat: ScheduledStoryBeat
+            readonly effectiveIsoDate: string
+            readonly occurrenceKey: string
+            readonly targetTick: number
+            readonly targetEpochSeconds: number
+            readonly deltaSeconds: number
+            readonly ticksUntilBeat: number
+        }[]
+        readonly activeReserveLocks: readonly {
+            readonly beat: ScheduledStoryBeat
+            readonly effectiveIsoDate: string
+            readonly occurrenceKey: string
+            readonly targetTick: number
+            readonly targetEpochSeconds: number
+            readonly deltaSeconds: number
+            readonly ticksUntilBeat: number
+        }[]
+    }
+    try {
+        agendaStatus = evaluateChronoAgendaWindow(
+            nextTick,
+            prevClock,
+            nextClock,
+            scheduledBeats,
+            consumedAgendaKeysInput,
+            tickSeconds,
+        )
+    } catch {
+        agendaStatus = Object.freeze({
+            tick: nextTick,
+            dueBeats: Object.freeze([]),
+            activeReserveLocks: Object.freeze([]),
+        })
+    }
+    const nextConsumedAgendaKeys: string[] = [...consumedAgendaKeysInput]
+    const nextTriggeredAgendaBeats: string[] = [...triggeredAgendaInput]
+    let droughtBreakersHeldByReserve = heldReserveInput
 
     const baseEntities =
         stateInput.entities.length > 0
@@ -2385,44 +2442,8 @@ export const stepAutonomousSimulationTick = (
         runningLastTick = nextTick
         runningLastElapsed = nextClock.totalElapsedSeconds
     }
-    if (significantEvents.length === 0 && pacingPolicy.enabled) {
-        const ticksSince =
-            prevLastSceneTick != null ? nextTick - prevLastSceneTick : nextTick
-        if (ticksSince >= pacingPolicy.max_dry_spell_ticks) {
-            const breakerPick = selectDeterministicDroughtBreaker(
-                candidates.map((c) => ({
-                    tick: nextTick,
-                    category: c.category,
-                    severityBps: c.severityBps,
-                    triggerReason: c.triggerReason,
-                    actorsInvolved: c.actorsInvolved,
-                    locationId: c.locationId,
-                    stateDeltaSummary: c.stateDeltaSummary,
-                })) as never,
-                masterSeed,
-                nextTick,
-            )
-            const fallbackChrono = {
-                tick: nextTick,
-                category: 'CHRONO_MILESTONE' as const,
-                severityBps: 3000,
-                triggerReason: `Drought recovery quiet stretch ${String(ticksSince)}t at ${nextClock.clockTimeHms}`,
-                actorsInvolved: Object.freeze(
-                    nextEntities.map((e) => e.id),
-                ) as readonly string[],
-                locationId: 'loc_culvert',
-                stateDeltaSummary: `dry spell ${String(ticksSince)} ticks recovered`,
-            }
-            const picked =
-                (breakerPick as unknown as typeof fallbackChrono | null) ??
-                fallbackChrono
-            const gate = evaluatePacingTensionGate(
-                picked as never,
-                pacingBaseState,
-                pacingPolicy,
-                nextClock,
-                96,
-            )
+    if (agendaStatus.dueBeats.length > 0) {
+        for (const due of agendaStatus.dueBeats) {
             sequence += 1
             const snapshot = {
                 isoDate: nextClock.isoDate,
@@ -2431,46 +2452,145 @@ export const stepAutonomousSimulationTick = (
                 timecodeSmpte: nextClock.timecodeSmpte,
                 daypart: nextClock.daypart,
             }
+            const reserveHeld = droughtBreakersHeldByReserve
+            const agendaActors = Object.freeze(nextEntities.map((e) => e.id))
             significantEvents.push(
                 Object.freeze({
                     eventSequence: sequence,
                     tick: nextTick,
                     clockSnapshot: snapshot,
-                    category: (picked as unknown as { category: never })
-                        .category,
-                    severityBps: (picked as unknown as { severityBps: number })
-                        .severityBps,
-                    triggerReason: (
-                        picked as unknown as { triggerReason: string }
-                    ).triggerReason,
-                    actorsInvolved: ((
-                        picked as unknown as {
-                            actorsInvolved?: readonly string[]
-                        }
-                    ).actorsInvolved ?? []) as readonly string[],
-                    locationId:
-                        (picked as unknown as { locationId?: string })
-                            .locationId ?? 'loc_culvert',
-                    stateDeltaSummary: (
-                        picked as unknown as { stateDeltaSummary?: string }
-                    ).stateDeltaSummary,
+                    category: due.beat.beatCategory,
+                    severityBps: due.beat.priorityBps,
+                    triggerReason: `Scheduled agenda ${due.beat.beat_id} ${due.beat.title} @ ${due.effectiveIsoDate} ${due.beat.startTimeHm}`,
+                    actorsInvolved: agendaActors,
+                    locationId: 'loc_culvert',
+                    stateDeltaSummary: `agenda ${due.beat.beat_id} triggered ${due.effectiveIsoDate} ${due.beat.startTimeHm}`,
                     causalHash: autoFnvHex(
-                        `${masterSeed}:${nextTick}:${(picked as unknown as { category: string }).category}:${String((picked as unknown as { severityBps: number }).severityBps)}:${sequence}:drought`,
+                        `${masterSeed}:${nextTick}:${due.beat.beat_id}:${sequence}:agenda`,
                     ),
-                    actStage: gate.actStage,
-                    actMultiplierBps: gate.actMultiplierBps,
-                    diurnalWeightBps: gate.diurnalWeightBps,
-                    droughtBoostBps: gate.droughtBoostBps,
-                    droughtBreaker: true,
-                    ticksSinceLastScene: ticksSince,
+                    actStage: lastActStage,
+                    actMultiplierBps: 10000,
+                    diurnalWeightBps: 10000,
+                    droughtBoostBps: 0,
+                    droughtBreaker: false,
+                    ticksSinceLastScene:
+                        runningLastTick == null
+                            ? nextTick
+                            : nextTick - runningLastTick,
+                    agendaScheduled: true,
+                    agendaBeatId: due.beat.beat_id,
+                    agendaTitle: due.beat.title,
+                    scheduledIsoDate: due.effectiveIsoDate,
+                    scheduledTimeHm: due.beat.startTimeHm,
+                    scheduledTimestamp: `${due.effectiveIsoDate} ${due.beat.startTimeHm}`,
+                    reserveHeldTicks: reserveHeld,
                 } as never),
             )
-            droughtBreakersCount += 1
-            lastActStage = gate.actStage
-            lastDroughtBoost = gate.droughtBoostBps
-            nextCooldowns[
-                (picked as unknown as { category: string }).category
-            ] = nextTick
+            nextCooldowns[due.beat.beatCategory] = nextTick
+            runningLastTick = nextTick
+            runningLastElapsed = nextClock.totalElapsedSeconds
+            if (!nextConsumedAgendaKeys.includes(due.occurrenceKey)) {
+                nextConsumedAgendaKeys.push(due.occurrenceKey)
+            }
+            if (!nextTriggeredAgendaBeats.includes(due.beat.beat_id)) {
+                nextTriggeredAgendaBeats.push(due.beat.beat_id)
+            }
+            committedEvents.push(`AGENDA_TRIGGERED:${due.beat.beat_id}`)
+        }
+    }
+    if (significantEvents.length === 0 && pacingPolicy.enabled) {
+        if (agendaStatus.activeReserveLocks.length > 0) {
+            droughtBreakersHeldByReserve += 1
+        } else {
+            const ticksSince =
+                prevLastSceneTick != null
+                    ? nextTick - prevLastSceneTick
+                    : nextTick
+            if (ticksSince >= pacingPolicy.max_dry_spell_ticks) {
+                const breakerPick = selectDeterministicDroughtBreaker(
+                    candidates.map((c) => ({
+                        tick: nextTick,
+                        category: c.category,
+                        severityBps: c.severityBps,
+                        triggerReason: c.triggerReason,
+                        actorsInvolved: c.actorsInvolved,
+                        locationId: c.locationId,
+                        stateDeltaSummary: c.stateDeltaSummary,
+                    })) as never,
+                    masterSeed,
+                    nextTick,
+                )
+                const fallbackChrono = {
+                    tick: nextTick,
+                    category: 'CHRONO_MILESTONE' as const,
+                    severityBps: 3000,
+                    triggerReason: `Drought recovery quiet stretch ${String(ticksSince)}t at ${nextClock.clockTimeHms}`,
+                    actorsInvolved: Object.freeze(
+                        nextEntities.map((e) => e.id),
+                    ) as readonly string[],
+                    locationId: 'loc_culvert',
+                    stateDeltaSummary: `dry spell ${String(ticksSince)} ticks recovered`,
+                }
+                const picked =
+                    (breakerPick as unknown as typeof fallbackChrono | null) ??
+                    fallbackChrono
+                const gate = evaluatePacingTensionGate(
+                    picked as never,
+                    pacingBaseState,
+                    pacingPolicy,
+                    nextClock,
+                    96,
+                )
+                sequence += 1
+                const snapshot = {
+                    isoDate: nextClock.isoDate,
+                    clockTimeHm: nextClock.clockTimeHm,
+                    clockTimeHms: nextClock.clockTimeHms,
+                    timecodeSmpte: nextClock.timecodeSmpte,
+                    daypart: nextClock.daypart,
+                }
+                significantEvents.push(
+                    Object.freeze({
+                        eventSequence: sequence,
+                        tick: nextTick,
+                        clockSnapshot: snapshot,
+                        category: (picked as unknown as { category: never })
+                            .category,
+                        severityBps: (
+                            picked as unknown as { severityBps: number }
+                        ).severityBps,
+                        triggerReason: (
+                            picked as unknown as { triggerReason: string }
+                        ).triggerReason,
+                        actorsInvolved: ((
+                            picked as unknown as {
+                                actorsInvolved?: readonly string[]
+                            }
+                        ).actorsInvolved ?? []) as readonly string[],
+                        locationId:
+                            (picked as unknown as { locationId?: string })
+                                .locationId ?? 'loc_culvert',
+                        stateDeltaSummary: (
+                            picked as unknown as { stateDeltaSummary?: string }
+                        ).stateDeltaSummary,
+                        causalHash: autoFnvHex(
+                            `${masterSeed}:${nextTick}:${(picked as unknown as { category: string }).category}:${String((picked as unknown as { severityBps: number }).severityBps)}:${sequence}:drought`,
+                        ),
+                        actStage: gate.actStage,
+                        actMultiplierBps: gate.actMultiplierBps,
+                        diurnalWeightBps: gate.diurnalWeightBps,
+                        droughtBoostBps: gate.droughtBoostBps,
+                        droughtBreaker: true,
+                        ticksSinceLastScene: ticksSince,
+                    } as never),
+                )
+                droughtBreakersCount += 1
+                lastActStage = gate.actStage
+                lastDroughtBoost = gate.droughtBoostBps
+                nextCooldowns[
+                    (picked as unknown as { category: string }).category
+                ] = nextTick
+            }
         }
     }
 
@@ -2530,6 +2650,10 @@ export const stepAutonomousSimulationTick = (
         droughtBreakersTriggered:
             prevDroughtTriggered +
             (droughtBreakersCount - (stateInput.droughtBreakersCount ?? 0)),
+        scheduledBeats: Object.freeze([...scheduledBeats]),
+        consumedAgendaKeys: Object.freeze([...nextConsumedAgendaKeys]),
+        droughtBreakersHeldByReserve,
+        triggeredAgendaBeats: Object.freeze([...nextTriggeredAgendaBeats]),
     })
 
     return Object.freeze({
@@ -2691,4 +2815,193 @@ const sanitizePacingBudgetPolicy = (
             fallback.diurnal_weights_bps,
         ),
     })
+}
+
+const AGENDA_CATEGORIES: readonly AgendaBeatCategory[] = Object.freeze([
+    'PARANOIA_TRIGGERED',
+    'GRIEVANCE_BREACH',
+    'SOMATIC_TRAUMA',
+    'INVENTORY_TRANSFER',
+    'EPISTEMIC_REVEAL',
+    'CHRONO_MILESTONE',
+])
+
+function isAgendaCategory(value: unknown): value is AgendaBeatCategory {
+    return (
+        typeof value === 'string' &&
+        (AGENDA_CATEGORIES as readonly string[]).includes(value)
+    )
+}
+
+function isValidAgendaDate(value: unknown): value is string {
+    if (typeof value !== 'string') return false
+    if (/^(\d{4})-(\d{2})-(\d{2})$/.test(value) === false) return false
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+    if (
+        match == null ||
+        match[1] == null ||
+        match[2] == null ||
+        match[3] == null
+    )
+        return false
+    const year = Number(match[1])
+    const month = Number(match[2])
+    const day = Number(match[3])
+    if (
+        !Number.isInteger(year) ||
+        !Number.isInteger(month) ||
+        !Number.isInteger(day)
+    )
+        return false
+    if (month < 1 || month > 12) return false
+    const dim =
+        month === 2
+            ? year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
+                ? 29
+                : 28
+            : month === 4 || month === 6 || month === 9 || month === 11
+              ? 30
+              : 31
+    return day >= 1 && day <= dim
+}
+
+function isValidAgendaTimeHm(value: unknown): value is string {
+    if (typeof value !== 'string') return false
+    const match = /^(\d{2}):(\d{2})$/.exec(value)
+    if (match == null || match[1] == null || match[2] == null) return false
+    const hour = Number(match[1])
+    const minute = Number(match[2])
+    if (!Number.isInteger(hour) || !Number.isInteger(minute)) return false
+    return hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59
+}
+
+function sanitizeAgendaBeat(raw: unknown): ScheduledStoryBeat | null {
+    if (raw == null || typeof raw !== 'object') return null
+    const rec = raw as Record<string, unknown>
+    const beatIdRaw =
+        rec['beat_id'] ?? rec['beatId'] ?? rec['id'] ?? rec['agendaBeatId']
+    const titleRaw = rec['title'] ?? rec['agendaTitle'] ?? rec['name']
+    const isoDateRaw =
+        rec['isoDate'] ??
+        rec['scheduledIsoDate'] ??
+        rec['date'] ??
+        rec['scheduled_iso_date']
+    const timeRaw =
+        rec['startTimeHm'] ??
+        rec['scheduledTimeHm'] ??
+        rec['timeHm'] ??
+        rec['time'] ??
+        rec['scheduled_time_hm']
+    const categoryRaw =
+        rec['beatCategory'] ?? rec['category'] ?? rec['agendaCategory']
+    const priorityRaw =
+        rec['priorityBps'] ?? rec['severityBps'] ?? rec['priority_bps']
+    const reserveRaw =
+        rec['reserveCooldownTicks'] ??
+        rec['reserve_cooldown_ticks'] ??
+        rec['reserveCooldown'] ??
+        rec['reserve_ticks']
+    const toleranceRaw =
+        rec['toleranceTicks'] ?? rec['tolerance_ticks'] ?? rec['tolerance']
+    const recurringRaw =
+        rec['recurringDaily'] ?? rec['recurring_daily'] ?? rec['recurring']
+    if (typeof beatIdRaw !== 'string' || beatIdRaw.trim().length === 0)
+        return null
+    if (typeof titleRaw !== 'string' || titleRaw.trim().length === 0)
+        return null
+    if (!isValidAgendaDate(isoDateRaw)) return null
+    if (!isValidAgendaTimeHm(timeRaw)) return null
+    if (!isAgendaCategory(categoryRaw)) return null
+    if (
+        !Number.isInteger(priorityRaw) ||
+        (priorityRaw as number) < 0 ||
+        (priorityRaw as number) > 10000
+    )
+        return null
+    if (
+        !Number.isInteger(reserveRaw) ||
+        (reserveRaw as number) < 0 ||
+        (reserveRaw as number) > 10000
+    )
+        return null
+    let tolerance = 0
+    if (toleranceRaw !== undefined) {
+        if (
+            !Number.isInteger(toleranceRaw) ||
+            (toleranceRaw as number) < 0 ||
+            (toleranceRaw as number) > 10000
+        )
+            return null
+        tolerance = toleranceRaw as number
+    }
+    const recurring = recurringRaw === true
+    const beat: ScheduledStoryBeat = Object.freeze({
+        beat_id: beatIdRaw.trim(),
+        title: (titleRaw as string).trim(),
+        isoDate: isoDateRaw as string,
+        startTimeHm: timeRaw as string,
+        beatCategory: categoryRaw as AgendaBeatCategory,
+        priorityBps: priorityRaw as number,
+        reserveCooldownTicks: reserveRaw as number,
+        toleranceTicks: tolerance,
+        recurringDaily: recurring,
+    })
+    return beat
+}
+
+function collectRawAgendaList(root: Record<string, unknown>): unknown[] {
+    const out: unknown[] = []
+    const pushList = (value: unknown): void => {
+        if (Array.isArray(value)) {
+            for (const entry of value) out.push(entry)
+        }
+    }
+    const chronology = root['chronology']
+    if (chronology != null && typeof chronology === 'object') {
+        const chrono = chronology as Record<string, unknown>
+        pushList(chrono['scheduled_beats'])
+        pushList(chrono['scheduledBeats'])
+        pushList(chrono['agenda'])
+    }
+    pushList(root['scheduled_beats'])
+    pushList(root['scheduledBeats'])
+    pushList(root['agenda_beats'])
+    const bundle = root['auto_script_bundle']
+    if (bundle != null && typeof bundle === 'object') {
+        const bundleRec = bundle as Record<string, unknown>
+        pushList(bundleRec['scheduled_beats'])
+        pushList(bundleRec['scheduledBeats'])
+        const config = bundleRec['config']
+        if (config != null && typeof config === 'object') {
+            pushList((config as Record<string, unknown>)['scheduled_beats'])
+            pushList((config as Record<string, unknown>)['scheduledBeats'])
+        }
+    }
+    return out
+}
+
+export const extractScheduledBeatsFromBible = (
+    bibleState: unknown,
+): readonly ScheduledStoryBeat[] => {
+    try {
+        if (bibleState == null || typeof bibleState !== 'object') {
+            return Object.freeze([])
+        }
+        const root = bibleState as Record<string, unknown>
+        const rawList = collectRawAgendaList(root)
+        const beats: ScheduledStoryBeat[] = []
+        for (const raw of rawList) {
+            const beat = sanitizeAgendaBeat(raw)
+            if (beat != null) beats.push(beat)
+        }
+        beats.sort((a, b) => {
+            if (a.isoDate !== b.isoDate) return a.isoDate < b.isoDate ? -1 : 1
+            if (a.startTimeHm !== b.startTimeHm)
+                return a.startTimeHm < b.startTimeHm ? -1 : 1
+            return a.beat_id < b.beat_id ? -1 : a.beat_id > b.beat_id ? 1 : 0
+        })
+        return Object.freeze([...beats])
+    } catch {
+        return Object.freeze([])
+    }
 }

@@ -674,6 +674,10 @@ export const evaluatePacingTensionGate = (
     policy: PacingBudgetPolicy = DEFAULT_PACING_BUDGET_POLICY,
     clockState?: SimulationClockState,
     totalTicks = 96,
+    agendaContext?: {
+        readonly activeReserveLocks?: readonly unknown[]
+        readonly isDroughtBreakerCandidate?: boolean
+    },
 ): PacingGateDecision => {
     if (!Number.isInteger(candidate.tick) || candidate.tick < 0) {
         throw new RangeError(
@@ -749,6 +753,13 @@ export const evaluatePacingTensionGate = (
         inCooldown &&
         !criticalOverrideApplied &&
         policy.enabled
+    const reserveLockCount = agendaContext?.activeReserveLocks?.length ?? 0
+    const isDroughtCandidate = agendaContext?.isDroughtBreakerCandidate === true
+    const suppressedByAgendaReserve =
+        policy.enabled &&
+        reserveLockCount > 0 &&
+        isDroughtCandidate &&
+        !criticalOverrideApplied
     let droughtBoostBps = 0
     if (policy.enabled && safeTicksSince >= policy.max_dry_spell_ticks) {
         const over = safeTicksSince - policy.max_dry_spell_ticks + 1
@@ -760,9 +771,11 @@ export const evaluatePacingTensionGate = (
             10000n,
     )
     const effectiveScoreBps = scaled + droughtBoostBps
-    const significant = !suppressedByCooldown
+    const suppressed = suppressedByCooldown || suppressedByAgendaReserve
+    const significant = !suppressed
     return Object.freeze({
         suppressedByCooldown,
+        suppressedByAgendaReserve,
         criticalOverrideApplied,
         actStage,
         actMultiplierBps,
@@ -774,9 +787,11 @@ export const evaluatePacingTensionGate = (
         ticksSinceLastScene: safeTicksSince,
         droughtBreaker: false,
         significant,
-        reason: suppressedByCooldown
-            ? `COOLDOWN_SUPPRESSED:${String(safeTicksSince)}t`
-            : `PACING_PASS:${actStage}:${String(effectiveScoreBps)}`,
+        reason: suppressedByAgendaReserve
+            ? `SUPPRESSED_BY_AGENDA_RESERVE:${String(safeTicksSince)}t`
+            : suppressedByCooldown
+              ? `COOLDOWN_SUPPRESSED:${String(safeTicksSince)}t`
+              : `PACING_PASS:${actStage}:${String(effectiveScoreBps)}`,
     })
 }
 

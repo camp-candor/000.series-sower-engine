@@ -1519,6 +1519,77 @@ function isValidAutoTime(value: string): boolean {
     return hh >= 0 && hh <= 23 && mm >= 0 && mm <= 59 && ss >= 0 && ss <= 59
 }
 
+function isValidAgendaDateStrict(value: unknown): boolean {
+    if (typeof value !== 'string') return false
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+    if (m == null || m[1] == null || m[2] == null || m[3] == null) return false
+    const year = Number(m[1])
+    const month = Number(m[2])
+    const day = Number(m[3])
+    if (
+        !Number.isInteger(year) ||
+        !Number.isInteger(month) ||
+        !Number.isInteger(day)
+    )
+        return false
+    if (month < 1 || month > 12) return false
+    const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
+    const dim =
+        month === 2
+            ? leap
+                ? 29
+                : 28
+            : month === 4 || month === 6 || month === 9 || month === 11
+              ? 30
+              : 31
+    return day >= 1 && day <= dim
+}
+
+function isValidAgendaTimeHmStrict(value: unknown): boolean {
+    if (typeof value !== 'string') return false
+    const m = /^(\d{2}):(\d{2})$/.exec(value)
+    if (m == null || m[1] == null || m[2] == null) return false
+    const hh = Number(m[1])
+    const mm = Number(m[2])
+    if (!Number.isInteger(hh) || !Number.isInteger(mm)) return false
+    return hh >= 0 && hh <= 23 && mm >= 0 && mm <= 59
+}
+
+function agendaDaysFromCivilLocal(y: number, m: number, d: number): number {
+    const yAdj = m <= 2 ? y - 1 : y
+    const era = Math.floor((yAdj >= 0 ? yAdj : yAdj - 399) / 400)
+    const yoe = yAdj - era * 400
+    const mp = Math.floor((m + 9) % 12)
+    const doy = Math.floor((153 * mp + 2) / 5) + d - 1
+    const doe = yoe * 365 + Math.floor(yoe / 4) - Math.floor(yoe / 100) + doy
+    return era * 146097 + doe - 719468
+}
+
+function agendaEpochLocal(isoDate: string, timeHm: string): number | null {
+    try {
+        const dm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate)
+        const tm = /^(\d{2}):(\d{2})$/.exec(timeHm)
+        if (dm == null || tm == null) return null
+        const y = Number(dm[1])
+        const mo = Number(dm[2])
+        const d = Number(dm[3])
+        const h = Number(tm[1])
+        const mi = Number(tm[2])
+        return agendaDaysFromCivilLocal(y, mo, d) * 86400 + h * 3600 + mi * 60
+    } catch {
+        return null
+    }
+}
+
+const AGENDA_VALID_CATEGORIES: readonly string[] = Object.freeze([
+    'PARANOIA_TRIGGERED',
+    'GRIEVANCE_BREACH',
+    'SOMATIC_TRAUMA',
+    'INVENTORY_TRANSFER',
+    'EPISTEMIC_REVEAL',
+    'CHRONO_MILESTONE',
+])
+
 export const openAutoScriptCockpitMenu = async (
     cpy: MenuModel,
     bal?: MenuBit,
@@ -1533,6 +1604,269 @@ export const openAutoScriptCockpitMenu = async (
         (typeof global !== 'undefined'
             ? (global as unknown as { LIBRARY?: { hunt?: Function } }).LIBRARY
             : undefined)
+
+    const runAgendaInspect = async (): Promise<boolean> => {
+        const datRec = dat as Record<string, unknown>
+        const startDate = String(datRec['startDate'] ?? '2026-10-31')
+        const startTimeRaw = String(datRec['startTime'] ?? '21:00:00')
+        const startHm = startTimeRaw.slice(0, 5)
+        const tickSecondsRaw = Number(datRec['tickSeconds'] ?? 900)
+        const tickSeconds =
+            Number.isInteger(tickSecondsRaw) && tickSecondsRaw > 0
+                ? tickSecondsRaw
+                : 900
+        const startEpoch = agendaEpochLocal(startDate, startHm)
+        if (startEpoch == null) {
+            await emitConsole(
+                ste,
+                `:: [AGENDA:ERR] Invalid start date/time: ${startDate} ${startTimeRaw}`,
+            )
+            return false
+        }
+        const { extractScheduledBeatsFromBible } = await import(
+            '../../00.engine.unit/buz/engine.buzz.js'
+        )
+        let bibleBeats: readonly {
+            readonly beat_id: string
+            readonly title: string
+            readonly isoDate: string
+            readonly startTimeHm: string
+            readonly beatCategory: string
+            readonly priorityBps: number
+            readonly reserveCooldownTicks: number
+            readonly toleranceTicks?: number
+            readonly recurringDaily?: boolean
+        }[] = []
+        try {
+            const bibleState = datRec['bibleState']
+            if (bibleState != null && typeof bibleState === 'object') {
+                bibleBeats = extractScheduledBeatsFromBible(bibleState) as never
+            }
+            const direct = datRec['scheduledBeats']
+            if (Array.isArray(direct) && direct.length > 0) {
+                const extra = extractScheduledBeatsFromBible({
+                    chronology: { scheduled_beats: direct },
+                }) as never
+                bibleBeats = [
+                    ...(bibleBeats as never[]),
+                    ...(extra as never[]),
+                ] as never
+            }
+        } catch {
+            bibleBeats = []
+        }
+        const sessionBeats =
+            ((cpy as unknown as { agendaOverrides?: unknown })
+                .agendaOverrides as readonly unknown[] | undefined) ?? []
+        const combined = [...(bibleBeats as unknown[]), ...sessionBeats]
+        let deduped: typeof bibleBeats = []
+        try {
+            const { extractScheduledBeatsFromBible: extractAgain } =
+                await import('../../00.engine.unit/buz/engine.buzz.js')
+            deduped = extractAgain({
+                chronology: { scheduled_beats: combined },
+            }) as never
+        } catch {
+            deduped = bibleBeats
+        }
+        if (deduped.length === 0) {
+            await emitConsole(
+                ste,
+                `>> [AGENDA:EMPTY] No scheduled appointments loaded.`,
+            )
+            return true
+        }
+        const rows: Array<{
+            beatId: string
+            isoDate: string
+            timeHm: string
+            targetTick: number
+            reserveStart: number
+            category: string
+        }> = []
+        for (const beat of deduped as unknown as Array<
+            Record<string, unknown>
+        >) {
+            const beatId = String(beat['beat_id'] ?? 'unknown')
+            const isoDate = String(beat['isoDate'] ?? '')
+            const timeHm = String(beat['startTimeHm'] ?? '')
+            const category = String(beat['beatCategory'] ?? 'UNKNOWN')
+            const reserve = Number(beat['reserveCooldownTicks'] ?? 0)
+            const targetEpoch = agendaEpochLocal(isoDate, timeHm)
+            if (targetEpoch == null) continue
+            const targetTick = Math.max(
+                0,
+                Math.ceil((targetEpoch - startEpoch) / tickSeconds),
+            )
+            const reserveStart = Math.max(
+                0,
+                targetTick - (Number.isInteger(reserve) ? reserve : 0),
+            )
+            rows.push({
+                beatId,
+                isoDate,
+                timeHm,
+                targetTick,
+                reserveStart,
+                category,
+            })
+        }
+        rows.sort((a, b) => {
+            if (a.targetTick !== b.targetTick)
+                return a.targetTick - b.targetTick
+            return a.beatId < b.beatId ? -1 : a.beatId > b.beatId ? 1 : 0
+        })
+        for (const row of rows) {
+            await emitConsole(
+                ste,
+                `>> [AGENDA:SLOT] ${row.beatId} | ${row.isoDate} ${row.timeHm} | T+${row.targetTick} (RES:${row.reserveStart}..${row.targetTick}) | ${row.category}`,
+            )
+        }
+        if (
+            ste != null &&
+            typeof (ste as unknown as { hunt?: unknown }).hunt === 'function'
+        ) {
+            try {
+                await (
+                    ste as unknown as {
+                        hunt: (t: string, b: unknown) => Promise<unknown>
+                    }
+                ).hunt(
+                    (ActMnu as unknown as { MANAGE_ENGINE_AGENDA?: string })
+                        .MANAGE_ENGINE_AGENDA ??
+                        '[Menu action] Manage Engine Agenda',
+                    { dat: { inspected: rows.length } },
+                )
+            } catch {
+                // headless fallback ignores dispatch faults
+            }
+        }
+        return true
+    }
+
+    const runAgendaAdd = async (rawBeat: unknown): Promise<boolean> => {
+        if (rawBeat == null || typeof rawBeat !== 'object') {
+            await emitConsole(
+                ste,
+                `:: [AGENDA:ERR] Missing session appointment payload.`,
+            )
+            return false
+        }
+        const rec = rawBeat as Record<string, unknown>
+        const beatId = rec['beat_id'] ?? rec['beatId'] ?? rec['id']
+        const title = rec['title'] ?? rec['agendaTitle'] ?? rec['name']
+        const isoDate = rec['isoDate'] ?? rec['scheduledIsoDate'] ?? rec['date']
+        const timeHm =
+            rec['startTimeHm'] ??
+            rec['scheduledTimeHm'] ??
+            rec['timeHm'] ??
+            rec['time']
+        const category = rec['beatCategory'] ?? rec['category']
+        const priority = rec['priorityBps'] ?? rec['severityBps']
+        const reserve =
+            rec['reserveCooldownTicks'] ?? rec['reserve_cooldown_ticks']
+        const tolerance = rec['toleranceTicks'] ?? 0
+        const recurring = rec['recurringDaily'] ?? rec['recurring'] ?? false
+        if (typeof beatId !== 'string' || beatId.trim().length === 0) {
+            await emitConsole(
+                ste,
+                `:: [AGENDA:ERR] Invalid beat_id for session appointment.`,
+            )
+            return false
+        }
+        if (typeof title !== 'string' || title.trim().length === 0) {
+            await emitConsole(
+                ste,
+                `:: [AGENDA:ERR] Invalid title for session appointment.`,
+            )
+            return false
+        }
+        if (!isValidAgendaDateStrict(isoDate)) {
+            await emitConsole(
+                ste,
+                `:: [AGENDA:ERR] Invalid isoDate ${String(isoDate)} expected YYYY-MM-DD.`,
+            )
+            return false
+        }
+        if (!isValidAgendaTimeHmStrict(timeHm)) {
+            await emitConsole(
+                ste,
+                `:: [AGENDA:ERR] Invalid startTimeHm ${String(timeHm)} expected HH:MM.`,
+            )
+            return false
+        }
+        if (!AGENDA_VALID_CATEGORIES.includes(String(category))) {
+            await emitConsole(
+                ste,
+                `:: [AGENDA:ERR] Invalid beatCategory ${String(category)}.`,
+            )
+            return false
+        }
+        if (
+            !Number.isInteger(priority) ||
+            (priority as number) < 0 ||
+            (priority as number) > 10000
+        ) {
+            await emitConsole(
+                ste,
+                `:: [AGENDA:ERR] Invalid priorityBps ${String(priority)}.`,
+            )
+            return false
+        }
+        if (
+            !Number.isInteger(reserve) ||
+            (reserve as number) < 0 ||
+            (reserve as number) > 10000
+        ) {
+            await emitConsole(
+                ste,
+                `:: [AGENDA:ERR] Invalid reserveCooldownTicks ${String(reserve)}.`,
+            )
+            return false
+        }
+        if (tolerance !== undefined && tolerance !== 0) {
+            if (
+                !Number.isInteger(tolerance) ||
+                (tolerance as number) < 0 ||
+                (tolerance as number) > 10000
+            ) {
+                await emitConsole(
+                    ste,
+                    `:: [AGENDA:ERR] Invalid toleranceTicks ${String(tolerance)}.`,
+                )
+                return false
+            }
+        }
+        const clean = Object.freeze({
+            beat_id: (beatId as string).trim(),
+            title: (title as string).trim(),
+            isoDate: isoDate as string,
+            startTimeHm: timeHm as string,
+            beatCategory: category as string,
+            priorityBps: priority as number,
+            reserveCooldownTicks: reserve as number,
+            toleranceTicks: (tolerance as number) ?? 0,
+            recurringDaily: recurring === true,
+        })
+        const holder = cpy as unknown as {
+            agendaOverrides?: readonly unknown[]
+        }
+        const prev = holder.agendaOverrides ?? []
+        holder.agendaOverrides = Object.freeze([...prev, clean])
+        await emitConsole(
+            ste,
+            `>> [AGENDA:ADDED] ${(beatId as string).trim()} @ ${isoDate as string} ${timeHm as string}`,
+        )
+        return true
+    }
+
+    const runAgendaClear = async (): Promise<void> => {
+        const holder = cpy as unknown as {
+            agendaOverrides?: readonly unknown[]
+        }
+        holder.agendaOverrides = Object.freeze([])
+        await emitConsole(ste, `>> [AGENDA:CLEARED] Session overrides cleared.`)
+    }
 
     const runLaunch = async (
         overrides?: Record<string, unknown>,
@@ -1837,6 +2171,17 @@ export const openAutoScriptCockpitMenu = async (
             await runPacingAudit24h()
         } else if (programmatic === 'export') {
             await runExport()
+        } else if (
+            programmatic === 'manage-agenda' ||
+            programmatic === 'agenda-inspect' ||
+            programmatic === 'inspect-agenda' ||
+            programmatic === 'agenda'
+        ) {
+            await runAgendaInspect()
+        } else if (programmatic === 'agenda-add') {
+            await runAgendaAdd((dat as Record<string, unknown>)['addBeat'])
+        } else if (programmatic === 'agenda-clear') {
+            await runAgendaClear()
         } else if (programmatic === 'bad-date') {
             await emitConsole(
                 ste,
@@ -1895,6 +2240,7 @@ export const openAutoScriptCockpitMenu = async (
         '[4] EXPORT STACKED SCRIPTS TO CONDUCTOR',
         '[5] CONFIGURE THREE-ACT PACING COOLDOWN',
         '[6] RUN 24H PACING DISTRIBUTION AUDIT',
+        '[7] INSPECT SCHEDULED CHRONO APPOINTMENTS',
         '[<] RETURN TO ENGINE MENU',
     ]
     let gridChoice: unknown = null
@@ -2006,6 +2352,59 @@ export const openAutoScriptCockpitMenu = async (
         }
     } else if (picked.startsWith('[6]')) {
         await runPacingAudit24h()
+    } else if (picked.startsWith('[7]')) {
+        await runAgendaInspect()
+        const headlessAdd = (dat as Record<string, unknown>)['addBeat']
+        if (headlessAdd != null) {
+            await runAgendaAdd(headlessAdd)
+        }
+        try {
+            const agendaGrid: unknown = await hunt(UPDATE_GRID, {
+                x: 0,
+                y: 4,
+                xSpan: 4,
+                ySpan: 8,
+            })
+            const agendaChoice = (await hunt(OPEN_CHOICE, {
+                dat: { clr0: 'black', clr1: 'green' },
+                src: Align.VERTICAL,
+                lst: [
+                    '[1] ADD SESSION APPOINTMENT',
+                    '[2] CLEAR SESSION OVERRIDES',
+                    '[<] BACK',
+                ],
+                net: (agendaGrid as { grdBit?: { dat?: unknown } } | null)
+                    ?.grdBit?.dat,
+            })) as { chcBit?: { src?: string } }
+            const agendaPicked = agendaChoice?.chcBit?.src ?? ''
+            if (agendaPicked.startsWith('[1]')) {
+                try {
+                    const inputGrid: unknown = await hunt(UPDATE_GRID, {
+                        x: 0,
+                        y: 4,
+                        xSpan: 4,
+                        ySpan: 8,
+                    })
+                    await hunt(OPEN_INPUT, {
+                        dat: { prompt: 'Agenda Beat JSON' },
+                        net: (
+                            inputGrid as {
+                                grdBit?: { dat?: unknown }
+                            } | null
+                        )?.grdBit?.dat,
+                    })
+                } catch {
+                    // input modal optional in headless harnesses
+                }
+                if (headlessAdd != null) {
+                    await runAgendaAdd(headlessAdd)
+                }
+            } else if (agendaPicked.startsWith('[2]')) {
+                await runAgendaClear()
+            }
+        } catch {
+            // agenda submenu optional in headless harnesses
+        }
     }
 
     cpy.activeSelection = picked

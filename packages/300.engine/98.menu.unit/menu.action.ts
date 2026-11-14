@@ -268,6 +268,12 @@ export class ConfigureEnginePacingBudget implements Action {
     constructor(public bale?: MenuBit) {}
 }
 
+export const MANAGE_ENGINE_AGENDA = '[Menu action] Manage Engine Agenda'
+export class ManageEngineAgenda implements Action {
+    readonly type = MANAGE_ENGINE_AGENDA
+    constructor(public bale?: MenuBit) {}
+}
+
 export type Actions =
     | InitMenu
     | UpdateMenu
@@ -308,3 +314,4 @@ export type Actions =
     | ExportToConductor
     | RunAutoScriptSimulation
     | ConfigureEnginePacingBudget
+    | ManageEngineAgenda

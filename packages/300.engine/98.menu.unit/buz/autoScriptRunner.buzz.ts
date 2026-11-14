@@ -2,9 +2,11 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
 import { normalizeLoreChronology } from '../../17.tick.unit/fce/tick.interface.js'
+import type { ScheduledStoryBeat } from '../../17.tick.unit/fce/tick.interface.js'
 import {
     createInitialAutonomousSimState,
     stepAutonomousSimulationTick,
+    extractScheduledBeatsFromBible,
 } from '../../00.engine.unit/buz/engine.buzz.js'
 import { synthesizeEventFountainScreenplay } from '../../21.compile.unit/buz/eventFountainSynth.buzz.js'
 
@@ -26,6 +28,7 @@ export interface AutoScriptRunParams {
     readonly actIMultiplierBps?: number
     readonly actIIMultiplierBps?: number
     readonly actIIIMultiplierBps?: number
+    readonly scheduledBeats?: readonly ScheduledStoryBeat[]
 }
 
 export interface AutoScriptStackEntry {
@@ -275,6 +278,28 @@ export const runUnattendedAutoScriptSimulation = async (
         pacingOverrides['act_iii_multiplier_bps'] = params.actIIIMultiplierBps
     }
     let simState = createInitialAutonomousSimState(masterSeed, clock)
+    const scheduledFromParams = Array.isArray(params.scheduledBeats)
+        ? (params.scheduledBeats as readonly ScheduledStoryBeat[])
+        : undefined
+    let scheduledBeats: readonly ScheduledStoryBeat[] = Object.freeze([])
+    try {
+        if (scheduledFromParams !== undefined) {
+            scheduledBeats = Object.freeze([...scheduledFromParams])
+        } else {
+            scheduledBeats = extractScheduledBeatsFromBible(bibleState)
+        }
+    } catch {
+        scheduledBeats = Object.freeze([])
+    }
+    if (scheduledBeats.length > 0) {
+        simState = Object.freeze({
+            ...simState,
+            scheduledBeats,
+            consumedAgendaKeys: Object.freeze([]),
+            droughtBreakersHeldByReserve: 0,
+            triggeredAgendaBeats: Object.freeze([]),
+        })
+    }
     if (Object.keys(pacingOverrides).length > 0) {
         const basePolicy = simState.pacingPolicy
         if (basePolicy != null) {
@@ -295,6 +320,7 @@ export const runUnattendedAutoScriptSimulation = async (
     const sceneSpacingTicks: number[] = []
     let prevAct: string | null = null
     let prevCooldownSuppressions = 0
+    let prevReserveHeld = 0
     for (let tick = 1; tick <= totalTicks; tick += 1) {
         const receipt = stepAutonomousSimulationTick(simState)
         simState = receipt.nextState
@@ -308,6 +334,24 @@ export const runUnattendedAutoScriptSimulation = async (
             ste,
             `>> [AUTO:TICK] tick=${tick} events=${receipt.significantEvents.length}`,
         )
+        const currentReserveHeld = simState.droughtBreakersHeldByReserve ?? 0
+        if (currentReserveHeld > prevReserveHeld) {
+            const pendingId =
+                scheduledBeats.find(
+                    (b) =>
+                        !(simState.consumedAgendaKeys ?? []).includes(
+                            `${b.beat_id}@${nextClock.isoDate}`,
+                        ) &&
+                        !(simState.consumedAgendaKeys ?? []).includes(
+                            `${b.beat_id}@${b.isoDate}`,
+                        ),
+                )?.beat_id ?? 'agenda_beat'
+            await emitCns00(
+                ste,
+                `>> [AGENDA:RESERVE] Holding drought filler (${currentReserveHeld - prevReserveHeld}t to ${pendingId})`,
+            )
+        }
+        prevReserveHeld = currentReserveHeld
         const currentSuppressions = simState.cooldownSuppressions ?? 0
         if (currentSuppressions > prevCooldownSuppressions) {
             await emitCns00(
@@ -361,6 +405,15 @@ export const runUnattendedAutoScriptSimulation = async (
             }
             const prevClock = tick > 1 ? receipt.nextState.clock : clock
             void prevClock
+            const agendaEvt = evt as unknown as {
+                agendaScheduled?: boolean
+                agendaBeatId?: string
+                agendaTitle?: string
+                scheduledIsoDate?: string
+                scheduledTimeHm?: string
+                scheduledTimestamp?: string
+                reserveHeldTicks?: number
+            }
             const screenplay = synthesizeEventFountainScreenplay({
                 seriesSlug: slug,
                 displayName: slug,
@@ -376,6 +429,13 @@ export const runUnattendedAutoScriptSimulation = async (
                     locationId: evt.locationId,
                     stateDeltaSummary: evt.stateDeltaSummary,
                     causalHash: evt.causalHash,
+                    agendaScheduled: agendaEvt.agendaScheduled,
+                    agendaBeatId: agendaEvt.agendaBeatId,
+                    agendaTitle: agendaEvt.agendaTitle,
+                    scheduledIsoDate: agendaEvt.scheduledIsoDate,
+                    scheduledTimeHm: agendaEvt.scheduledTimeHm,
+                    scheduledTimestamp: agendaEvt.scheduledTimestamp,
+                    reserveHeldTicks: agendaEvt.reserveHeldTicks,
                 },
                 pacing: {
                     actStage: evtAct,
@@ -419,6 +479,13 @@ export const runUnattendedAutoScriptSimulation = async (
                 diurnalWeightBps?: number
                 droughtBreaker?: boolean
                 ticksSinceLastScene?: number
+                agendaScheduled?: boolean
+                agendaBeatId?: string
+                agendaTitle?: string
+                scheduledIsoDate?: string
+                scheduledTimeHm?: string
+                scheduledTimestamp?: string
+                reserveHeldTicks?: number
             }
             const astPayload = {
                 seriesSlug: slug,
@@ -434,6 +501,19 @@ export const runUnattendedAutoScriptSimulation = async (
                     isoDate: evt.clockSnapshot.isoDate,
                     clockTimeHm: evt.clockSnapshot.clockTimeHm,
                     daypart: evt.clockSnapshot.daypart,
+                    agenda:
+                        pacedAst.agendaScheduled === true
+                            ? {
+                                  agendaBeatId: pacedAst.agendaBeatId,
+                                  agendaTitle: pacedAst.agendaTitle,
+                                  scheduledIsoDate: pacedAst.scheduledIsoDate,
+                                  scheduledTimeHm: pacedAst.scheduledTimeHm,
+                                  scheduledTimestamp:
+                                      pacedAst.scheduledTimestamp,
+                                  reserveHeldTicks:
+                                      pacedAst.reserveHeldTicks ?? 0,
+                              }
+                            : undefined,
                     pacing: {
                         actStage: pacedAst.actStage ?? 'ACT_I',
                         actMultiplierBps: pacedAst.actMultiplierBps ?? 10000,
@@ -465,6 +545,12 @@ export const runUnattendedAutoScriptSimulation = async (
                 ste,
                 `>> [AUTO:STACKED] #${pad4(evt.eventSequence)} -> ${fountainFile} (${normalizedFountain.length} bytes)`,
             )
+            if (agendaEvt.agendaScheduled === true) {
+                await emitCns00(
+                    ste,
+                    `>> [AGENDA:TRIGGERED] ${agendaEvt.agendaBeatId ?? 'agenda_beat'} @ ${agendaEvt.scheduledIsoDate ?? evt.clockSnapshot.isoDate} ${agendaEvt.scheduledTimeHm ?? evt.clockSnapshot.clockTimeHm} -> ${fountainFile}`,
+                )
+            }
         }
         if (stacked >= maxScripts) break
     }
@@ -487,6 +573,20 @@ export const runUnattendedAutoScriptSimulation = async (
         droughtBreakersCount: simState.droughtBreakersCount ?? 0,
         sceneSpacingTicks: [...sceneSpacingTicks],
     }
+    const triggeredBeatIds: readonly string[] = Object.freeze([
+        ...((simState.triggeredAgendaBeats ?? []) as readonly string[]),
+    ])
+    const triggeredOccurrences: readonly string[] = Object.freeze([
+        ...((simState.consumedAgendaKeys ?? []) as readonly string[]),
+    ])
+    const agendaSummary = Object.freeze({
+        configuredCount: scheduledBeats.length,
+        triggeredCount: triggeredBeatIds.length,
+        triggeredBeatIds,
+        triggeredOccurrences,
+        droughtBreakersHeldByReserve:
+            simState.droughtBreakersHeldByReserve ?? 0,
+    })
     const indexPayload = {
         seriesSlug: slug,
         masterSeed,
@@ -497,6 +597,7 @@ export const runUnattendedAutoScriptSimulation = async (
         stackedCount: sorted.length,
         entries: sorted,
         pacingSummary,
+        agendaSummary,
     }
     const indexPath = path.join(outputDir, 'index.json')
     fs.writeFileSync(
@@ -612,6 +713,71 @@ export const verifyAutoScriptReplayDeterminism = async (
         mismatchedFiles,
         stackDigestSha256: secondManifest.stackDigestSha256,
     }
+}
+
+export interface ChronoAgendaReplayReceipt {
+    readonly deterministic: boolean
+    readonly fileCount: number
+    readonly mismatchedFiles: readonly string[]
+    readonly stackDigestSha256: string
+    readonly triggeredCount: number
+    readonly triggeredBeatIds: readonly string[]
+    readonly droughtBreakersHeldByReserve: number
+    readonly replayMismatches: number
+}
+
+export const verifyChronoAgendaReplayDeterminism = async (
+    params: AutoScriptRunParams,
+    ste?: unknown,
+): Promise<ChronoAgendaReplayReceipt> => {
+    const replay = await verifyAutoScriptReplayDeterminism(params, ste)
+    const outputDir = resolveOutputDir(params)
+    const indexPath = path.join(outputDir, 'index.json')
+    let triggeredCount = 0
+    let triggeredBeatIds: readonly string[] = Object.freeze([])
+    let droughtBreakersHeldByReserve = 0
+    try {
+        const raw = fs.readFileSync(indexPath, 'utf8')
+        const parsed = JSON.parse(raw) as {
+            agendaSummary?: {
+                configuredCount?: number
+                triggeredCount?: number
+                triggeredBeatIds?: string[]
+                droughtBreakersHeldByReserve?: number
+            }
+        }
+        const summary = parsed.agendaSummary
+        if (summary != null) {
+            triggeredCount = Number.isInteger(summary.triggeredCount)
+                ? (summary.triggeredCount as number)
+                : 0
+            triggeredBeatIds = Object.freeze([
+                ...(summary.triggeredBeatIds ?? []),
+            ])
+            droughtBreakersHeldByReserve = Number.isInteger(
+                summary.droughtBreakersHeldByReserve,
+            )
+                ? (summary.droughtBreakersHeldByReserve as number)
+                : 0
+        }
+    } catch {
+        // missing index treated as zero agenda activity
+    }
+    const replayMismatches = replay.mismatchedFiles.length
+    await emitCns00(
+        ste,
+        `>> [AGENDA:REPLAY] Triggered=${triggeredCount} ReserveHeld=${droughtBreakersHeldByReserve} Mismatches=${replayMismatches}`,
+    )
+    return Object.freeze({
+        deterministic: replay.deterministic,
+        fileCount: replay.fileCount,
+        mismatchedFiles: Object.freeze([...replay.mismatchedFiles]),
+        stackDigestSha256: replay.stackDigestSha256,
+        triggeredCount,
+        triggeredBeatIds,
+        droughtBreakersHeldByReserve,
+        replayMismatches,
+    })
 }
 
 export const exportAutoScriptBatchToConductor = async (
