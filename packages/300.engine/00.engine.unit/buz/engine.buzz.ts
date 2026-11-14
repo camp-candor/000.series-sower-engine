@@ -24,7 +24,9 @@ import { UPDATE_TICK } from '../../17.tick.unit/tick.action.js'
 import {
     toSimTime,
     type TickStatePayload,
+    type SimulationClockState,
 } from '../../17.tick.unit/fce/tick.interface.js'
+import { extractLoreChronology } from '../../17.tick.unit/tick.reduce.js'
 import { assertBasisPoint } from '../../20.arithmetic.unit/fce/arithmetic.interface.js'
 import { ArithmeticModel } from '../../20.arithmetic.unit/arithmetic.model.js'
 import {
@@ -382,23 +384,77 @@ let demoTickState: TickStatePayload = {
         },
     ],
     pending_actions: [],
+    clock: extractLoreChronology(null),
 }
+
+async function emitSimTimecode(
+    ste: State | undefined,
+    banner: string,
+): Promise<void> {
+    const lib =
+        (globalThis as any).LIBRARY ||
+        (typeof global !== 'undefined' ? (global as any).LIBRARY : undefined)
+    if (lib != null && typeof lib.hunt === 'function') {
+        try {
+            await lib.hunt('[Console action] Update Console', {
+                idx: 'cns00',
+                src: banner,
+            })
+        } catch {
+            // Headless fallback: never crash simulation on telemetry failure
+        }
+        return
+    }
+    if (ste != null && typeof (ste as any).hunt === 'function') {
+        try {
+            await (ste as any).hunt('[Console action] Update Console', {
+                idx: 'cns00',
+                src: banner,
+            })
+        } catch {
+            // Degrade gracefully in headless runs
+        }
+    }
+}
+
+export const formatTimecodeBanner = (
+    clock: SimulationClockState,
+    previousTick: number,
+    nextTick: number,
+): string =>
+    `>> [SIM:TIMECODE] ${clock.isoDate} ${clock.clockTimeHms} | TC ${clock.timecodeSmpte} | DAYPART: ${clock.daypart} | TICK ${previousTick} -> ${nextTick}`
 
 export const formatTickReceipt = (
     advanced: number,
     fromTick: number,
     toTick: number,
     elapsedMs: number,
+    clock?: SimulationClockState,
 ): string => {
     const safeMs = elapsedMs > 0 ? elapsedMs : 0.0001
     const ticksPerSec = Math.round(advanced / (safeMs / 1000))
     const unit = advanced === 1 ? 'tick' : 'ticks'
-    return `>> [TICK_OK] Advanced ${advanced} ${unit} in ${elapsedMs.toFixed(4)}ms (~${ticksPerSec} ticks/sec, tick ${fromTick} -> ${toTick})`
+    const base = `>> [TICK_OK] Advanced ${advanced} ${unit} in ${elapsedMs.toFixed(4)}ms (~${ticksPerSec} ticks/sec, tick ${fromTick} -> ${toTick})`
+    if (clock == null) return base
+    return `${base} | CLOCK ${clock.isoDate} ${clock.clockTimeHms} TC ${clock.timecodeSmpte} [${clock.daypart}]`
 }
 
 export const stepTick = (cpy: EngineModel, bal: EngineBit, ste?: State) => {
-    void ste
     const ticksToAdvance = Math.max(1, bal?.val || (bal?.dat as any)?.val || 1)
+    if (cpy.activeChronology == null) {
+        try {
+            cpy.activeChronology = extractLoreChronology(null)
+        } catch {
+            cpy.activeChronology =
+                demoTickState.clock ?? extractLoreChronology(null)
+        }
+    }
+    if (demoTickState.clock == null) {
+        demoTickState = {
+            ...(demoTickState as any),
+            clock: cpy.activeChronology,
+        } as TickStatePayload
+    }
     const fromTick: number = demoTickState.tick
     const start = process.hrtime.bigint()
     for (let i = 0; i < ticksToAdvance; i++) {
@@ -407,6 +463,13 @@ export const stepTick = (cpy: EngineModel, bal: EngineBit, ste?: State) => {
     const end = process.hrtime.bigint()
     const elapsedMs = Number(end - start) / 1_000_000
     const toTick: number = demoTickState.tick
+    const nextClock: SimulationClockState =
+        demoTickState.clock ??
+        cpy.activeChronology ??
+        extractLoreChronology(null)
+    cpy.activeChronology = nextClock
+    const banner = formatTimecodeBanner(nextClock, fromTick, toTick)
+    void emitSimTimecode(ste, banner)
     if (bal?.slv != null) {
         bal.slv({
             fenBit: {
@@ -423,6 +486,8 @@ export const stepTick = (cpy: EngineModel, bal: EngineBit, ste?: State) => {
                     fromTick,
                     toTick,
                     elapsedMs,
+                    chronology: nextClock,
+                    timecodeBanner: banner,
                 },
             },
         })
@@ -435,7 +500,15 @@ export const fastForwardTicks = (
     bal: EngineBit,
     ste?: State,
 ) => {
-    void ste
+    if (cpy.activeChronology == null) {
+        cpy.activeChronology = extractLoreChronology(null)
+    }
+    if (demoTickState.clock == null) {
+        demoTickState = {
+            ...(demoTickState as any),
+            clock: cpy.activeChronology,
+        } as TickStatePayload
+    }
     // JIT warm-up pass to eliminate initial cache skew and optimize loop
     let warm = demoTickState
     for (let i = 0; i < 5; i++) {
@@ -449,12 +522,27 @@ export const fastForwardTicks = (
     const end = process.hrtime.bigint()
     const elapsedMs = Number(end - start) / 1_000_000
     const toTick: number = demoTickState.tick
+    const nextClock: SimulationClockState =
+        demoTickState.clock ??
+        cpy.activeChronology ??
+        extractLoreChronology(null)
+    cpy.activeChronology = nextClock
+    const banner = formatTimecodeBanner(nextClock, fromTick, toTick)
+    void emitSimTimecode(ste, banner)
     if (bal.slv != null) {
         bal.slv({
             fenBit: {
                 idx: 'fast-forward-ticks-ok',
                 src: formatTickReceipt(100, fromTick, toTick, elapsedMs),
-                dat: { ok: true, advanced: 100, fromTick, toTick, elapsedMs },
+                dat: {
+                    ok: true,
+                    advanced: 100,
+                    fromTick,
+                    toTick,
+                    elapsedMs,
+                    chronology: nextClock,
+                    timecodeBanner: banner,
+                },
             },
         })
     }
@@ -1104,8 +1192,25 @@ export const bootEngine = async (
     const seriesSlug =
         bootParams?.seriesSlug || cpy.seriesSlug || 'wiregrass-basin'
     const bibleState = bootParams?.bibleState
+    const initialClock = extractLoreChronology(
+        (bibleState as Readonly<Record<string, any>> | undefined) ?? null,
+    )
+    cpy.activeChronology = initialClock
+    demoTickState = {
+        ...(demoTickState as any),
+        tick: toSimTime(0),
+        clock: initialClock,
+    } as TickStatePayload
+    const deterministicBootMs = Date.UTC(
+        initialClock.year,
+        initialClock.month - 1,
+        initialClock.day,
+        initialClock.hour,
+        initialClock.minute,
+        initialClock.second,
+    )
     const nowMs =
-        bal?.dat?.timestampMs || bootParams?.timestampMs || 1700000000000
+        bal?.dat?.timestampMs || bootParams?.timestampMs || deterministicBootMs
 
     if (bootParams?.seedGenesis && !bibleState) {
         throw new Error(
@@ -1309,7 +1414,13 @@ export const bootEngine = async (
         stateHash,
         durationMs: 1,
         timestampMs: nowMs,
+        chronology: cpy.activeChronology,
     }
+
+    await emitConsole(
+        ste,
+        `>> [SIM:BOOT_CLOCK] ${cpy.activeChronology.isoDate} ${cpy.activeChronology.clockTimeHms} (${cpy.activeChronology.daypart}) | CADENCE: ${cpy.activeChronology.tickSeconds}s @ ${cpy.activeChronology.framesPerSecond}fps`,
+    )
 
     if (bal?.slv) {
         bal.slv({
@@ -1325,6 +1436,12 @@ export const bootEngine = async (
                     status: cpy.status,
                     stateHash,
                     seriesSlug,
+                    chronology: cpy.activeChronology,
+                    timecodeBanner: formatTimecodeBanner(
+                        cpy.activeChronology,
+                        0,
+                        0,
+                    ),
                 },
             },
         })
@@ -1378,6 +1495,7 @@ export const statusEngine = async (
         tables: Object.freeze(tables),
         totalRows,
         timestampMs: nowMs,
+        chronology: cpy.activeChronology,
     }
     cpy.lastStatusReport = report
 

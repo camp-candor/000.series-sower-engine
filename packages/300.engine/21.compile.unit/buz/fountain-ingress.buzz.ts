@@ -181,3 +181,110 @@ export function validateFountainIngress(
         violations,
     }
 }
+
+export interface FountainChronologyHeader {
+    readonly date?: string
+    readonly startTimeHm?: string
+    readonly timecodeSmpte?: string
+    readonly daypart?: string
+    readonly timezoneLabel?: string
+    readonly eraLabel?: string
+}
+
+function isValidFountainDate(value: string): boolean {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+    if (m == null || m[1] == null || m[2] == null || m[3] == null) return false
+    const year = Number(m[1])
+    const month = Number(m[2])
+    const day = Number(m[3])
+    if (month < 1 || month > 12 || day < 1 || day > 31) return false
+    const isLeap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
+    const dim =
+        month === 2
+            ? isLeap
+                ? 29
+                : 28
+            : month === 4 || month === 6 || month === 9 || month === 11
+              ? 30
+              : 31
+    return day <= dim
+}
+
+function isValidFountainTimeHm(value: string): boolean {
+    const m = /^(\d{2}):(\d{2})$/.exec(value)
+    if (m == null || m[1] == null || m[2] == null) return false
+    const hh = Number(m[1])
+    const mm = Number(m[2])
+    return hh >= 0 && hh <= 23 && mm >= 0 && mm <= 59
+}
+
+function isValidFountainTimecode(value: string): boolean {
+    return /^\d{2}:\d{2}:\d{2}:\d{2}$/.test(value)
+}
+
+export const extractFountainChronologyHeaders = (
+    rawFountain: string,
+): FountainChronologyHeader => {
+    const lines = String(rawFountain).split('\n')
+    const header: Record<string, string> = {}
+    for (const line of lines) {
+        const trimmed = line.trim()
+        if (trimmed === '') break
+        if (/^(INT|EXT)\./.test(trimmed)) break
+        const sep = trimmed.indexOf(':')
+        if (sep <= 0) continue
+        const key = trimmed.slice(0, sep).trim()
+        const value = trimmed.slice(sep + 1).trim()
+        if (
+            key === 'Date' ||
+            key === 'Start-Time' ||
+            key === 'Timecode' ||
+            key === 'Daypart' ||
+            key === 'Timezone' ||
+            key === 'Era'
+        ) {
+            if (header[key] == null) header[key] = value
+        }
+    }
+    const out: FountainChronologyHeader = {}
+    if (header['Date'] != null) {
+        if (!isValidFountainDate(header['Date'] as string)) {
+            throw new Error(
+                `[INVALID_FOUNTAIN_HEADER_CHRONOLOGY] Malformed Date header: ${header['Date']}`,
+            )
+        }
+        ;(out as any).date = header['Date']
+    }
+    if (header['Start-Time'] != null) {
+        if (!isValidFountainTimeHm(header['Start-Time'] as string)) {
+            throw new Error(
+                `[INVALID_FOUNTAIN_HEADER_CHRONOLOGY] Malformed Start-Time header: ${header['Start-Time']}`,
+            )
+        }
+        ;(out as any).startTimeHm = header['Start-Time']
+    }
+    if (header['Timecode'] != null) {
+        if (!isValidFountainTimecode(header['Timecode'] as string)) {
+            throw new Error(
+                `[INVALID_FOUNTAIN_HEADER_CHRONOLOGY] Malformed Timecode header: ${header['Timecode']}`,
+            )
+        }
+        ;(out as any).timecodeSmpte = header['Timecode']
+    }
+    if (header['Daypart'] != null) {
+        const valid = ['DAWN', 'MORNING', 'AFTERNOON', 'DUSK', 'NIGHT']
+        if (!valid.includes(String(header['Daypart']).toUpperCase())) {
+            throw new Error(
+                `[INVALID_FOUNTAIN_HEADER_CHRONOLOGY] Malformed Daypart header: ${header['Daypart']}`,
+            )
+        }
+        ;(out as any).daypart = String(header['Daypart']).toUpperCase()
+    }
+    if (header['Timezone'] != null) {
+        ;(out as any).timezoneLabel = header['Timezone']
+    }
+    if (header['Era'] != null) {
+        ;(out as any).eraLabel = header['Era']
+    }
+    return out
+}

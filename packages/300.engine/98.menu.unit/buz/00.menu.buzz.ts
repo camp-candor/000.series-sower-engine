@@ -344,7 +344,8 @@ export const handleMenuSelection = async (
                 break
             }
 
-            case 'ADVANCE TICK': {
+            case 'ADVANCE TICK':
+            case 'STEP_TICK': {
                 await emitConsole(
                     ste,
                     '>> [TICK] Advancing logical clock (+1 tick) & executing decay sweep...',
@@ -358,6 +359,12 @@ export const handleMenuSelection = async (
                             ste,
                             `>> [TICK] ${tickRes.fenBit.src}`,
                         )
+                    }
+                    const banner =
+                        tickRes?.fenBit?.dat?.timecodeBanner ??
+                        tickRes?.engBit?.dat?.timecodeBanner
+                    if (typeof banner === 'string' && banner.length > 0) {
+                        await emitSimTimecodeToCns00(ste, banner)
                     }
                 }
                 await emitConsole(
@@ -485,7 +492,8 @@ export const handleMenuSelection = async (
                 break
             }
 
-            case 'RUN SIM GAUNTLET': {
+            case 'RUN SIM GAUNTLET':
+            case 'FAST_FORWARD_TICKS': {
                 await emitConsole(
                     ste,
                     '>> [GAUNTLET] Launching continuous simulation gauntlet (100 ticks)...',
@@ -500,6 +508,12 @@ export const handleMenuSelection = async (
                             ste,
                             `>> [GAUNTLET] ${gauntletRes.fenBit.src}`,
                         )
+                    }
+                    const banner =
+                        gauntletRes?.fenBit?.dat?.timecodeBanner ??
+                        gauntletRes?.engBit?.dat?.timecodeBanner
+                    if (typeof banner === 'string' && banner.length > 0) {
+                        await emitSimTimecodeToCns00(ste, banner)
                     }
                 }
                 await emitConsole(
@@ -1384,6 +1398,77 @@ export function loadAndFreezeUniverseManifest(
     }
 
     return deepFreezePayload(parsed)
+}
+
+export function loadBibleStateForSeries(
+    repoRoot: string,
+    seriesSlug: string,
+): Record<string, any> | undefined {
+    const candidates: string[] = [
+        path.join(repoRoot, 'compiled', seriesSlug, 'bible-state.json'),
+        path.join(repoRoot, 'data', 'canon', 'bible-state.json'),
+        path.resolve(
+            repoRoot,
+            '..',
+            '000.goblin-lore',
+            'packages',
+            '299.lore',
+            'compiled',
+            seriesSlug,
+            'bible-state.json',
+        ),
+        path.resolve(
+            repoRoot,
+            '..',
+            '000.goblin-lore',
+            'data',
+            'compiled',
+            seriesSlug,
+            'bible-state.json',
+        ),
+    ]
+    for (const candidate of candidates) {
+        try {
+            if (fs.existsSync(candidate)) {
+                const raw = fs.readFileSync(candidate, 'utf8')
+                return JSON.parse(raw) as Record<string, any>
+            }
+        } catch {
+            // Try next candidate fail-closed
+        }
+    }
+    return undefined
+}
+
+export async function emitSimTimecodeToCns00(
+    ste: State | undefined,
+    banner: string,
+): Promise<void> {
+    const clean = String(banner)
+    const lib =
+        (globalThis as any).LIBRARY ||
+        (typeof global !== 'undefined' ? (global as any).LIBRARY : undefined)
+    if (lib != null && typeof lib.hunt === 'function') {
+        try {
+            await lib.hunt('[Console action] Update Console', {
+                idx: 'cns00',
+                src: clean,
+            })
+            return
+        } catch {
+            // Fall through to ste.hunt
+        }
+    }
+    if (ste != null && typeof ste.hunt === 'function') {
+        try {
+            await ste.hunt('[Console action] Update Console', {
+                idx: 'cns00',
+                src: clean,
+            })
+        } catch {
+            // Degrade gracefully in headless runs
+        }
+    }
 }
 
 export function calculateSubmenuSpan(candidateCount: number): number {

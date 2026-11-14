@@ -18,6 +18,7 @@ export interface EngineStatusReport {
     readonly tables: readonly TableStatusReport[]
     readonly totalRows: number
     readonly timestampMs: number
+    readonly chronology?: SimulationClockState
 }
 
 export interface EngineAuditReceipt {
@@ -30,12 +31,15 @@ export interface EngineAuditReceipt {
     readonly error?: string
 }
 
+import type { SimulationClockState } from '../../17.tick.unit/fce/tick.interface.js'
+
 export interface EngineBootReceipt {
     readonly success: boolean
     readonly seriesSlug: string
     readonly stateHash: string
     readonly durationMs: number
     readonly timestampMs: number
+    readonly chronology?: SimulationClockState
     readonly error?: string
 }
 
@@ -58,4 +62,5 @@ export default interface Engine {
     lastStateHash: string
     lastAuditReceipt?: EngineAuditReceipt
     lastStatusReport?: EngineStatusReport
+    activeChronology?: SimulationClockState
 }

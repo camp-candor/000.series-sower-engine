@@ -7,6 +7,8 @@ import type {
     EngineAuditReceipt,
     EngineStatusReport,
 } from './fce/engine.interface.js'
+import type { SimulationClockState } from '../17.tick.unit/fce/tick.interface.js'
+import { normalizeLoreChronology } from '../17.tick.unit/fce/tick.interface.js'
 
 export class EngineModel implements Engine {
     idx: string = '00.engine'
@@ -19,6 +21,7 @@ export class EngineModel implements Engine {
     lastStateHash: string = '0'.repeat(64)
     lastAuditReceipt?: EngineAuditReceipt
     lastStatusReport?: EngineStatusReport
+    activeChronology?: SimulationClockState = normalizeLoreChronology(null)
 }
 
 export default EngineModel

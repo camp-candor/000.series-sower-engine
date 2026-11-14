@@ -15,4 +15,28 @@ export class UpdateTick implements Action {
     constructor(public bale: TickBit) {}
 }
 
-export type Actions = InitTick | UpdateTick
+export const SET_SIMULATION_CHRONOLOGY =
+    '[Tick action] Set Simulation Chronology'
+export class SetSimulationChronology implements Action {
+    readonly type = SET_SIMULATION_CHRONOLOGY
+    constructor(public bale: TickBit) {}
+}
+
+export const ADVANCE_SIMULATION_CLOCK = '[Tick action] Advance Simulation Clock'
+export class AdvanceSimulationClock implements Action {
+    readonly type = ADVANCE_SIMULATION_CLOCK
+    constructor(public bale: TickBit) {}
+}
+
+export const READ_SIMULATION_TIMECODE = '[Tick action] Read Simulation Timecode'
+export class ReadSimulationTimecode implements Action {
+    readonly type = READ_SIMULATION_TIMECODE
+    constructor(public bale: TickBit) {}
+}
+
+export type Actions =
+    | InitTick
+    | UpdateTick
+    | SetSimulationChronology
+    | AdvanceSimulationClock
+    | ReadSimulationTimecode
