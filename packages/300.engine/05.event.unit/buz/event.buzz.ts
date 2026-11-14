@@ -817,3 +817,25 @@ export const selectDeterministicDroughtBreaker = (
     void tick
     return best
 }
+
+export const canBeatFireUnderMaxOccurrences = (
+    beat: {
+        readonly beat_id: string
+        readonly recurrenceRule?: { readonly maxOccurrences?: number }
+    },
+    currentCount: number,
+): boolean => {
+    const max = beat.recurrenceRule?.maxOccurrences
+    if (max == null) return true
+    if (!Number.isInteger(max) || (max as number) < 1) return true
+    if (!Number.isInteger(currentCount) || currentCount < 0) return true
+    return currentCount < (max as number)
+}
+
+export const shouldTriggerRecurringBeatOccurrence = (
+    beat: {
+        readonly beat_id: string
+        readonly recurrenceRule?: { readonly maxOccurrences?: number }
+    },
+    currentCount: number,
+): boolean => canBeatFireUnderMaxOccurrences(beat, currentCount)

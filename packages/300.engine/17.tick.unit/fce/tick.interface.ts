@@ -287,6 +287,59 @@ export interface ScheduledStoryBeat {
     readonly reserveCooldownTicks: number
     readonly toleranceTicks?: number
     readonly recurringDaily?: boolean
+    readonly recurrenceRule?: EngineRecurrenceRule
+}
+
+export type WeekdayToken = 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN'
+
+export type LunarPhaseToken =
+    | 'NEW_MOON'
+    | 'FIRST_QUARTER'
+    | 'FULL_MOON'
+    | 'LAST_QUARTER'
+
+export type SolarMarkerToken =
+    | 'VERNAL_EQUINOX'
+    | 'SUMMER_SOLSTICE'
+    | 'AUTUMN_EQUINOX'
+    | 'WINTER_SOLSTICE'
+
+export type BlackoutShiftPolicy = 'SKIP' | 'DEFER_NEXT_VALID_DAY'
+
+export type EngineRecurrenceFrequency =
+    | 'ONCE'
+    | 'DAILY'
+    | 'WEEKLY_MASK'
+    | 'INTERVAL_DAYS'
+    | 'LUNAR_PHASE'
+    | 'SOLAR_SOLSTICE_EQUINOX'
+
+export interface EngineRecurrenceRule {
+    readonly frequency: EngineRecurrenceFrequency
+    readonly weekdayMask?: readonly WeekdayToken[]
+    readonly intervalDays?: number
+    readonly lunarPhase?: LunarPhaseToken
+    readonly solarMarkers?: readonly SolarMarkerToken[]
+    readonly blackoutDates?: readonly string[]
+    readonly blackoutWeekdays?: readonly WeekdayToken[]
+    readonly blackoutShiftPolicy?: BlackoutShiftPolicy
+    readonly untilIsoDate?: string
+    readonly maxOccurrences?: number
+}
+
+export interface BlackoutEvaluationResult {
+    readonly isBlackedOut: boolean
+    readonly policy: BlackoutShiftPolicy
+    readonly effectiveIsoDate: string | null
+    readonly deferredFromIsoDate: string | null
+}
+
+export interface BlackoutSkipNotice {
+    readonly beatId: string
+    readonly blackoutDate: string
+    readonly policy: BlackoutShiftPolicy
+    readonly effectiveIsoDate: string | null
+    readonly deferredFromIsoDate: string | null
 }
 
 export interface ResolvedAgendaBeatWindow {
@@ -297,12 +350,14 @@ export interface ResolvedAgendaBeatWindow {
     readonly targetEpochSeconds: number
     readonly deltaSeconds: number
     readonly ticksUntilBeat: number
+    readonly deferredFromIsoDate?: string | null
 }
 
 export interface ChronoAgendaWindowStatus {
     readonly tick: number
     readonly dueBeats: readonly ResolvedAgendaBeatWindow[]
     readonly activeReserveLocks: readonly ResolvedAgendaBeatWindow[]
+    readonly blackoutSkips?: readonly BlackoutSkipNotice[]
 }
 
 export function agendaOccurrenceKey(

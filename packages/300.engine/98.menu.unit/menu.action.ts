@@ -274,6 +274,12 @@ export class ManageEngineAgenda implements Action {
     constructor(public bale?: MenuBit) {}
 }
 
+export const MANAGE_ENGINE_RECURRENCE = '[Menu action] Manage Engine Recurrence'
+export class ManageEngineRecurrence implements Action {
+    readonly type = MANAGE_ENGINE_RECURRENCE
+    constructor(public bale?: MenuBit) {}
+}
+
 export type Actions =
     | InitMenu
     | UpdateMenu
@@ -315,3 +321,4 @@ export type Actions =
     | RunAutoScriptSimulation
     | ConfigureEnginePacingBudget
     | ManageEngineAgenda
+    | ManageEngineRecurrence

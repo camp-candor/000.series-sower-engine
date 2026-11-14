@@ -36,6 +36,12 @@ import type {
 import type {
     ScheduledStoryBeat,
     AgendaBeatCategory,
+    EngineRecurrenceRule,
+    EngineRecurrenceFrequency,
+    WeekdayToken,
+    LunarPhaseToken,
+    SolarMarkerToken,
+    BlackoutShiftPolicy,
 } from '../../17.tick.unit/fce/tick.interface.js'
 import { DEFAULT_PACING_BUDGET_POLICY } from '../../05.event.unit/fce/event.interface.js'
 import type { PacingActStage } from '../../05.event.unit/fce/event.interface.js'
@@ -44,6 +50,11 @@ import {
     selectDeterministicDroughtBreaker,
 } from '../../05.event.unit/buz/event.buzz.js'
 import { evaluateChronoAgendaWindow } from '../../17.tick.unit/buz/tick.buzz.js'
+import {
+    resolveEngineGregorianWeekday,
+    computeEngineLunarPhaseSnapshot,
+} from '../../17.tick.unit/buz/tick.buzz.js'
+import { canBeatFireUnderMaxOccurrences } from '../../05.event.unit/buz/event.buzz.js'
 import {
     computeHorizonProgressBps,
     resolveThreeActStage,
@@ -1738,6 +1749,8 @@ export interface AutonomousSimState {
     readonly consumedAgendaKeys?: readonly string[]
     readonly droughtBreakersHeldByReserve?: number
     readonly triggeredAgendaBeats?: readonly string[]
+    readonly beatOccurrenceCounts?: Readonly<Record<string, number>>
+    readonly seriesBlackouts?: readonly string[]
 }
 
 export interface AutonomousTickReceipt {
@@ -2019,6 +2032,8 @@ export const createInitialAutonomousSimState = (
         consumedAgendaKeys: Object.freeze([]),
         droughtBreakersHeldByReserve: 0,
         triggeredAgendaBeats: Object.freeze([]),
+        beatOccurrenceCounts: Object.freeze({}),
+        seriesBlackouts: Object.freeze([]),
         ...(overrides ?? {}),
     }) as AutonomousSimState
 }
@@ -2041,6 +2056,11 @@ export const stepAutonomousSimulationTick = (
     const consumedAgendaKeysInput = stateInput.consumedAgendaKeys ?? []
     const triggeredAgendaInput = stateInput.triggeredAgendaBeats ?? []
     const heldReserveInput = stateInput.droughtBreakersHeldByReserve ?? 0
+    const beatCountsInput: Readonly<Record<string, number>> =
+        stateInput.beatOccurrenceCounts ?? {}
+    const seriesBlackoutsInput: readonly string[] =
+        stateInput.seriesBlackouts ?? []
+    const nextBeatCounts: Record<string, number> = { ...beatCountsInput }
     let agendaStatus: {
         readonly tick: number
         readonly dueBeats: readonly {
@@ -2051,6 +2071,7 @@ export const stepAutonomousSimulationTick = (
             readonly targetEpochSeconds: number
             readonly deltaSeconds: number
             readonly ticksUntilBeat: number
+            readonly deferredFromIsoDate?: string | null
         }[]
         readonly activeReserveLocks: readonly {
             readonly beat: ScheduledStoryBeat
@@ -2060,6 +2081,7 @@ export const stepAutonomousSimulationTick = (
             readonly targetEpochSeconds: number
             readonly deltaSeconds: number
             readonly ticksUntilBeat: number
+            readonly deferredFromIsoDate?: string | null
         }[]
     }
     try {
@@ -2070,6 +2092,8 @@ export const stepAutonomousSimulationTick = (
             scheduledBeats,
             consumedAgendaKeysInput,
             tickSeconds,
+            seriesBlackoutsInput,
+            beatCountsInput,
         )
     } catch {
         agendaStatus = Object.freeze({
@@ -2444,7 +2468,51 @@ export const stepAutonomousSimulationTick = (
     }
     if (agendaStatus.dueBeats.length > 0) {
         for (const due of agendaStatus.dueBeats) {
+            if (
+                !canBeatFireUnderMaxOccurrences(
+                    due.beat as unknown as {
+                        readonly beat_id: string
+                        readonly recurrenceRule?: {
+                            readonly maxOccurrences?: number
+                        }
+                    },
+                    nextBeatCounts[due.beat.beat_id] ?? 0,
+                )
+            ) {
+                continue
+            }
             sequence += 1
+            const occurrenceIndex = (nextBeatCounts[due.beat.beat_id] ?? 0) + 1
+            nextBeatCounts[due.beat.beat_id] = occurrenceIndex
+            const rule = (
+                due.beat as unknown as {
+                    readonly recurrenceRule?: { readonly frequency?: string }
+                }
+            )?.recurrenceRule
+            const recurrenceFrequency =
+                typeof rule?.frequency === 'string'
+                    ? (rule.frequency as string)
+                    : due.beat.recurringDaily === true
+                      ? 'DAILY'
+                      : 'ONCE'
+            let weekday = 'UNKNOWN'
+            try {
+                weekday = resolveEngineGregorianWeekday(due.effectiveIsoDate)
+            } catch {
+                weekday = 'UNKNOWN'
+            }
+            let lunarPhase = 'NEW_MOON'
+            let lunarIlluminationBps = 0
+            try {
+                const snap = computeEngineLunarPhaseSnapshot(
+                    due.effectiveIsoDate,
+                    due.beat.startTimeHm,
+                )
+                lunarPhase = snap.phase
+                lunarIlluminationBps = snap.illuminationBps
+            } catch {
+                // keep defaults
+            }
             const snapshot = {
                 isoDate: nextClock.isoDate,
                 clockTimeHm: nextClock.clockTimeHm,
@@ -2484,6 +2552,19 @@ export const stepAutonomousSimulationTick = (
                     scheduledTimeHm: due.beat.startTimeHm,
                     scheduledTimestamp: `${due.effectiveIsoDate} ${due.beat.startTimeHm}`,
                     reserveHeldTicks: reserveHeld,
+                    recurring: Object.freeze({
+                        occurrenceIndex,
+                        recurrenceFrequency,
+                        weekday,
+                        lunarPhase,
+                        lunarIlluminationBps,
+                        deferredFromIsoDate:
+                            (
+                                due as {
+                                    readonly deferredFromIsoDate?: string | null
+                                }
+                            )?.deferredFromIsoDate ?? null,
+                    }),
                 } as never),
             )
             nextCooldowns[due.beat.beatCategory] = nextTick
@@ -2654,6 +2735,8 @@ export const stepAutonomousSimulationTick = (
         consumedAgendaKeys: Object.freeze([...nextConsumedAgendaKeys]),
         droughtBreakersHeldByReserve,
         triggeredAgendaBeats: Object.freeze([...nextTriggeredAgendaBeats]),
+        beatOccurrenceCounts: Object.freeze({ ...nextBeatCounts }),
+        seriesBlackouts: Object.freeze([...seriesBlackoutsInput]),
     })
 
     return Object.freeze({
@@ -2875,6 +2958,202 @@ function isValidAgendaTimeHm(value: unknown): value is string {
     return hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59
 }
 
+const WEEKDAY_TOKENS: readonly WeekdayToken[] = Object.freeze([
+    'MON',
+    'TUE',
+    'WED',
+    'THU',
+    'FRI',
+    'SAT',
+    'SUN',
+])
+
+const FREQUENCIES: readonly EngineRecurrenceFrequency[] = Object.freeze([
+    'ONCE',
+    'DAILY',
+    'WEEKLY_MASK',
+    'INTERVAL_DAYS',
+    'LUNAR_PHASE',
+    'SOLAR_SOLSTICE_EQUINOX',
+])
+
+const LUNAR_TOKENS: readonly LunarPhaseToken[] = Object.freeze([
+    'NEW_MOON',
+    'FIRST_QUARTER',
+    'FULL_MOON',
+    'LAST_QUARTER',
+])
+
+const SOLAR_TOKENS: readonly SolarMarkerToken[] = Object.freeze([
+    'VERNAL_EQUINOX',
+    'SUMMER_SOLSTICE',
+    'AUTUMN_EQUINOX',
+    'WINTER_SOLSTICE',
+])
+
+function normalizeWeekdayList(value: unknown): WeekdayToken[] {
+    if (!Array.isArray(value)) return []
+    const out: WeekdayToken[] = []
+    for (const entry of value) {
+        if (
+            typeof entry === 'string' &&
+            (WEEKDAY_TOKENS as readonly string[]).includes(entry) &&
+            !out.includes(entry as WeekdayToken)
+        ) {
+            out.push(entry as WeekdayToken)
+        }
+    }
+    out.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+    return out
+}
+
+function normalizeDateList(value: unknown): string[] {
+    if (!Array.isArray(value)) return []
+    const out: string[] = []
+    for (const entry of value) {
+        if (isValidAgendaDate(entry) && !out.includes(entry as string)) {
+            out.push(entry as string)
+        }
+    }
+    out.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+    return out
+}
+
+export const normalizeEngineRecurrenceRule = (
+    beat: Readonly<Record<string, unknown>> | ScheduledStoryBeat,
+): EngineRecurrenceRule => {
+    const rec =
+        (beat as Record<string, unknown>)?.['recurrenceRule'] ??
+        (beat as Record<string, unknown>)?.['recurrence_rule'] ??
+        null
+    if (rec != null && typeof rec === 'object') {
+        const r = rec as Record<string, unknown>
+        const freqRaw = r['frequency']
+        const frequency: EngineRecurrenceFrequency =
+            typeof freqRaw === 'string' &&
+            (FREQUENCIES as readonly string[]).includes(freqRaw)
+                ? (freqRaw as EngineRecurrenceFrequency)
+                : 'ONCE'
+        const weekdayMask = Object.freeze(
+            normalizeWeekdayList(r['weekdayMask'] ?? r['weekday_mask']),
+        )
+        const intervalRaw = r['intervalDays'] ?? r['interval_days']
+        const intervalDays =
+            Number.isInteger(intervalRaw) &&
+            (intervalRaw as number) >= 1 &&
+            (intervalRaw as number) <= 365
+                ? (intervalRaw as number)
+                : frequency === 'INTERVAL_DAYS'
+                  ? 1
+                  : undefined
+        const lunarRaw = r['lunarPhase'] ?? r['lunar_phase']
+        const lunarPhase: LunarPhaseToken | undefined =
+            typeof lunarRaw === 'string' &&
+            (LUNAR_TOKENS as readonly string[]).includes(lunarRaw)
+                ? (lunarRaw as LunarPhaseToken)
+                : undefined
+        const solarRaw = r['solarMarkers'] ?? r['solar_markers']
+        const solarList: SolarMarkerToken[] = []
+        if (Array.isArray(solarRaw)) {
+            for (const entry of solarRaw) {
+                if (
+                    typeof entry === 'string' &&
+                    (SOLAR_TOKENS as readonly string[]).includes(entry) &&
+                    !solarList.includes(entry as SolarMarkerToken)
+                ) {
+                    solarList.push(entry as SolarMarkerToken)
+                }
+            }
+        }
+        solarList.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+        const blackoutDates = Object.freeze(
+            normalizeDateList(
+                r['blackoutDates'] ?? r['blackout_dates'] ?? r['blackouts'],
+            ),
+        )
+        const blackoutWeekdays = Object.freeze(
+            normalizeWeekdayList(
+                r['blackoutWeekdays'] ?? r['blackout_weekdays'],
+            ),
+        )
+        const policyRaw = r['blackoutShiftPolicy'] ?? r['blackout_shift_policy']
+        const blackoutShiftPolicy: BlackoutShiftPolicy =
+            policyRaw === 'DEFER_NEXT_VALID_DAY'
+                ? 'DEFER_NEXT_VALID_DAY'
+                : 'SKIP'
+        const untilRaw = r['untilIsoDate'] ?? r['until_iso_date']
+        const untilIsoDate =
+            isValidAgendaDate(untilRaw) && typeof untilRaw === 'string'
+                ? (untilRaw as string)
+                : undefined
+        const maxRaw = r['maxOccurrences'] ?? r['max_occurrences']
+        const maxOccurrences =
+            Number.isInteger(maxRaw) && (maxRaw as number) >= 1
+                ? (maxRaw as number)
+                : undefined
+        return Object.freeze({
+            frequency,
+            weekdayMask,
+            ...(intervalDays !== undefined ? { intervalDays } : {}),
+            ...(lunarPhase !== undefined ? { lunarPhase } : {}),
+            solarMarkers: Object.freeze([...solarList]),
+            blackoutDates,
+            blackoutWeekdays,
+            blackoutShiftPolicy,
+            ...(untilIsoDate !== undefined ? { untilIsoDate } : {}),
+            ...(maxOccurrences !== undefined ? { maxOccurrences } : {}),
+        }) as EngineRecurrenceRule
+    }
+    const legacyRecurring =
+        (beat as Record<string, unknown>)?.['recurringDaily'] === true
+    const frequency: EngineRecurrenceFrequency = legacyRecurring
+        ? 'DAILY'
+        : 'ONCE'
+    return Object.freeze({
+        frequency,
+        weekdayMask: Object.freeze([]),
+        solarMarkers: Object.freeze([]),
+        blackoutDates: Object.freeze([]),
+        blackoutWeekdays: Object.freeze([]),
+        blackoutShiftPolicy: 'SKIP',
+    }) as EngineRecurrenceRule
+}
+
+export const extractSeriesBlackoutDatesFromBible = (
+    bibleState: unknown,
+): readonly string[] => {
+    try {
+        if (bibleState == null || typeof bibleState !== 'object') {
+            return Object.freeze([])
+        }
+        const root = bibleState as Record<string, unknown>
+        const chrono =
+            root['chronology'] != null && typeof root['chronology'] === 'object'
+                ? (root['chronology'] as Record<string, unknown>)
+                : null
+        const raw =
+            chrono?.['series_blackout_dates'] ??
+            chrono?.['seriesBlackoutDates'] ??
+            root['series_blackout_dates'] ??
+            []
+        const out: string[] = []
+        if (Array.isArray(raw)) {
+            for (const entry of raw) {
+                if (
+                    isValidAgendaDate(entry) &&
+                    !out.includes(entry as string)
+                ) {
+                    out.push(entry as string)
+                }
+            }
+        }
+        out.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+        return Object.freeze([...out])
+    } catch {
+        return Object.freeze([])
+    }
+}
+
 function sanitizeAgendaBeat(raw: unknown): ScheduledStoryBeat | null {
     if (raw == null || typeof raw !== 'object') return null
     const rec = raw as Record<string, unknown>
@@ -2935,6 +3214,9 @@ function sanitizeAgendaBeat(raw: unknown): ScheduledStoryBeat | null {
         tolerance = toleranceRaw as number
     }
     const recurring = recurringRaw === true
+    const rule = normalizeEngineRecurrenceRule(
+        rec as unknown as Record<string, unknown>,
+    )
     const beat: ScheduledStoryBeat = Object.freeze({
         beat_id: beatIdRaw.trim(),
         title: (titleRaw as string).trim(),
@@ -2945,6 +3227,7 @@ function sanitizeAgendaBeat(raw: unknown): ScheduledStoryBeat | null {
         reserveCooldownTicks: reserveRaw as number,
         toleranceTicks: tolerance,
         recurringDaily: recurring,
+        recurrenceRule: rule,
     })
     return beat
 }

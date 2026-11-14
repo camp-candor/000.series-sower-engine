@@ -57,6 +57,40 @@ function isPure7BitAscii(text: string): boolean {
     return true
 }
 
+export function formatRecurrenceFountainHeaders(meta: {
+    readonly recurrenceFrequency?: string
+    readonly occurrenceIndex?: number
+    readonly weekday?: string
+    readonly lunarPhase?: string
+    readonly deferredFromIsoDate?: string | null
+}): string[] {
+    const freq =
+        typeof meta.recurrenceFrequency === 'string'
+            ? meta.recurrenceFrequency
+            : 'ONCE'
+    const occ =
+        Number.isInteger(meta.occurrenceIndex) &&
+        (meta.occurrenceIndex as number) >= 1
+            ? String(meta.occurrenceIndex)
+            : '1'
+    const wd = typeof meta.weekday === 'string' ? meta.weekday : 'UNKNOWN'
+    const lp =
+        typeof meta.lunarPhase === 'string' ? meta.lunarPhase : 'NEW_MOON'
+    const out: string[] = []
+    out.push(`Recurrence-Rule: ${freq}`)
+    out.push(`Occurrence-Index: ${occ}`)
+    out.push(`Calendar-Weekday: ${wd}`)
+    out.push(`Lunar-Phase: ${lp}`)
+    if (
+        meta.deferredFromIsoDate != null &&
+        typeof meta.deferredFromIsoDate === 'string' &&
+        meta.deferredFromIsoDate.length > 0
+    ) {
+        out.push(`Deferred-From-Blackout: ${meta.deferredFromIsoDate}`)
+    }
+    return out
+}
+
 function validateBpField(
     value: number | undefined,
     entityId: string,

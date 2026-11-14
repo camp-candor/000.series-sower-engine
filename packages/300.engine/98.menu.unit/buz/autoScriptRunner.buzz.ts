@@ -4,9 +4,14 @@ import { createHash } from 'node:crypto'
 import { normalizeLoreChronology } from '../../17.tick.unit/fce/tick.interface.js'
 import type { ScheduledStoryBeat } from '../../17.tick.unit/fce/tick.interface.js'
 import {
+    evaluateBlackoutException,
+    matchesBeatRecurrenceOnDate,
+} from '../../17.tick.unit/buz/tick.buzz.js'
+import {
     createInitialAutonomousSimState,
     stepAutonomousSimulationTick,
     extractScheduledBeatsFromBible,
+    extractSeriesBlackoutDatesFromBible,
 } from '../../00.engine.unit/buz/engine.buzz.js'
 import { synthesizeEventFountainScreenplay } from '../../21.compile.unit/buz/eventFountainSynth.buzz.js'
 
@@ -291,13 +296,25 @@ export const runUnattendedAutoScriptSimulation = async (
     } catch {
         scheduledBeats = Object.freeze([])
     }
-    if (scheduledBeats.length > 0) {
+    let seriesBlackouts: readonly string[] = Object.freeze([])
+    try {
+        seriesBlackouts = extractSeriesBlackoutDatesFromBible(bibleState)
+    } catch {
+        seriesBlackouts = Object.freeze([])
+    }
+    const occurrenceCountsByBeat: Record<string, number> = {}
+    let recurringScenesFired = 0
+    let blackoutSkipsCount = 0
+    let blackoutDeferralsCount = 0
+    if (scheduledBeats.length > 0 || seriesBlackouts.length > 0) {
         simState = Object.freeze({
             ...simState,
             scheduledBeats,
             consumedAgendaKeys: Object.freeze([]),
             droughtBreakersHeldByReserve: 0,
             triggeredAgendaBeats: Object.freeze([]),
+            beatOccurrenceCounts: Object.freeze({}),
+            seriesBlackouts: Object.freeze([...seriesBlackouts]),
         })
     }
     if (Object.keys(pacingOverrides).length > 0) {
@@ -413,6 +430,80 @@ export const runUnattendedAutoScriptSimulation = async (
                 scheduledTimeHm?: string
                 scheduledTimestamp?: string
                 reserveHeldTicks?: number
+                recurring?: {
+                    occurrenceIndex?: number
+                    recurrenceFrequency?: string
+                    weekday?: string
+                    lunarPhase?: string
+                    lunarIlluminationBps?: number
+                    deferredFromIsoDate?: string | null
+                }
+            }
+            const recurringMeta =
+                agendaEvt.recurring != null &&
+                typeof agendaEvt.recurring === 'object'
+                    ? agendaEvt.recurring
+                    : undefined
+            if (recurringMeta !== undefined) {
+                recurringScenesFired += 1
+                const bid = agendaEvt.agendaBeatId ?? 'unknown_beat'
+                occurrenceCountsByBeat[bid] =
+                    (occurrenceCountsByBeat[bid] ?? 0) + 1
+                await emitCns00(
+                    ste,
+                    `>> [AGENDA:RECURRING] ${bid} occurrence=${String(recurringMeta.occurrenceIndex ?? 1)} rule=${recurringMeta.recurrenceFrequency ?? 'ONCE'} weekday=${recurringMeta.weekday ?? 'UNKNOWN'} lunar=${recurringMeta.lunarPhase ?? 'NEW_MOON'}`,
+                )
+                if (
+                    recurringMeta.deferredFromIsoDate != null &&
+                    typeof recurringMeta.deferredFromIsoDate === 'string'
+                ) {
+                    blackoutDeferralsCount += 1
+                    await emitCns00(
+                        ste,
+                        `>> [AGENDA:BLACKOUT_DEFER] ${bid} deferred ${recurringMeta.deferredFromIsoDate} -> ${agendaEvt.scheduledIsoDate ?? nextClock.isoDate}`,
+                    )
+                }
+            }
+            if (
+                agendaEvt.agendaScheduled !== true &&
+                receipt.significantEvents.length === 0
+            ) {
+                for (const beat of scheduledBeats) {
+                    let matches = false
+                    try {
+                        matches = matchesBeatRecurrenceOnDate(
+                            beat,
+                            nextClock.isoDate,
+                        )
+                    } catch {
+                        matches = false
+                    }
+                    if (!matches) continue
+                    let evaluated: {
+                        readonly isBlackedOut: boolean
+                        readonly policy: string
+                    } | null = null
+                    try {
+                        evaluated = evaluateBlackoutException(
+                            beat,
+                            nextClock.isoDate,
+                            seriesBlackouts,
+                        )
+                    } catch {
+                        evaluated = null
+                    }
+                    if (
+                        evaluated != null &&
+                        evaluated.isBlackedOut &&
+                        evaluated.policy === 'SKIP'
+                    ) {
+                        blackoutSkipsCount += 1
+                        await emitCns00(
+                            ste,
+                            `>> [AGENDA:BLACKOUT_SKIP] ${beat.beat_id} | ${nextClock.isoDate} | SKIP`,
+                        )
+                    }
+                }
             }
             const screenplay = synthesizeEventFountainScreenplay({
                 seriesSlug: slug,
@@ -436,6 +527,7 @@ export const runUnattendedAutoScriptSimulation = async (
                     scheduledTimeHm: agendaEvt.scheduledTimeHm,
                     scheduledTimestamp: agendaEvt.scheduledTimestamp,
                     reserveHeldTicks: agendaEvt.reserveHeldTicks,
+                    recurring: recurringMeta,
                 },
                 pacing: {
                     actStage: evtAct,
@@ -587,6 +679,12 @@ export const runUnattendedAutoScriptSimulation = async (
         droughtBreakersHeldByReserve:
             simState.droughtBreakersHeldByReserve ?? 0,
     })
+    const recurrenceSummary = Object.freeze({
+        recurringScenesFired,
+        blackoutSkipsCount,
+        blackoutDeferralsCount,
+        occurrenceCountsByBeat: Object.freeze({ ...occurrenceCountsByBeat }),
+    })
     const indexPayload = {
         seriesSlug: slug,
         masterSeed,
@@ -598,6 +696,7 @@ export const runUnattendedAutoScriptSimulation = async (
         entries: sorted,
         pacingSummary,
         agendaSummary,
+        recurrenceSummary,
     }
     const indexPath = path.join(outputDir, 'index.json')
     fs.writeFileSync(
@@ -713,6 +812,92 @@ export const verifyAutoScriptReplayDeterminism = async (
         mismatchedFiles,
         stackDigestSha256: secondManifest.stackDigestSha256,
     }
+}
+
+export interface RecurrenceReplayOptions extends AutoScriptRunParams {
+    readonly seed?: string
+}
+
+export interface RecurrenceReplayReceipt {
+    readonly equivalent: boolean
+    readonly runADigest: string
+    readonly runBDigest: string
+    readonly recurrenceSummary: {
+        readonly recurringScenesFired: number
+        readonly blackoutSkipsCount: number
+        readonly blackoutDeferralsCount: number
+        readonly occurrenceCountsByBeat: Readonly<Record<string, number>>
+    }
+}
+
+function hashRecurrenceRun(outputDir: string): {
+    digest: string
+    summary: RecurrenceReplayReceipt['recurrenceSummary']
+} {
+    const manifest = computeAutoScriptStackManifest(outputDir)
+    let summary: RecurrenceReplayReceipt['recurrenceSummary'] = Object.freeze({
+        recurringScenesFired: 0,
+        blackoutSkipsCount: 0,
+        blackoutDeferralsCount: 0,
+        occurrenceCountsByBeat: Object.freeze({}),
+    })
+    try {
+        const raw = fs.readFileSync(path.join(outputDir, 'index.json'), 'utf8')
+        const parsed = JSON.parse(raw) as {
+            recurrenceSummary?: {
+                recurringScenesFired?: number
+                blackoutSkipsCount?: number
+                blackoutDeferralsCount?: number
+                occurrenceCountsByBeat?: Record<string, number>
+            }
+        }
+        const rs = parsed.recurrenceSummary
+        if (rs != null) {
+            summary = Object.freeze({
+                recurringScenesFired: rs.recurringScenesFired ?? 0,
+                blackoutSkipsCount: rs.blackoutSkipsCount ?? 0,
+                blackoutDeferralsCount: rs.blackoutDeferralsCount ?? 0,
+                occurrenceCountsByBeat: Object.freeze({
+                    ...(rs.occurrenceCountsByBeat ?? {}),
+                }),
+            })
+        }
+    } catch {
+        // keep defaults
+    }
+    const digest = createHash('sha256')
+        .update(
+            `${manifest.stackDigestSha256}:${JSON.stringify(summary)}`,
+            'utf8',
+        )
+        .digest('hex')
+    return { digest, summary }
+}
+
+export const verifyRecurrenceGrammarReplayDeterminism = async (
+    params: RecurrenceReplayOptions,
+    ste?: unknown,
+): Promise<RecurrenceReplayReceipt> => {
+    const first = await runUnattendedAutoScriptSimulation(params, ste)
+    const runA = hashRecurrenceRun(first.outputDir)
+    try {
+        fs.rmSync(first.outputDir, { recursive: true, force: true })
+    } catch {
+        // best effort wipe
+    }
+    const second = await runUnattendedAutoScriptSimulation(params, ste)
+    const runB = hashRecurrenceRun(second.outputDir)
+    const equivalent = runA.digest === runB.digest
+    await emitCns00(
+        ste,
+        `>> [RECURRENCE:DETERMINISM_OK] digest=${runB.digest.slice(0, 12)}`,
+    )
+    return Object.freeze({
+        equivalent,
+        runADigest: runA.digest,
+        runBDigest: runB.digest,
+        recurrenceSummary: runB.summary,
+    })
 }
 
 export interface ChronoAgendaReplayReceipt {

@@ -216,6 +216,16 @@ export interface SignificantEventRecord {
     readonly scheduledTimeHm?: string
     readonly scheduledTimestamp?: string
     readonly reserveHeldTicks?: number
+    readonly recurring?: RecurringEventMetadata
+}
+
+export interface RecurringEventMetadata {
+    readonly occurrenceIndex: number
+    readonly recurrenceFrequency: string
+    readonly weekday: string
+    readonly lunarPhase: string
+    readonly lunarIlluminationBps: number
+    readonly deferredFromIsoDate: string | null
 }
 
 export interface EventDetectorRuleConfig {

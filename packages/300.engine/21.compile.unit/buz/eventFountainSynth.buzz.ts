@@ -31,6 +31,15 @@ export interface AgendaMetadataStamp {
     readonly agendaScheduled?: boolean
 }
 
+export interface RecurringScreenplayMetadata {
+    readonly occurrenceIndex?: number
+    readonly recurrenceFrequency?: string
+    readonly weekday?: string
+    readonly lunarPhase?: string
+    readonly lunarIlluminationBps?: number
+    readonly deferredFromIsoDate?: string | null
+}
+
 export interface SynthesizeEventScreenplayInput {
     readonly seriesSlug: string
     readonly displayName?: string
@@ -60,6 +69,7 @@ export interface SynthesizeEventScreenplayInput {
         readonly scheduledTimeHm?: string
         readonly scheduledTimestamp?: string
         readonly reserveHeldTicks?: number
+        readonly recurring?: RecurringScreenplayMetadata
     }
     readonly clockBefore: {
         readonly isoDate: string
@@ -425,6 +435,39 @@ export const synthesizeEventFountainScreenplay = (
         lines.push(`Agenda-Beat-Id: ${agendaBeatId}`)
         lines.push(`Scheduled-Time: ${agendaDate} ${agendaTime}`)
         lines.push(`Reserve-Held-Ticks: ${agendaReserve}`)
+    }
+    const recurring = evt.recurring as RecurringScreenplayMetadata | undefined
+    if (recurring != null && typeof recurring === 'object') {
+        const freq =
+            typeof recurring.recurrenceFrequency === 'string'
+                ? recurring.recurrenceFrequency
+                : 'ONCE'
+        const occ =
+            Number.isInteger(recurring.occurrenceIndex) &&
+            (recurring.occurrenceIndex as number) >= 1
+                ? String(recurring.occurrenceIndex)
+                : '1'
+        const wd =
+            typeof recurring.weekday === 'string'
+                ? recurring.weekday
+                : 'UNKNOWN'
+        const lp =
+            typeof recurring.lunarPhase === 'string'
+                ? recurring.lunarPhase
+                : 'NEW_MOON'
+        lines.push(`Recurrence-Rule: ${freq}`)
+        lines.push(`Occurrence-Index: ${occ}`)
+        lines.push(`Calendar-Weekday: ${wd}`)
+        lines.push(`Lunar-Phase: ${lp}`)
+        if (
+            recurring.deferredFromIsoDate != null &&
+            typeof recurring.deferredFromIsoDate === 'string' &&
+            recurring.deferredFromIsoDate.length > 0
+        ) {
+            lines.push(
+                `Deferred-From-Blackout: ${recurring.deferredFromIsoDate}`,
+            )
+        }
     }
     lines.push('')
     lines.push(

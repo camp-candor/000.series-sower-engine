@@ -1868,6 +1868,349 @@ export const openAutoScriptCockpitMenu = async (
         await emitConsole(ste, `>> [AGENDA:CLEARED] Session overrides cleared.`)
     }
 
+    const addDaysLocal = (isoDate: string, delta: number): string | null => {
+        if (!isValidAgendaDateStrict(isoDate)) return null
+        const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate)
+        if (m == null || m[1] == null || m[2] == null || m[3] == null)
+            return null
+        let y = Number(m[1])
+        let mo = Number(m[2])
+        let d = Number(m[3])
+        if (delta >= 0) {
+            let n = delta
+            while (n > 0) {
+                const leap = y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0)
+                const dim =
+                    mo === 2
+                        ? leap
+                            ? 29
+                            : 28
+                        : mo === 4 || mo === 6 || mo === 9 || mo === 11
+                          ? 30
+                          : 31
+                if (d < dim) {
+                    d += 1
+                } else {
+                    d = 1
+                    if (mo === 12) {
+                        mo = 1
+                        y += 1
+                    } else {
+                        mo += 1
+                    }
+                }
+                n -= 1
+            }
+        } else {
+            let n = -delta
+            while (n > 0) {
+                if (d > 1) {
+                    d -= 1
+                } else {
+                    if (mo === 1) {
+                        mo = 12
+                        y -= 1
+                    } else {
+                        mo -= 1
+                    }
+                    const leap = y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0)
+                    d =
+                        mo === 2
+                            ? leap
+                                ? 29
+                                : 28
+                            : mo === 4 || mo === 6 || mo === 9 || mo === 11
+                              ? 30
+                              : 31
+                }
+                n -= 1
+            }
+        }
+        const pad = (v: number, w: number): string => String(v).padStart(w, '0')
+        return `${pad(y, 4)}-${pad(mo, 2)}-${pad(d, 2)}`
+    }
+
+    const runRecurrenceInspect = async (): Promise<boolean> => {
+        const datRec = dat as Record<string, unknown>
+        const {
+            extractScheduledBeatsFromBible: extractBeats,
+            extractSeriesBlackoutDatesFromBible: extractBlackouts,
+        } = await import('../../00.engine.unit/buz/engine.buzz.js')
+        const tickMod = await import('../../17.tick.unit/buz/tick.buzz.js')
+        const matchesBeat = tickMod.matchesBeatRecurrenceOnDate as (
+            beat: unknown,
+            iso: string,
+        ) => boolean
+        const evalBlackout = tickMod.evaluateBlackoutException as (
+            beat: unknown,
+            iso: string,
+            series: readonly string[],
+        ) => {
+            readonly isBlackedOut: boolean
+            readonly policy: string
+            readonly effectiveIsoDate: string | null
+            readonly deferredFromIsoDate: string | null
+        }
+        const resolveWeekday = tickMod.resolveEngineGregorianWeekday as (
+            iso: string,
+        ) => string
+        const lunarSnap = tickMod.computeEngineLunarPhaseSnapshot as (
+            iso: string,
+            hm: string,
+        ) => { readonly phase: string }
+        const addRaw = datRec['addBlackoutDate']
+        if (addRaw !== undefined && addRaw !== null) {
+            const candidate = String(addRaw)
+            if (!isValidAgendaDateStrict(candidate)) {
+                await emitConsole(
+                    ste,
+                    `:: [RECURRENCE:ERR] Invalid blackout date ${candidate} expected YYYY-MM-DD.`,
+                )
+                return false
+            }
+            const holder = cpy as unknown as {
+                sessionBlackouts?: readonly string[]
+            }
+            const prev = holder.sessionBlackouts ?? []
+            if (!prev.includes(candidate)) {
+                holder.sessionBlackouts = Object.freeze(
+                    [...prev, candidate].sort((a, b) =>
+                        a < b ? -1 : a > b ? 1 : 0,
+                    ),
+                )
+            }
+            await emitConsole(
+                ste,
+                `>> [RECURRENCE:BLACKOUT] session | ${candidate} | SKIP`,
+            )
+        }
+        const overrideRaw = datRec['overrideRecurrenceRule'] as
+            | { beatId?: unknown; beat_id?: unknown; rule?: unknown }
+            | undefined
+        if (overrideRaw != null && typeof overrideRaw === 'object') {
+            const beatId = String(
+                overrideRaw.beatId ?? overrideRaw.beat_id ?? '',
+            )
+            const rule = overrideRaw.rule as Record<string, unknown> | undefined
+            const validFreq = [
+                'ONCE',
+                'DAILY',
+                'WEEKLY_MASK',
+                'INTERVAL_DAYS',
+                'LUNAR_PHASE',
+                'SOLAR_SOLSTICE_EQUINOX',
+            ]
+            if (
+                beatId.length === 0 ||
+                rule == null ||
+                typeof rule !== 'object' ||
+                !validFreq.includes(String(rule['frequency']))
+            ) {
+                await emitConsole(
+                    ste,
+                    `:: [RECURRENCE:ERR] Invalid recurrence rule override for ${beatId || 'unknown'}.`,
+                )
+                return false
+            }
+            if (
+                rule['intervalDays'] !== undefined &&
+                (!Number.isInteger(rule['intervalDays']) ||
+                    (rule['intervalDays'] as number) < 1 ||
+                    (rule['intervalDays'] as number) > 365)
+            ) {
+                await emitConsole(
+                    ste,
+                    `:: [RECURRENCE:ERR] Invalid intervalDays for ${beatId}.`,
+                )
+                return false
+            }
+            const holder = cpy as unknown as {
+                sessionRuleOverrides?: Readonly<Record<string, unknown>>
+            }
+            holder.sessionRuleOverrides = Object.freeze({
+                ...(holder.sessionRuleOverrides ?? {}),
+                [beatId]: rule,
+            })
+            await emitConsole(
+                ste,
+                `>> [RECURRENCE:SLOT] ${beatId} | override applied | ${String(rule['frequency'])}`,
+            )
+        }
+        let beats: readonly unknown[] = []
+        try {
+            const bibleState = datRec['bibleState']
+            const base =
+                bibleState != null && typeof bibleState === 'object'
+                    ? (extractBeats(bibleState) as readonly unknown[])
+                    : []
+            const direct = datRec['scheduledBeats']
+            let extra: readonly unknown[] = []
+            if (Array.isArray(direct) && direct.length > 0) {
+                extra = extractBeats({
+                    chronology: { scheduled_beats: direct },
+                }) as readonly unknown[]
+            }
+            beats = [...base, ...extra]
+        } catch {
+            beats = []
+        }
+        const overrides = (
+            cpy as unknown as {
+                sessionRuleOverrides?: Readonly<Record<string, unknown>>
+            }
+        ).sessionRuleOverrides
+        if (overrides != null) {
+            beats = beats.map((b) => {
+                const rec = b as Record<string, unknown>
+                const id = String(rec['beat_id'] ?? '')
+                if (Object.prototype.hasOwnProperty.call(overrides, id)) {
+                    return Object.freeze({
+                        ...(rec as object),
+                        recurrenceRule: overrides[id],
+                    })
+                }
+                return b
+            })
+        }
+        let series: readonly string[] = []
+        try {
+            const bibleState = datRec['bibleState']
+            series = extractBlackouts(bibleState) as readonly string[]
+        } catch {
+            series = []
+        }
+        const sessionExtra =
+            (cpy as unknown as { sessionBlackouts?: readonly string[] })
+                .sessionBlackouts ?? []
+        const allBlackouts: readonly string[] = Object.freeze([
+            ...series,
+            ...sessionExtra,
+        ])
+        const startDate = String(datRec['startDate'] ?? '2026-10-31')
+        if (!isValidAgendaDateStrict(startDate)) {
+            await emitConsole(
+                ste,
+                `:: [RECURRENCE:ERR] Invalid start date ${startDate} expected YYYY-MM-DD.`,
+            )
+            return false
+        }
+        if (beats.length === 0) {
+            await emitConsole(
+                ste,
+                `>> [RECURRENCE:EMPTY] No recurring schedules loaded.`,
+            )
+            return true
+        }
+        const window: string[] = []
+        for (let i = 0; i < 14; i += 1) {
+            const d = addDaysLocal(startDate, i)
+            if (d != null) window.push(d)
+        }
+        for (const iso of window) {
+            for (const beat of beats) {
+                const rec = beat as Record<string, unknown>
+                const beatId = String(rec['beat_id'] ?? 'unknown')
+                const hm = String(rec['startTimeHm'] ?? '00:00')
+                let matches = false
+                try {
+                    matches = matchesBeat(beat, iso)
+                } catch {
+                    matches = false
+                }
+                if (!matches) continue
+                let weekday = 'UNKNOWN'
+                try {
+                    weekday = resolveWeekday(iso)
+                } catch {
+                    weekday = 'UNKNOWN'
+                }
+                let lunar = 'NEW_MOON'
+                try {
+                    lunar = lunarSnap(iso, hm).phase
+                } catch {
+                    lunar = 'NEW_MOON'
+                }
+                const rule = (
+                    rec as { recurrenceRule?: { frequency?: string } }
+                ).recurrenceRule
+                const freq =
+                    typeof rule?.frequency === 'string'
+                        ? rule.frequency
+                        : rec['recurringDaily'] === true
+                          ? 'DAILY'
+                          : 'ONCE'
+                let evaluated: {
+                    readonly isBlackedOut: boolean
+                    readonly policy: string
+                    readonly effectiveIsoDate: string | null
+                } | null = null
+                try {
+                    evaluated = evalBlackout(beat, iso, allBlackouts)
+                } catch {
+                    evaluated = null
+                }
+                if (evaluated != null && evaluated.isBlackedOut) {
+                    const pol = String(evaluated.policy ?? 'SKIP')
+                    await emitConsole(
+                        ste,
+                        `>> [RECURRENCE:BLACKOUT] ${beatId} | ${iso} | ${pol}`,
+                    )
+                    if (
+                        evaluated.effectiveIsoDate != null &&
+                        pol === 'DEFER_NEXT_VALID_DAY'
+                    ) {
+                        let effWeekday = weekday
+                        try {
+                            effWeekday = resolveWeekday(
+                                evaluated.effectiveIsoDate,
+                            )
+                        } catch {
+                            effWeekday = weekday
+                        }
+                        let effLunar = lunar
+                        try {
+                            effLunar = lunarSnap(
+                                evaluated.effectiveIsoDate,
+                                hm,
+                            ).phase
+                        } catch {
+                            effLunar = lunar
+                        }
+                        await emitConsole(
+                            ste,
+                            `>> [RECURRENCE:SLOT] ${beatId} | ${evaluated.effectiveIsoDate} (${effWeekday}) ${hm} | ${freq} | ${effLunar}`,
+                        )
+                    }
+                    continue
+                }
+                await emitConsole(
+                    ste,
+                    `>> [RECURRENCE:SLOT] ${beatId} | ${iso} (${weekday}) ${hm} | ${freq} | ${lunar}`,
+                )
+            }
+        }
+        if (
+            ste != null &&
+            typeof (ste as unknown as { hunt?: unknown }).hunt === 'function'
+        ) {
+            try {
+                await (
+                    ste as unknown as {
+                        hunt: (t: string, b: unknown) => Promise<unknown>
+                    }
+                ).hunt(
+                    (ActMnu as unknown as { MANAGE_ENGINE_RECURRENCE?: string })
+                        .MANAGE_ENGINE_RECURRENCE ??
+                        '[Menu action] Manage Engine Recurrence',
+                    { dat: { inspected: beats.length } },
+                )
+            } catch {
+                // headless fallback ignores dispatch faults
+            }
+        }
+        return true
+    }
+
     const runLaunch = async (
         overrides?: Record<string, unknown>,
     ): Promise<void> => {
@@ -2178,6 +2521,13 @@ export const openAutoScriptCockpitMenu = async (
             programmatic === 'agenda'
         ) {
             await runAgendaInspect()
+        } else if (
+            programmatic === 'recurrence-inspect' ||
+            programmatic === 'manage-recurrence' ||
+            programmatic === 'inspect-recurrence' ||
+            programmatic === 'recurrence'
+        ) {
+            await runRecurrenceInspect()
         } else if (programmatic === 'agenda-add') {
             await runAgendaAdd((dat as Record<string, unknown>)['addBeat'])
         } else if (programmatic === 'agenda-clear') {
@@ -2241,6 +2591,7 @@ export const openAutoScriptCockpitMenu = async (
         '[5] CONFIGURE THREE-ACT PACING COOLDOWN',
         '[6] RUN 24H PACING DISTRIBUTION AUDIT',
         '[7] INSPECT SCHEDULED CHRONO APPOINTMENTS',
+        '[8] INSPECT CALENDAR RECURRENCE & BLACKOUTS',
         '[<] RETURN TO ENGINE MENU',
     ]
     let gridChoice: unknown = null
@@ -2404,6 +2755,94 @@ export const openAutoScriptCockpitMenu = async (
             }
         } catch {
             // agenda submenu optional in headless harnesses
+        }
+    } else if (picked.startsWith('[8]')) {
+        await runRecurrenceInspect()
+        try {
+            const recurGrid: unknown = await hunt(UPDATE_GRID, {
+                x: 0,
+                y: 4,
+                xSpan: 4,
+                ySpan: 8,
+            })
+            const recurChoice = (await hunt(OPEN_CHOICE, {
+                dat: { clr0: 'black', clr1: 'green' },
+                src: Align.VERTICAL,
+                lst: [
+                    '[1] ADD SESSION BLACKOUT DATE',
+                    '[2] OVERRIDE RECURRENCE RULE',
+                    '[<] BACK',
+                ],
+                net: (recurGrid as { grdBit?: { dat?: unknown } } | null)
+                    ?.grdBit?.dat,
+            })) as { chcBit?: { src?: string } }
+            const recurPicked = recurChoice?.chcBit?.src ?? ''
+            if (recurPicked.startsWith('[1]')) {
+                try {
+                    const inputGrid: unknown = await hunt(UPDATE_GRID, {
+                        x: 0,
+                        y: 4,
+                        xSpan: 4,
+                        ySpan: 8,
+                    })
+                    const inputRes = (await hunt(OPEN_INPUT, {
+                        dat: { prompt: 'Blackout Date YYYY-MM-DD' },
+                        net: (
+                            inputGrid as {
+                                grdBit?: { dat?: unknown }
+                            } | null
+                        )?.grdBit?.dat,
+                    })) as { inpBit?: { src?: string } } | null
+                    const rawInput = inputRes?.inpBit?.src?.trim() ?? ''
+                    if (rawInput.length > 0) {
+                        const holder = cpy as unknown as {
+                            sessionBlackouts?: readonly string[]
+                        }
+                        if (!isValidAgendaDateStrict(rawInput)) {
+                            await hunt(UPDATE_CONSOLE, {
+                                idx: 'cns00',
+                                src: `:: [RECURRENCE:ERR] Invalid blackout date ${rawInput} expected YYYY-MM-DD.`,
+                            })
+                        } else {
+                            const prev = holder.sessionBlackouts ?? []
+                            if (!prev.includes(rawInput)) {
+                                holder.sessionBlackouts = Object.freeze(
+                                    [...prev, rawInput].sort((a, b) =>
+                                        a < b ? -1 : a > b ? 1 : 0,
+                                    ),
+                                )
+                            }
+                            await hunt(UPDATE_CONSOLE, {
+                                idx: 'cns00',
+                                src: `>> [RECURRENCE:BLACKOUT] session | ${rawInput} | SKIP`,
+                            })
+                        }
+                    }
+                } catch {
+                    // input modal optional in headless harnesses
+                }
+            } else if (recurPicked.startsWith('[2]')) {
+                try {
+                    const inputGrid: unknown = await hunt(UPDATE_GRID, {
+                        x: 0,
+                        y: 4,
+                        xSpan: 4,
+                        ySpan: 8,
+                    })
+                    await hunt(OPEN_INPUT, {
+                        dat: { prompt: 'Recurrence Rule JSON' },
+                        net: (
+                            inputGrid as {
+                                grdBit?: { dat?: unknown }
+                            } | null
+                        )?.grdBit?.dat,
+                    })
+                } catch {
+                    // input modal optional in headless harnesses
+                }
+            }
+        } catch {
+            // recurrence submenu optional in headless harnesses
         }
     }
 

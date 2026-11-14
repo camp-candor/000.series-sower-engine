@@ -226,6 +226,10 @@ import type {
     ResolvedAgendaBeatWindow,
     ScheduledStoryBeat,
     SimulationClockState as AgendaClockState,
+    WeekdayToken,
+    LunarPhaseToken,
+    BlackoutEvaluationResult,
+    BlackoutSkipNotice,
 } from '../fce/tick.interface.js'
 import { agendaOccurrenceKey } from '../fce/tick.interface.js'
 
@@ -391,6 +395,374 @@ export function computeAgendaBeatTargetTick(
     return referenceTick + ticksUntil
 }
 
+const SAKAMOTO_TABLE: readonly number[] = Object.freeze([
+    0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4,
+])
+
+const WEEKDAY_ORDER: readonly WeekdayToken[] = Object.freeze([
+    'SUN',
+    'MON',
+    'TUE',
+    'WED',
+    'THU',
+    'FRI',
+    'SAT',
+])
+
+function ruleOf(beat: ScheduledStoryBeat): {
+    readonly frequency: string
+    readonly weekdayMask?: readonly string[]
+    readonly intervalDays?: number
+    readonly lunarPhase?: string
+    readonly solarMarkers?: readonly string[]
+    readonly blackoutDates?: readonly string[]
+    readonly blackoutWeekdays?: readonly string[]
+    readonly blackoutShiftPolicy?: string
+    readonly untilIsoDate?: string
+    readonly maxOccurrences?: number
+} {
+    const r = (beat as unknown as Record<string, unknown>)?.[
+        'recurrenceRule'
+    ] as unknown as Record<string, unknown> | undefined
+    if (
+        r != null &&
+        typeof r === 'object' &&
+        typeof r['frequency'] === 'string'
+    ) {
+        return r as unknown as {
+            readonly frequency: string
+            readonly weekdayMask?: readonly string[]
+            readonly intervalDays?: number
+            readonly lunarPhase?: string
+            readonly solarMarkers?: readonly string[]
+            readonly blackoutDates?: readonly string[]
+            readonly blackoutWeekdays?: readonly string[]
+            readonly blackoutShiftPolicy?: string
+            readonly untilIsoDate?: string
+            readonly maxOccurrences?: number
+        }
+    }
+    const legacy =
+        (beat as unknown as Record<string, unknown>)?.['recurringDaily'] ===
+        true
+    return {
+        frequency: legacy ? 'DAILY' : 'ONCE',
+        blackoutDates: [],
+        blackoutWeekdays: [],
+        blackoutShiftPolicy: 'SKIP',
+    }
+}
+
+export function resolveEngineGregorianWeekday(isoDate: string): WeekdayToken {
+    const { year, month, day } = agendaParseIsoDate(isoDate)
+    let y = year
+    if (month < 3) y -= 1
+    const t = SAKAMOTO_TABLE[month - 1] as number
+    const w =
+        (y +
+            Math.floor(y / 4) -
+            Math.floor(y / 100) +
+            Math.floor(y / 400) +
+            t +
+            day) %
+        7
+    return WEEKDAY_ORDER[((w % 7) + 7) % 7] as WeekdayToken
+}
+
+export function computeDaysBetweenIsoDates(
+    anchorIsoDate: string,
+    currentIsoDate: string,
+): number {
+    const a = computeGregorianTimestampSeconds(anchorIsoDate, '00:00')
+    const b = computeGregorianTimestampSeconds(currentIsoDate, '00:00')
+    return Math.round((b - a) / 86400)
+}
+
+function addDaysIsoDate(isoDate: string, delta: number): string {
+    const { year, month, day } = agendaParseIsoDate(isoDate)
+    let y = year
+    let m = month
+    let d = day
+    if (delta >= 0) {
+        let n = delta
+        while (n > 0) {
+            const dim =
+                m === 2
+                    ? y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0)
+                        ? 29
+                        : 28
+                    : m === 4 || m === 6 || m === 9 || m === 11
+                      ? 30
+                      : 31
+            if (d < dim) {
+                d += 1
+            } else {
+                d = 1
+                if (m === 12) {
+                    m = 1
+                    y += 1
+                } else {
+                    m += 1
+                }
+            }
+            n -= 1
+        }
+    } else {
+        let n = -delta
+        while (n > 0) {
+            if (d > 1) {
+                d -= 1
+            } else {
+                if (m === 1) {
+                    m = 12
+                    y -= 1
+                } else {
+                    m -= 1
+                }
+                const dim =
+                    m === 2
+                        ? y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0)
+                            ? 29
+                            : 28
+                        : m === 4 || m === 6 || m === 9 || m === 11
+                          ? 30
+                          : 31
+                d = dim
+            }
+            n -= 1
+        }
+    }
+    const pad = (v: number, w: number): string => String(v).padStart(w, '0')
+    return `${pad(y, 4)}-${pad(m, 2)}-${pad(d, 2)}`
+}
+
+export function matchesWeekdayOrIntervalCadence(
+    beat: ScheduledStoryBeat,
+    currentIsoDate: string,
+): boolean {
+    if (currentIsoDate < beat.isoDate) return false
+    const rule = ruleOf(beat)
+    if (rule.untilIsoDate != null && currentIsoDate > rule.untilIsoDate) {
+        return false
+    }
+    const freq = rule.frequency
+    if (freq === 'ONCE') return currentIsoDate === beat.isoDate
+    if (freq === 'DAILY') {
+        return computeDaysBetweenIsoDates(beat.isoDate, currentIsoDate) >= 0
+    }
+    if (freq === 'WEEKLY_MASK') {
+        const delta = computeDaysBetweenIsoDates(beat.isoDate, currentIsoDate)
+        if (delta < 0) return false
+        const mask = (rule.weekdayMask ?? []) as readonly string[]
+        if (mask.length === 0) return false
+        return mask.includes(resolveEngineGregorianWeekday(currentIsoDate))
+    }
+    if (freq === 'INTERVAL_DAYS') {
+        const delta = computeDaysBetweenIsoDates(beat.isoDate, currentIsoDate)
+        if (delta < 0) return false
+        const interval =
+            Number.isInteger(rule.intervalDays) &&
+            (rule.intervalDays as number) >= 1
+                ? (rule.intervalDays as number)
+                : 1
+        return delta % interval === 0
+    }
+    return false
+}
+
+export const SYNODIC_MONTH_SECONDS = 2551443
+export const REF_NEW_MOON_SEC = 947182440
+
+export interface EngineLunarPhaseSnapshot {
+    readonly phase: LunarPhaseToken
+    readonly illuminationBps: number
+    readonly ageSeconds: number
+    readonly cycleProgressBps: number
+}
+
+export function computeEngineLunarPhaseSnapshot(
+    isoDate: string,
+    startTimeHm = '00:00',
+): EngineLunarPhaseSnapshot {
+    const ts = computeGregorianTimestampSeconds(isoDate, startTimeHm)
+    let age = (ts - REF_NEW_MOON_SEC) % SYNODIC_MONTH_SECONDS
+    if (age < 0) age += SYNODIC_MONTH_SECONDS
+    const cycleProgressBps = Math.floor((age * 10000) / SYNODIC_MONTH_SECONDS)
+    const quarter = SYNODIC_MONTH_SECONDS / 4
+    let phase: LunarPhaseToken = 'NEW_MOON'
+    if (age < quarter * 0.5 || age >= SYNODIC_MONTH_SECONDS - quarter * 0.5) {
+        phase = 'NEW_MOON'
+    } else if (age < quarter * 1.5) {
+        phase = 'FIRST_QUARTER'
+    } else if (age < quarter * 2.5) {
+        phase = 'FULL_MOON'
+    } else {
+        phase = 'LAST_QUARTER'
+    }
+    const progress = age / SYNODIC_MONTH_SECONDS
+    const illum = Math.round(
+        ((1 - Math.cos(2 * Math.PI * progress)) / 2) * 10000,
+    )
+    const illuminationBps = Math.max(0, Math.min(10000, illum))
+    return Object.freeze({
+        phase,
+        illuminationBps,
+        ageSeconds: age,
+        cycleProgressBps,
+    })
+}
+
+export function resolveEngineSolarMarker(
+    isoDate: string,
+): import('../fce/tick.interface.js').SolarMarkerToken | null {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate)
+    if (m == null || m[2] == null || m[3] == null) return null
+    const mmdd = `${m[2]}-${m[3]}`
+    if (mmdd === '03-20') return 'VERNAL_EQUINOX'
+    if (mmdd === '06-21') return 'SUMMER_SOLSTICE'
+    if (mmdd === '09-22') return 'AUTUMN_EQUINOX'
+    if (mmdd === '12-21') return 'WINTER_SOLSTICE'
+    return null
+}
+
+export function matchesLunarOrSolarRecurrence(
+    beat: ScheduledStoryBeat,
+    currentIsoDate: string,
+): boolean {
+    if (currentIsoDate < beat.isoDate) return false
+    const rule = ruleOf(beat)
+    if (rule.untilIsoDate != null && currentIsoDate > rule.untilIsoDate) {
+        return false
+    }
+    if (rule.frequency === 'LUNAR_PHASE') {
+        if (rule.lunarPhase == null) return false
+        const snap = computeEngineLunarPhaseSnapshot(
+            currentIsoDate,
+            beat.startTimeHm,
+        )
+        return snap.phase === rule.lunarPhase
+    }
+    if (rule.frequency === 'SOLAR_SOLSTICE_EQUINOX') {
+        const marker = resolveEngineSolarMarker(currentIsoDate)
+        if (marker == null) return false
+        const markers = (rule.solarMarkers ?? []) as readonly string[]
+        return markers.includes(marker)
+    }
+    return false
+}
+
+export function matchesBeatRecurrenceOnDate(
+    beat: ScheduledStoryBeat,
+    currentIsoDate: string,
+): boolean {
+    const rule = ruleOf(beat)
+    if (currentIsoDate < beat.isoDate) return false
+    if (rule.untilIsoDate != null && currentIsoDate > rule.untilIsoDate) {
+        return false
+    }
+    switch (rule.frequency) {
+        case 'ONCE':
+            return currentIsoDate === beat.isoDate
+        case 'DAILY':
+        case 'WEEKLY_MASK':
+        case 'INTERVAL_DAYS':
+            return matchesWeekdayOrIntervalCadence(beat, currentIsoDate)
+        case 'LUNAR_PHASE':
+        case 'SOLAR_SOLSTICE_EQUINOX':
+            return matchesLunarOrSolarRecurrence(beat, currentIsoDate)
+        default:
+            return currentIsoDate === beat.isoDate
+    }
+}
+
+export function evaluateBlackoutException(
+    beat: ScheduledStoryBeat,
+    candidateIsoDate: string,
+    seriesBlackouts: readonly string[] = [],
+): BlackoutEvaluationResult {
+    const rule = ruleOf(beat)
+    const policy =
+        rule.blackoutShiftPolicy === 'DEFER_NEXT_VALID_DAY'
+            ? 'DEFER_NEXT_VALID_DAY'
+            : 'SKIP'
+    const beatDates = new Set<string>(
+        ((rule.blackoutDates ?? []) as readonly string[]).filter(
+            (d) => typeof d === 'string',
+        ),
+    )
+    const seriesSet = new Set<string>(
+        (seriesBlackouts ?? []).filter((d) => typeof d === 'string'),
+    )
+    let weekday: WeekdayToken
+    try {
+        weekday = resolveEngineGregorianWeekday(candidateIsoDate)
+    } catch {
+        return Object.freeze({
+            isBlackedOut: false,
+            policy,
+            effectiveIsoDate: candidateIsoDate,
+            deferredFromIsoDate: null,
+        })
+    }
+    const weekdaySet = new Set<string>(
+        ((rule.blackoutWeekdays ?? []) as readonly string[]).filter(
+            (d) => typeof d === 'string',
+        ),
+    )
+    const isBlacked =
+        beatDates.has(candidateIsoDate) ||
+        seriesSet.has(candidateIsoDate) ||
+        weekdaySet.has(weekday)
+    if (!isBlacked) {
+        return Object.freeze({
+            isBlackedOut: false,
+            policy,
+            effectiveIsoDate: candidateIsoDate,
+            deferredFromIsoDate: null,
+        })
+    }
+    if (policy === 'SKIP') {
+        return Object.freeze({
+            isBlackedOut: true,
+            policy,
+            effectiveIsoDate: null,
+            deferredFromIsoDate: candidateIsoDate,
+        })
+    }
+    for (let i = 1; i <= 7; i += 1) {
+        let shifted: string
+        try {
+            shifted = addDaysIsoDate(candidateIsoDate, i)
+        } catch {
+            continue
+        }
+        if (rule.untilIsoDate != null && shifted > rule.untilIsoDate) {
+            continue
+        }
+        let shiftedWeekday: string
+        try {
+            shiftedWeekday = resolveEngineGregorianWeekday(shifted)
+        } catch {
+            continue
+        }
+        if (beatDates.has(shifted)) continue
+        if (seriesSet.has(shifted)) continue
+        if (weekdaySet.has(shiftedWeekday)) continue
+        return Object.freeze({
+            isBlackedOut: true,
+            policy,
+            effectiveIsoDate: shifted,
+            deferredFromIsoDate: candidateIsoDate,
+        })
+    }
+    return Object.freeze({
+        isBlackedOut: true,
+        policy,
+        effectiveIsoDate: null,
+        deferredFromIsoDate: candidateIsoDate,
+    })
+}
+
 export function evaluateChronoAgendaWindow(
     tick: number,
     previousClock: AgendaClockState,
@@ -398,6 +770,8 @@ export function evaluateChronoAgendaWindow(
     beats: readonly ScheduledStoryBeat[],
     consumedKeys: readonly string[] | ReadonlySet<string>,
     tickSeconds: number,
+    seriesBlackouts?: readonly string[],
+    beatOccurrenceCounts?: Readonly<Record<string, number>>,
 ): ChronoAgendaWindowStatus {
     if (!Number.isInteger(tick) || tick < 0) {
         throw new RangeError(
@@ -413,13 +787,28 @@ export function evaluateChronoAgendaWindow(
         consumedKeys instanceof Set
             ? consumedKeys
             : new Set<string>(consumedKeys ?? [])
+    const seriesList: readonly string[] = Array.isArray(seriesBlackouts)
+        ? seriesBlackouts
+        : []
     const prevEpoch = agendaClockEpochSeconds(previousClock)
     const nextEpoch = agendaClockEpochSeconds(nextClock)
     const dueBeats: ResolvedAgendaBeatWindow[] = []
     const activeReserveLocks: ResolvedAgendaBeatWindow[] = []
+    const blackoutSkips: BlackoutSkipNotice[] = []
     const seenDue = new Set<string>()
+    const seenReserve = new Set<string>()
     for (const beat of beats ?? []) {
         if (beat == null) continue
+        const rule = ruleOf(beat)
+        if (
+            beatOccurrenceCounts != null &&
+            rule.maxOccurrences != null &&
+            Number.isInteger(rule.maxOccurrences) &&
+            (beatOccurrenceCounts[beat.beat_id] ?? 0) >=
+                (rule.maxOccurrences as number)
+        ) {
+            continue
+        }
         const tolerance =
             Number.isInteger(beat.toleranceTicks) &&
             (beat.toleranceTicks as number) >= 0
@@ -430,23 +819,139 @@ export function evaluateChronoAgendaWindow(
             (beat.reserveCooldownTicks as number) >= 0
                 ? (beat.reserveCooldownTicks as number)
                 : 0
-        const recurring = beat.recurringDaily === true
-        let candidateDates: string[]
-        if (recurring) {
-            const dates = new Set<string>([
-                previousClock.isoDate,
-                nextClock.isoDate,
-            ])
+        const freq = rule.frequency ?? 'ONCE'
+        const isRecurring = freq !== 'ONCE' || beat.recurringDaily === true
+        let anchorDates: string[]
+        if (!isRecurring) {
+            anchorDates = [beat.isoDate]
+        } else {
+            const dates = new Set<string>()
+            dates.add(previousClock.isoDate)
+            dates.add(nextClock.isoDate)
             try {
                 dates.add(agendaNextIsoDate(nextClock.isoDate))
             } catch {
-                // ignore malformed date
+                // ignore
             }
-            candidateDates = [...dates]
-        } else {
-            candidateDates = [beat.isoDate]
+            for (let i = 1; i <= 7; i += 1) {
+                try {
+                    dates.add(addDaysIsoDate(nextClock.isoDate, -i))
+                } catch {
+                    // ignore
+                }
+            }
+            if (typeof beat.isoDate === 'string') {
+                dates.add(beat.isoDate)
+            }
+            anchorDates = [...dates]
         }
-        for (const effectiveIsoDate of candidateDates) {
+        for (const anchor of anchorDates) {
+            let matches = false
+            try {
+                matches = matchesBeatRecurrenceOnDate(beat, anchor)
+            } catch {
+                continue
+            }
+            if (!matches) continue
+            let evaluated: BlackoutEvaluationResult
+            try {
+                evaluated = evaluateBlackoutException(beat, anchor, seriesList)
+            } catch {
+                continue
+            }
+            if (evaluated.isBlackedOut) {
+                if (
+                    evaluated.policy === 'SKIP' ||
+                    evaluated.effectiveIsoDate == null
+                ) {
+                    const key = `${beat.beat_id}@${anchor}:skip`
+                    if (!seenDue.has(key)) {
+                        seenDue.add(key)
+                        blackoutSkips.push(
+                            Object.freeze({
+                                beatId: beat.beat_id,
+                                blackoutDate: anchor,
+                                policy: evaluated.policy,
+                                effectiveIsoDate: null,
+                                deferredFromIsoDate: anchor,
+                            }),
+                        )
+                    }
+                    continue
+                }
+                const effectiveIsoDate = evaluated.effectiveIsoDate as string
+                const occurrenceKey = agendaOccurrenceKey(
+                    beat.beat_id,
+                    effectiveIsoDate,
+                )
+                if (consumedSet.has(occurrenceKey)) continue
+                if (seenDue.has(occurrenceKey)) continue
+                let targetEpoch: number
+                try {
+                    targetEpoch = computeGregorianTimestampSeconds(
+                        effectiveIsoDate,
+                        beat.startTimeHm,
+                    )
+                } catch {
+                    continue
+                }
+                const deltaSeconds = targetEpoch - nextEpoch
+                const ticksUntilBeat = Math.ceil(
+                    (targetEpoch - nextEpoch) / tickSeconds,
+                )
+                let targetTick = tick + ticksUntilBeat
+                try {
+                    targetTick = computeAgendaBeatTargetTick(
+                        beat,
+                        effectiveIsoDate,
+                        nextClock,
+                        tick,
+                        tickSeconds,
+                    )
+                } catch {
+                    targetTick = tick + ticksUntilBeat
+                }
+                const inInterval =
+                    targetEpoch > prevEpoch && targetEpoch <= nextEpoch
+                const withinTolerance = Math.abs(targetTick - tick) <= tolerance
+                if (inInterval || withinTolerance) {
+                    dueBeats.push(
+                        Object.freeze({
+                            beat,
+                            effectiveIsoDate,
+                            occurrenceKey,
+                            targetTick,
+                            targetEpochSeconds: targetEpoch,
+                            deltaSeconds,
+                            ticksUntilBeat,
+                            deferredFromIsoDate: anchor,
+                        }),
+                    )
+                    seenDue.add(occurrenceKey)
+                    continue
+                }
+                if (targetEpoch > nextEpoch) {
+                    if (ticksUntilBeat >= 1 && ticksUntilBeat <= reserve) {
+                        if (!seenReserve.has(occurrenceKey)) {
+                            seenReserve.add(occurrenceKey)
+                            activeReserveLocks.push(
+                                Object.freeze({
+                                    beat,
+                                    effectiveIsoDate,
+                                    occurrenceKey,
+                                    targetTick,
+                                    targetEpochSeconds: targetEpoch,
+                                    deltaSeconds,
+                                    ticksUntilBeat,
+                                    deferredFromIsoDate: anchor,
+                                }),
+                            )
+                        }
+                    }
+                }
+                continue
+            }
+            const effectiveIsoDate = anchor
             const occurrenceKey = agendaOccurrenceKey(
                 beat.beat_id,
                 effectiveIsoDate,
@@ -491,6 +996,7 @@ export function evaluateChronoAgendaWindow(
                         targetEpochSeconds: targetEpoch,
                         deltaSeconds,
                         ticksUntilBeat,
+                        deferredFromIsoDate: null,
                     }),
                 )
                 seenDue.add(occurrenceKey)
@@ -507,6 +1013,7 @@ export function evaluateChronoAgendaWindow(
                             targetEpochSeconds: targetEpoch,
                             deltaSeconds,
                             ticksUntilBeat,
+                            deferredFromIsoDate: null,
                         }),
                     )
                 }
@@ -535,5 +1042,6 @@ export function evaluateChronoAgendaWindow(
         tick,
         dueBeats: Object.freeze([...dueBeats]),
         activeReserveLocks: Object.freeze([...activeReserveLocks]),
+        blackoutSkips: Object.freeze([...blackoutSkips]),
     })
 }
