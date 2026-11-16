@@ -494,3 +494,23 @@ export const assertMassConservationInventoryAction = (
 
     return cpy
 }
+
+export const resetInventoryAction = async (
+    cpy: InventoryModel,
+    bal?: InventoryBit,
+    ste?: State,
+): Promise<InventoryModel> => {
+    const fresh = new InventoryModel()
+    for (const key of Object.keys(fresh) as Array<keyof InventoryModel>) {
+        ;(cpy as any)[key] = (fresh as any)[key]
+    }
+    cpy.inventories = {}
+    await emitConsole(
+        ste,
+        '>> [INVENTORY:RESET] Possession caches cleared to void state [OK]',
+    )
+    if (bal?.slv) {
+        bal.slv({ invBit: { idx: 'reset-inventory-pass', val: 0 } })
+    }
+    return cpy
+}

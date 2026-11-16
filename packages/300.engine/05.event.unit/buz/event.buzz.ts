@@ -839,3 +839,25 @@ export const shouldTriggerRecurringBeatOccurrence = (
     },
     currentCount: number,
 ): boolean => canBeatFireUnderMaxOccurrences(beat, currentCount)
+
+export const resetEventAction = async (
+    cpy: EventModel,
+    bal?: EventBit,
+    ste?: State,
+): Promise<EventModel> => {
+    const fresh = new EventModel()
+    for (const key of Object.keys(fresh) as Array<keyof EventModel>) {
+        ;(cpy as any)[key] = (fresh as any)[key]
+    }
+    cpy.totalAppended = 0
+    cpy.lastSequenceId = 0
+    cpy.lastEventHash = '0'.repeat(64)
+    await emitConsole(
+        ste,
+        '>> [EVENT:RESET] Append log rewound to sequence zero [OK]',
+    )
+    if (bal?.slv) {
+        bal.slv({ evtBit: { idx: 'reset-event-pass', val: 0 } })
+    }
+    return cpy
+}

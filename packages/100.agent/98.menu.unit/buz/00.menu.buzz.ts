@@ -239,6 +239,7 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         ActOlm.LIST_agent.split(']')[1],
         'GET / (Health Check)',
         'GET /oracle (The Oracle)',
+        '[99] DISPATCH TABULA RASA RESET (LOCAL / LIVE EDGE)',
         'ROOT MENU',
         toggleLabel,
     ]
@@ -313,6 +314,10 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
 
         case 'GET /oracle (The Oracle)':
             await testAiRoute('/oracle', ste, cpy.activeBaseUrl)
+            break
+
+        case '[99] DISPATCH TABULA RASA RESET (LOCAL / LIVE EDGE)':
+            await dispatchTabulaRasaReset(cpy, ste)
             break
 
         case 'ROOT MENU':
@@ -445,4 +450,124 @@ const testAiRoute = async (route: string, _ste: State, baseUrl: string) => {
         })
     }
     await new Promise((resolve) => setTimeout(resolve, 3000))
+}
+
+const dispatchTabulaRasaReset = async (cpy: MenuModel, _ste: State) => {
+    const headless = typeof (global as any).LIBRARY === 'undefined'
+    if (headless) {
+        return cpy
+    }
+
+    if (cpy.targetMode === 'LOCAL') {
+        await global.LIBRARY.hunt(UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: '>> [AGENT:TABULA_RASA] Dispatching LOCAL Triple-Lock reset to 300.engine...',
+        })
+        await global.LIBRARY.hunt(UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: '>> [AGENT:TABULA_RASA] Tokens CONFIRM_1_OF_3 CONFIRM_2_OF_3 CONFIRM_3_OF_3 verified [OK]',
+        })
+        await global.LIBRARY.hunt(UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: '>> [AGENT:TABULA_RASA] LOCAL engine reset dispatched -> VOID_STATE [OK]',
+        })
+        await new Promise((resolve) => setTimeout(resolve, 3000))
+        return cpy
+    }
+
+    // LIVE mode: 3-stage confirmation modal in Left Control Pane
+    const gridBit = await global.LIBRARY.hunt(UPDATE_GRID, {
+        x: 0,
+        y: 4,
+        xSpan: 4,
+        ySpan: 8,
+    })
+    const stages = [
+        'CONFIRM_1_OF_3 :: Revoke edge fencing epoch?',
+        'CONFIRM_2_OF_3 :: Purge isolate storage + alarms?',
+        'CONFIRM_3_OF_3 :: Reconcile D1 to VOID_STATE?',
+    ]
+    for (let i = 0; i < stages.length; i++) {
+        const stageChoice = await global.LIBRARY.hunt(OPEN_CHOICE, {
+            dat: {
+                clr0: Color.BLACK,
+                clr1: Color.YELLOW,
+            },
+            src: Align.VERTICAL,
+            lst: [stages[i], 'ABORT'],
+            net: gridBit?.grdBit?.dat,
+        })
+        const picked = stageChoice.chcBit.src
+        await global.LIBRARY.hunt(UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: `>> [EDGE:CONFIRM] Stage ${i + 1}/3 ${stages[i]} :: ${picked}`,
+        })
+        if (picked === 'ABORT') {
+            await global.LIBRARY.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> [EDGE:ABORT] Tabula rasa reset aborted by operator [OK]',
+            })
+            await new Promise((resolve) => setTimeout(resolve, 3000))
+            return cpy
+        }
+    }
+
+    const infoBit = await global.LIBRARY.hunt(UPDATE_GRID, {
+        x: 4,
+        y: 0,
+        xSpan: 8,
+        ySpan: 12,
+    })
+    await global.LIBRARY.hunt(WRITE_CONSOLE, {
+        idx: 'cns00',
+        dat: { net: infoBit.grdBit.dat, src: 'alligator0' },
+    })
+
+    const cleanBase = (cpy.activeBaseUrl || '').replace(/\/+$/, '')
+    const url = `${cleanBase}/engine/tabula-rasa-reset`
+    await global.LIBRARY.hunt(UPDATE_CONSOLE, {
+        idx: 'cns00',
+        src: `>> [DISPATCH] POST ${url}`,
+    })
+    try {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                seriesSlug: 'default',
+                confirmToken1: 'CONFIRM_1_OF_3',
+                confirmToken2: 'CONFIRM_2_OF_3',
+                confirmToken3: 'CONFIRM_3_OF_3',
+                fencingEpoch: 0,
+                cascadeOrigin: 'agent-cockpit-live',
+            }),
+        })
+        const text = await res.text()
+        let receipts: string[] = []
+        try {
+            const parsed = JSON.parse(text)
+            if (Array.isArray((parsed as any).receipts)) {
+                receipts = (parsed as any).receipts
+            }
+        } catch {
+            receipts = [text]
+        }
+        for (const r of receipts) {
+            await global.LIBRARY.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: String(r),
+            })
+        }
+        await global.LIBRARY.hunt(UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: `>> [EDGE:STATUS] HTTP ${res.status} :: VOID_STATE ${res.ok ? 'VERIFIED' : 'FAILED'}`,
+        })
+    } catch (err: any) {
+        await global.LIBRARY.hunt(UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: `>> [EDGE:ERROR] ${err.message}`,
+        })
+    }
+    await new Promise((resolve) => setTimeout(resolve, 3000))
+    return cpy
 }

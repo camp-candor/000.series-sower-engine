@@ -3,9 +3,26 @@ import TickBit from '../fce/tick.bit.js'
 import State from '../../99.core/state.js'
 import {
     normalizeLoreChronology,
+    toSimTime,
     deriveSimDaypart,
     type SimulationClockState,
 } from '../fce/tick.interface.js'
+
+async function emitConsole(ste: State | undefined, src: string): Promise<void> {
+    if (ste && typeof ste.hunt === 'function') {
+        await ste
+            .hunt('[Console action] Update Console', { idx: 'cns00', src })
+            .catch(() => {})
+    }
+    const lib =
+        (globalThis as any).LIBRARY ||
+        (typeof global !== 'undefined' ? (global as any).LIBRARY : undefined)
+    if (lib && typeof lib.hunt === 'function') {
+        await lib
+            .hunt('[Console action] Update Console', { idx: 'cns00', src })
+            .catch(() => {})
+    }
+}
 
 function pad2Local(value: number): string {
     return value < 10 ? `0${value}` : `${value}`
@@ -1044,4 +1061,29 @@ export function evaluateChronoAgendaWindow(
         activeReserveLocks: Object.freeze([...activeReserveLocks]),
         blackoutSkips: Object.freeze([...blackoutSkips]),
     })
+}
+
+export const resetTickAction = async (
+    cpy: TickModel,
+    bal: TickBit,
+    ste?: State,
+): Promise<TickModel> => {
+    const fresh = new TickModel()
+    for (const key of Object.keys(fresh) as Array<keyof TickModel>) {
+        ;(cpy as any)[key] = (fresh as any)[key]
+    }
+    cpy.tickCount = 0
+    cpy.simTime = 0
+    cpy.clockState = normalizeLoreChronology(null)
+    if ('currentTick' in cpy) {
+        ;(cpy as any).currentTick = toSimTime(0)
+    }
+    await emitConsole(
+        ste,
+        '>> [TICK:RESET] Logical chronology restored to Tick 0 [OK]',
+    )
+    if (bal?.slv) {
+        bal.slv({ tickBit: { idx: 'reset-tick-pass', val: 0 } })
+    }
+    return cpy
 }

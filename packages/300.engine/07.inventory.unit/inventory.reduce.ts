@@ -46,6 +46,9 @@ export function reducer(
                 state,
             )
 
+        case Act.RESET_INVENTORY:
+            return Buzz.resetInventoryAction(clone(model), act.bale, state)
+
         default:
             return model
     }

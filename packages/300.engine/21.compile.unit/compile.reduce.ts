@@ -8,7 +8,7 @@ export function reducer(
     model: CompileModel = new CompileModel(),
     act: Act.Actions,
     state?: State,
-): CompileModel {
+): CompileModel | Promise<CompileModel> {
     switch (act.type) {
         case Act.INIT_COMPILE:
             return Buzz.initCompile(clone(model, true), act.bale, state)
@@ -34,6 +34,9 @@ export function reducer(
                 act.bale,
                 state,
             )
+
+        case Act.RESET_COMPILE:
+            return Buzz.resetCompileAction(clone(model), act.bale, state)
 
         default:
             return model

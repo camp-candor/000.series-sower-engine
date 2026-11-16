@@ -523,3 +523,23 @@ export const auditLeverageSolvencyAction = async (
 
     return cpy
 }
+
+export const resetLeverageAction = async (
+    cpy: LeverageModel,
+    bal?: LeverageBit,
+    ste?: State,
+): Promise<LeverageModel> => {
+    const fresh = new LeverageModel()
+    for (const key of Object.keys(fresh) as Array<keyof LeverageModel>) {
+        ;(cpy as any)[key] = (fresh as any)[key]
+    }
+    cpy.records.clear()
+    await emitConsole(
+        ste,
+        '>> [LEVERAGE:RESET] Social debt records cleared to void state [OK]',
+    )
+    if (bal?.slv) {
+        bal.slv({ levBit: { idx: 'reset-leverage-pass', val: 0 } })
+    }
+    return cpy
+}

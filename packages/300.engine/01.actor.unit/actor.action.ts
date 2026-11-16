@@ -95,6 +95,12 @@ export class EnforceCurtnessBudgetActor implements Action {
     constructor(public bale?: ActorBit) {}
 }
 
+export const RESET_ACTOR = '[Actor action] Reset Actor'
+export class ResetActor implements Action {
+    readonly type = RESET_ACTOR
+    constructor(public bale?: ActorBit) {}
+}
+
 export type Actions =
     | InitActor
     | UpdateActor
@@ -110,3 +116,4 @@ export type Actions =
     | ProbeDialogueLeakActor
     | CompileDialogueBeatActor
     | EnforceCurtnessBudgetActor
+    | ResetActor

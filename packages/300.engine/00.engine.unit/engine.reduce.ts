@@ -86,6 +86,9 @@ export function reducer(
         case Act.RESET_ENGINE:
             return Buzz.resetEngine(clone(model), act.bale as any, state)
 
+        case Act.AUDIT_RESET_COVERAGE:
+            return Buzz.auditResetCoverage(clone(model), act.bale as any, state)
+
         default:
             return model
     }

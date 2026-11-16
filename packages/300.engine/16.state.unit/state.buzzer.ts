@@ -13,6 +13,7 @@ export {
     computeHashStateAction,
     recursiveDeepFreeze,
     deepFreeze,
+    resetStateAction,
     computeWorkingStateHash,
     reduceLedgerState,
     foldLedgerEvents,

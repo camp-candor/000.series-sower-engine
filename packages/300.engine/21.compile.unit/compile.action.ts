@@ -47,6 +47,12 @@ export class Gate0Verify implements Action {
     constructor(public bale: CompileBit) {}
 }
 
+export const RESET_COMPILE = '[Compile action] Reset Compile'
+export class ResetCompile implements Action {
+    readonly type = RESET_COMPILE
+    constructor(public bale: CompileBit) {}
+}
+
 export type Actions =
     | InitCompile
     | RunCompile
@@ -55,3 +61,4 @@ export type Actions =
     | Pass3Seal
     | Gate0Verify
     | SynthesizeEventFountain
+    | ResetCompile

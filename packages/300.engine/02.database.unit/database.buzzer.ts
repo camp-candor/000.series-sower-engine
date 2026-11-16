@@ -22,6 +22,7 @@ export {
     inspectContinuityDatabase,
     mountRealmDatabase,
     closeDatabaseConnection,
+    closeDatabaseAction,
     ensureSchema,
 } from './buz/database.buzz.js'
 export { EVENT_LOG_DDL, EVENT_LOG_TRIGGERS } from './buz/schemaDdl.buzz.js'

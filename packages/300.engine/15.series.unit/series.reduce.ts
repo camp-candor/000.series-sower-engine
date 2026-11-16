@@ -26,6 +26,13 @@ export const reducer = async (
         case Act.GET_ACTIVE_SERIES:
             return Buzz.getActiveSeries(clone(model), act.bale, state as State)
 
+        case Act.RESET_SERIES:
+            return Buzz.resetSeriesAction(
+                clone(model),
+                act.bale,
+                state as State,
+            )
+
         default:
             return model
     }

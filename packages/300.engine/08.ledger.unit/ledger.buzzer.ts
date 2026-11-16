@@ -10,6 +10,7 @@ export {
     commitStagingAction,
     queryStagingStateAction,
     resolveDual2d6Action,
+    resetLedgerAction,
     roll2d6,
     classifyMargin,
     evaluateDual2d6,

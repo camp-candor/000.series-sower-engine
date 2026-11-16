@@ -77,6 +77,9 @@ export function reducer(
                 state,
             ).then(() => clone(model))
 
+        case Act.RESET_TABULA_RASA_MENU:
+            return Buzz.runEngineTabulaRasaMenu(clone(model), act.bale, state)
+
         default:
             return model
     }

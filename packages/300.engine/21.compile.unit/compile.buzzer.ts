@@ -8,6 +8,7 @@ export {
     synthesizeEventFountain,
     canonicalizeJcs,
     sha256Hex,
+    resetCompileAction,
 } from './buz/compile.buzz.js'
 export {
     sanitizeFountainToAscii,

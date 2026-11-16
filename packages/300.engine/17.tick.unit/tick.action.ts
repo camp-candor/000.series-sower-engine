@@ -34,9 +34,16 @@ export class ReadSimulationTimecode implements Action {
     constructor(public bale: TickBit) {}
 }
 
+export const RESET_TICK = '[Tick action] Reset Tick'
+export class ResetTick implements Action {
+    readonly type = RESET_TICK
+    constructor(public bale: TickBit) {}
+}
+
 export type Actions =
     | InitTick
     | UpdateTick
     | SetSimulationChronology
     | AdvanceSimulationClock
     | ReadSimulationTimecode
+    | ResetTick

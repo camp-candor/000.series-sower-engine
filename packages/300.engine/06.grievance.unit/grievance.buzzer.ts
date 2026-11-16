@@ -13,6 +13,7 @@ export {
     assertBasisPoints,
     calculateJaccardSimilarity,
     evaluateMachineRailFilter,
+    resetGrievanceAction,
 } from './buz/grievance.buzz.js'
 export type {
     GrievanceStatus,

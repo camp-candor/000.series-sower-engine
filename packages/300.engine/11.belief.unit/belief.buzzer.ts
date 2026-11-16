@@ -7,6 +7,7 @@ export {
     processPerceptCandidateAction,
     evaluateSensoryGateAction,
     combineBeliefsAction,
+    resetBeliefAction,
 } from './buz/belief.buzz.js'
 
 export { parsePerceptCandidate } from './buz/percept-ingest.buzz.js'

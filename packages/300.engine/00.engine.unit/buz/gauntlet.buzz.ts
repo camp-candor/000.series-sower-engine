@@ -2,6 +2,7 @@
 import { createRequire } from 'module'
 import type GauntletBit from '../fce/gauntlet.bit.js'
 import type { GauntletStageResult } from '../fce/gauntlet.bit.js'
+import { evaluateResetCoveragePure } from './reset-coverage.buzz.js'
 
 const req = createRequire(import.meta.url)
 const { execSync } = req('child_process')
@@ -71,7 +72,7 @@ export const GAUNTLET_STAGES: readonly StageConfig[] = [
     },
 ]
 
-async function logToConsolePane(lines: string[]): Promise<void> {
+async function logToConsolePane(lines: readonly string[]): Promise<void> {
     if (
         typeof global !== 'undefined' &&
         global.LIBRARY &&
@@ -134,6 +135,45 @@ export async function runGauntlet(
 
     const results: GauntletStageResult[] = []
     let allPassed = true
+
+    const resetCoverageReport = evaluateResetCoveragePure()
+    for (const line of resetCoverageReport.receipts) {
+        receipts.push(line)
+    }
+    await logToConsolePane(resetCoverageReport.receipts)
+    if (!resetCoverageReport.valid) {
+        allPassed = false
+        results.push({
+            stageId: 'STAGE_0_RESET_COVERAGE',
+            name: 'Tabula Rasa Reset Coverage Sentinel',
+            passed: false,
+            durationMs: 0,
+            error: 'RESET COVERAGE DRIFT DETECTED',
+        })
+        receipts.push(
+            '>> ------------------------------------------------------------------',
+        )
+        receipts.push(
+            '>> [VERDICT:FAIL] GAUNTLET TRIPPED. EXECUTION HALTED AT CHEAPEST STAGE',
+        )
+        receipts.push(
+            '>> ==================================================================',
+        )
+        await logToConsolePane(receipts.slice(-3))
+        await yieldToPaint()
+
+        bal.val = -1
+        bal.lst = receipts
+        bal.dat = {
+            stages: results,
+            passed: false,
+            totalDurationMs: 0,
+            resetCoverage: resetCoverageReport,
+        } as any
+
+        if (bal.slv) bal.slv({ gntBit: bal })
+        return cpy
+    }
 
     for (const stage of GAUNTLET_STAGES) {
         const res = executeStage(stage)

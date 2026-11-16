@@ -43,6 +43,9 @@ export function reducer(
                 state,
             )
 
+        case Act.RESET_TRAUMA:
+            return Buzz.resetTraumaAction(clone(model), act.bale, state)
+
         default:
             return model
     }

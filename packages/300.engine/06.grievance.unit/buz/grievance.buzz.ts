@@ -733,3 +733,24 @@ export const auditGrievanceRecordsAction = (
     }
     return cpy
 }
+
+export const resetGrievanceAction = async (
+    cpy: GrievanceModel,
+    bal?: GrievanceBit,
+    ste?: State,
+): Promise<GrievanceModel> => {
+    const fresh = new GrievanceModel()
+    for (const key of Object.keys(fresh) as Array<keyof GrievanceModel>) {
+        ;(cpy as any)[key] = (fresh as any)[key]
+    }
+    cpy.records.clear()
+    cpy.recentEncounterHistory = []
+    await emitConsole(
+        ste,
+        '>> [GRIEVANCE:RESET] Escalation lottery state cleared to void [OK]',
+    )
+    if (bal?.slv) {
+        bal.slv({ grvBit: { idx: 'reset-grievance-pass', val: 0 } })
+    }
+    return cpy
+}

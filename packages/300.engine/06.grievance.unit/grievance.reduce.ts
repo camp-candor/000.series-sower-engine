@@ -61,6 +61,9 @@ export function reducer(
                 state,
             )
 
+        case Act.RESET_GRIEVANCE:
+            return Buzz.resetGrievanceAction(clone(model), act.bale, state)
+
         default:
             return model
     }

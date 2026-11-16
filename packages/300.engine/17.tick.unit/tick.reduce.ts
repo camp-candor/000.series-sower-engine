@@ -462,6 +462,9 @@ export function reducer(
             return model
         }
 
+        case Act.RESET_TICK:
+            return Buzz.resetTickAction(clone(model), act.bale, state as State)
+
         default:
             return model
     }

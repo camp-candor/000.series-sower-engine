@@ -8,6 +8,7 @@ export {
     assertExpectedSeq,
     commitSequence,
     verifySequenceContinuity,
+    resetSequenceAction,
 } from './buz/sequence.buzz.js'
 export type {
     SequenceValidationReport,

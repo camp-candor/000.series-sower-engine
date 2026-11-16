@@ -128,3 +128,69 @@ export const getActiveSeries = (
     }
     return cpy
 }
+
+export const resetSeriesAction = async (
+    cpy: SeriesModel,
+    bal?: SeriesBit,
+    ste?: State,
+): Promise<SeriesModel> => {
+    const previousSeriesSlug = cpy.activeSeriesSlug || ''
+    const clearedAllocationsCount = Object.keys(cpy.allocations || {}).length
+
+    cpy.activeSeriesSlug = ''
+    cpy.activeStorageTarget = ''
+    cpy.allocations = {}
+    cpy.seriesBits = {}
+
+    if ((cpy as any).activeCorpus !== undefined) {
+        ;(cpy as any).activeCorpus = undefined
+    }
+    if ((cpy as any).activeMetadata !== undefined) {
+        ;(cpy as any).activeMetadata = undefined
+    }
+    if ((cpy as any).merkleRootHex !== undefined) {
+        ;(cpy as any).merkleRootHex = '0'.repeat(64)
+    }
+
+    if (typeof globalThis !== 'undefined') {
+        delete (globalThis as any).ACTIVE_SERIES_SLUG
+    }
+
+    const line =
+        '>> [SERIES:RESET] Active series namespace unbound -> [NONE (UNBOUND)] [OK]'
+    if (ste && typeof ste.hunt === 'function') {
+        await ste
+            .hunt('[Console action] Update Console', {
+                idx: 'cns00',
+                src: line,
+            })
+            .catch(() => {})
+    }
+    const lib =
+        (globalThis as any).LIBRARY ||
+        (typeof global !== 'undefined' ? (global as any).LIBRARY : undefined)
+    if (lib && typeof lib.hunt === 'function') {
+        await lib
+            .hunt('[Console action] Update Console', {
+                idx: 'cns00',
+                src: line,
+            })
+            .catch(() => {})
+    }
+
+    if (bal?.slv) {
+        bal.slv({
+            seriesBit: {
+                idx: 'reset-series-pass',
+                val: 0,
+                dat: {
+                    previousSeriesSlug,
+                    clearedAllocationsCount,
+                    activeSeriesSlug: '',
+                },
+            },
+        })
+    }
+
+    return cpy
+}

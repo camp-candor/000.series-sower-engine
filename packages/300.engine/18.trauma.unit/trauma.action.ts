@@ -41,6 +41,12 @@ export class GetSomaticState implements Action {
     constructor(public bale?: TraumaBit) {}
 }
 
+export const RESET_TRAUMA = '[Trauma action] Reset Trauma'
+export class ResetTrauma implements Action {
+    readonly type = RESET_TRAUMA
+    constructor(public bale?: TraumaBit) {}
+}
+
 export type Actions =
     | InitTrauma
     | UpdateTrauma
@@ -48,3 +54,4 @@ export type Actions =
     | DecayFatigueTrauma
     | ClampBasisPointsTrauma
     | GetSomaticState
+    | ResetTrauma

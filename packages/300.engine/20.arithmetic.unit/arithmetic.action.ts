@@ -21,7 +21,13 @@ export class UpdateArithmetic implements Action {
     constructor(public bale: ArithmeticBit) {}
 }
 
-export type Actions = InitArithmetic | UpdateArithmetic
+export const RESET_ARITHMETIC = '[Arithmetic action] Reset Arithmetic'
+export class ResetArithmetic implements Action {
+    readonly type = RESET_ARITHMETIC
+    constructor(public bale: ArithmeticBit) {}
+}
+
+export type Actions = InitArithmetic | UpdateArithmetic | ResetArithmetic
 
 export function arbitrateRemainder(
     quotient: number,

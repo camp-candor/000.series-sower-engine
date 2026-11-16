@@ -47,6 +47,12 @@ export class GetActorPosition implements Action {
     constructor(public bale?: MovementBit) {}
 }
 
+export const RESET_MOVEMENT = '[Movement action] Reset Movement'
+export class ResetMovement implements Action {
+    readonly type = RESET_MOVEMENT
+    constructor(public bale?: MovementBit) {}
+}
+
 export type Actions =
     | InitMovement
     | UpdateMovement
@@ -55,3 +61,4 @@ export type Actions =
     | AssertInteractionRange
     | ExecuteMovement
     | GetActorPosition
+    | ResetMovement

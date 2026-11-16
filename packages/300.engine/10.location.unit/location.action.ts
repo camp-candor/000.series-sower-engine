@@ -103,6 +103,12 @@ export class ExecuteBatchPath implements Action<LocationBit> {
     constructor(public bale?: LocationBit) {}
 }
 
+export const RESET_LOCATION = '[Location action] Reset Location'
+export class ResetLocation implements Action<LocationBit> {
+    readonly type = RESET_LOCATION
+    constructor(public bale?: LocationBit) {}
+}
+
 export type Actions =
     | InitLocation
     | UpdateLocation
@@ -120,3 +126,4 @@ export type Actions =
     | BuildSpatialOverlay
     | VerifyTraversalBudget
     | ExecuteBatchPath
+    | ResetLocation

@@ -853,3 +853,61 @@ export const whyDirtyStateAction = (
 
     return cpy
 }
+
+export const resetStateAction = async (
+    cpy: StateModel,
+    bal?: StateBit,
+    ste?: State,
+): Promise<StateModel> => {
+    const freshDefaults = new StateModel()
+    for (const key of Object.keys(freshDefaults) as Array<keyof StateModel>) {
+        ;(cpy as any)[key] = (freshDefaults as any)[key]
+    }
+    cpy.idx = '16.state'
+    if ('stateHash' in cpy) {
+        ;(cpy as any).stateHash = '0'.repeat(64)
+    }
+    if ('lastStateHash' in cpy) {
+        ;(cpy as any).lastStateHash = '0'.repeat(64)
+    }
+    if ('activeStateHash' in cpy) {
+        ;(cpy as any).activeStateHash = '0'.repeat(64)
+    }
+
+    const line =
+        '>> [STATE:RESET] Deep-frozen snapshot folds cleared -> GENESIS_HASH_64 [OK]'
+    if (ste && typeof ste.hunt === 'function') {
+        await ste
+            .hunt('[Console action] Update Console', {
+                idx: 'cns00',
+                src: line,
+            })
+            .catch(() => {})
+    }
+    const lib =
+        (globalThis as any).LIBRARY ||
+        (typeof global !== 'undefined' ? (global as any).LIBRARY : undefined)
+    if (lib && typeof lib.hunt === 'function') {
+        await lib
+            .hunt('[Console action] Update Console', {
+                idx: 'cns00',
+                src: line,
+            })
+            .catch(() => {})
+    }
+
+    if (bal?.slv) {
+        bal.slv({
+            stateBit: {
+                idx: 'reset-state-pass',
+                val: 0,
+                dat: {
+                    stateHash: '0'.repeat(64),
+                    snapshotCleared: true,
+                },
+            },
+        })
+    }
+
+    return cpy
+}

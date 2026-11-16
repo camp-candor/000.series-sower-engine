@@ -14,9 +14,9 @@ export class EngineModel implements Engine {
     idx: string = '00.engine'
     status: EngineStatus = 'OFFLINE'
     booted: boolean = false
-    seriesSlug: string = 'under-the-floorboards'
+    seriesSlug: string = ''
     lastBootMs: number = 0
-    headSequence?: number
+    headSequence: number = 0
     activeSeriesSlug?: string
     lastStateHash: string = '0'.repeat(64)
     lastAuditReceipt?: EngineAuditReceipt

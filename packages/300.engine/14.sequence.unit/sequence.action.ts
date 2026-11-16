@@ -41,6 +41,12 @@ export class VerifySequenceContinuity implements Action {
     constructor(public bale?: SequenceBit) {}
 }
 
+export const RESET_SEQUENCE = '[Sequence action] Reset Sequence'
+export class ResetSequence implements Action {
+    readonly type = RESET_SEQUENCE
+    constructor(public bale?: SequenceBit) {}
+}
+
 export type Actions =
     | InitSequence
     | UpdateSequence
@@ -48,3 +54,4 @@ export type Actions =
     | AssertExpectedSeq
     | CommitSequence
     | VerifySequenceContinuity
+    | ResetSequence

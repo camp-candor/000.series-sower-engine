@@ -280,6 +280,12 @@ export class ManageEngineRecurrence implements Action {
     constructor(public bale?: MenuBit) {}
 }
 
+export const RESET_TABULA_RASA_MENU = '[Menu action] Reset Tabula Rasa Menu'
+export class ResetTabulaRasaMenu implements Action {
+    readonly type = RESET_TABULA_RASA_MENU
+    constructor(public bale?: MenuBit) {}
+}
+
 export type Actions =
     | InitMenu
     | UpdateMenu
@@ -322,3 +328,4 @@ export type Actions =
     | ConfigureEnginePacingBudget
     | ManageEngineAgenda
     | ManageEngineRecurrence
+    | ResetTabulaRasaMenu

@@ -38,6 +38,9 @@ export function reducer(
                 state,
             )
 
+        case Act.RESET_EVENT:
+            return Buzz.resetEventAction(clone(model), act.bale, state)
+
         default:
             return model
     }

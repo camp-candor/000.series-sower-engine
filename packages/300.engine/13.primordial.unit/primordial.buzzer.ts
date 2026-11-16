@@ -5,6 +5,7 @@ export {
     seedPrimordialAction,
     verifyGenesisPrimordialAction,
     computeManifestHRoot,
+    resetPrimordialAction,
 } from './buz/primordial.buzz.js'
 
 export type {

@@ -36,9 +36,16 @@ export class AssertKineticVerbsWounds implements Action {
     constructor(public bale?: WoundsBit) {}
 }
 
+export const RESET_WOUNDS = '[Wounds action] Reset Wounds'
+export class ResetWounds implements Action {
+    readonly type = RESET_WOUNDS
+    constructor(public bale?: WoundsBit) {}
+}
+
 export type Actions =
     | InitWounds
     | UpdateWounds
     | AddWound
     | CompileSomaticMaskWounds
     | AssertKineticVerbsWounds
+    | ResetWounds

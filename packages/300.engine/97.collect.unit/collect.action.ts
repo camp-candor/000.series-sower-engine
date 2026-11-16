@@ -97,6 +97,12 @@ export class HashCollect implements Action {
     constructor(public bale: CollectBit) {}
 }
 
+export const RESET_COLLECT = '[Collect action] Reset Collect'
+export class ResetCollect implements Action {
+    readonly type = RESET_COLLECT
+    constructor(public bale: CollectBit) {}
+}
+
 export type Actions =
     | InitCollect
     | UpdateCollect
@@ -114,3 +120,4 @@ export type Actions =
     | DotCollect
     | ListCollect
     | HashCollect
+    | ResetCollect

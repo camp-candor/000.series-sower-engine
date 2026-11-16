@@ -12,6 +12,7 @@ export {
     makeRelationId,
     assertBasisPoints,
     assertNonNegativeInteger,
+    resetLeverageAction,
 } from './buz/leverage.buzz.js'
 export type {
     StringsLedgerRecord,

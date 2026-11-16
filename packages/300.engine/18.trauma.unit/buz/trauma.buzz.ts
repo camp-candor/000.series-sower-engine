@@ -316,3 +316,23 @@ export const getSomaticStateAction = (
     }
     return cpy
 }
+
+export const resetTraumaAction = async (
+    cpy: TraumaModel,
+    bal?: TraumaBit,
+    ste?: State,
+): Promise<TraumaModel> => {
+    const fresh = new TraumaModel()
+    for (const key of Object.keys(fresh) as Array<keyof TraumaModel>) {
+        ;(cpy as any)[key] = (fresh as any)[key]
+    }
+    cpy.entities = {}
+    await emitConsole(
+        ste,
+        '>> [TRAUMA:RESET] Somatic trauma vectors cleared to void [OK]',
+    )
+    if (bal?.slv) {
+        bal.slv({ trmBit: { idx: 'reset-trauma-pass', val: 0 } })
+    }
+    return cpy
+}

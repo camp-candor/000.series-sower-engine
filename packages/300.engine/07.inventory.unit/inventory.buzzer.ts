@@ -10,6 +10,7 @@ export {
     assertHandCapacityInventoryAction,
     assertMassConservationInventoryAction,
     validateHandCapacity,
+    resetInventoryAction,
 } from './buz/inventory.buzz.js'
 export type {
     EquipSlotType,

@@ -36,6 +36,9 @@ export function reducer(
                 state,
             )
 
+        case Act.RESET_WOUNDS:
+            return Buzz.resetWoundsAction(clone(model), act.bale, state)
+
         default:
             return model
     }

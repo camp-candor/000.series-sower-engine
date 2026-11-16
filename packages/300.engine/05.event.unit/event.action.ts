@@ -47,6 +47,12 @@ export class DetectSignificantEvent implements Action {
     constructor(public bale?: EventBit) {}
 }
 
+export const RESET_EVENT = '[Event action] Reset Event'
+export class ResetEvent implements Action {
+    readonly type = RESET_EVENT
+    constructor(public bale?: EventBit) {}
+}
+
 export type Actions =
     | InitEvent
     | UpdateEvent
@@ -55,3 +61,4 @@ export type Actions =
     | RegisterUpcaster
     | UpcastEvent
     | DetectSignificantEvent
+    | ResetEvent

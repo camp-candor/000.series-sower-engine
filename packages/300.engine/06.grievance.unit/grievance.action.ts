@@ -56,6 +56,12 @@ export class AuditGrievanceRecords implements Action {
     constructor(public bale?: GrievanceBit) {}
 }
 
+export const RESET_GRIEVANCE = '[Grievance action] Reset Grievance'
+export class ResetGrievance implements Action {
+    readonly type = RESET_GRIEVANCE
+    constructor(public bale?: GrievanceBit) {}
+}
+
 export type Actions =
     | InitGrievance
     | UpdateGrievance
@@ -65,3 +71,4 @@ export type Actions =
     | QueryEligibleGrievances
     | SelectStage3Encounter
     | AuditGrievanceRecords
+    | ResetGrievance

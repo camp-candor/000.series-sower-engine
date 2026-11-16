@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import type { Env } from './types/env.js'
 import { EdgeScrubbedPathQuerySchema } from './types/spatial.js'
 import { SowerSessionDO } from './objects/SowerSessionDO.js'
+import { redactSecrets, redactObject } from './redaction.js'
 
 export { SowerSessionDO }
 export class AgentSessionDO {}
@@ -88,6 +89,70 @@ app.post('/series/:slug/spatial/route', async (c) => {
     const receipt = await (stub as any).evaluateSpatialRoute(parseResult.data)
 
     return c.json(receipt)
+})
+
+app.post('/engine/tabula-rasa-reset', async (c) => {
+    const body = await c.req.json().catch(() => null)
+    if (
+        !body ||
+        typeof body.seriesSlug !== 'string' ||
+        body.seriesSlug.trim().length === 0 ||
+        body.confirmToken1 !== 'CONFIRM_1_OF_3' ||
+        body.confirmToken2 !== 'CONFIRM_2_OF_3' ||
+        body.confirmToken3 !== 'CONFIRM_3_OF_3'
+    ) {
+        return c.json(
+            redactObject({
+                ok: false,
+                error: 'TRIPLE_LOCK_REJECTED',
+                message:
+                    'Missing or invalid triple-lock confirmation tokens (CONFIRM_1_OF_3, CONFIRM_2_OF_3, CONFIRM_3_OF_3).',
+            }),
+            403,
+        )
+    }
+
+    const fencingEpoch =
+        typeof body.fencingEpoch === 'number' &&
+        Number.isInteger(body.fencingEpoch)
+            ? body.fencingEpoch
+            : 0
+
+    const doId = c.env.SOWER_SESSION.idFromName(body.seriesSlug)
+    const stub = c.env.SOWER_SESSION.get(doId)
+    const doResp = await stub.fetch(
+        new Request('https://sower-session.internal/tabula-rasa-reset', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                seriesSlug: body.seriesSlug,
+                confirmToken1: body.confirmToken1,
+                confirmToken2: body.confirmToken2,
+                confirmToken3: body.confirmToken3,
+                fencingEpoch,
+                cascadeOrigin: body.cascadeOrigin || 'hono-edge-ingress',
+            }),
+        }),
+    )
+
+    const result = await doResp.json()
+    void redactSecrets('tabula-rasa-reset')
+    return c.json(redactObject(result), doResp.status as any)
+})
+
+app.get('/engine/void-state-status', async (c) => {
+    const seriesSlug = c.req.query('seriesSlug') || 'default'
+    const doId = c.env.SOWER_SESSION.idFromName(seriesSlug)
+    const stub = c.env.SOWER_SESSION.get(doId)
+    const doResp = await stub.fetch(
+        new Request(
+            `https://sower-session.internal/void-state-status?seriesSlug=${encodeURIComponent(seriesSlug)}`,
+            { method: 'GET' },
+        ),
+    )
+    const result = await doResp.json()
+    void redactSecrets('void-state-status')
+    return c.json(redactObject(result), 200)
 })
 
 export default app

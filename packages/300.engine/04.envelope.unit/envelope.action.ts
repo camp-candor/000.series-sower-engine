@@ -46,6 +46,12 @@ export class ValidateSpatialProof implements Action {
     constructor(public bale?: EnvelopeBit) {}
 }
 
+export const RESET_ENVELOPE = '[Envelope action] Reset Envelope'
+export class ResetEnvelope implements Action {
+    readonly type = RESET_ENVELOPE
+    constructor(public bale?: EnvelopeBit) {}
+}
+
 export type Actions =
     | InitEnvelope
     | UpdateEnvelope
@@ -54,3 +60,4 @@ export type Actions =
     | HashStateEnvelope
     | VerifyChainEnvelope
     | ValidateSpatialProof
+    | ResetEnvelope

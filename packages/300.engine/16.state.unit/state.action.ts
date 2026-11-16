@@ -46,6 +46,12 @@ export class WhyDirtyState implements Action {
     constructor(public bale?: StateBit) {}
 }
 
+export const RESET_STATE = '[State action] Reset State'
+export class ResetState implements Action {
+    readonly type = RESET_STATE
+    constructor(public bale?: StateBit) {}
+}
+
 export type Actions =
     | InitState
     | UpdateState
@@ -54,3 +60,4 @@ export type Actions =
     | FreezeState
     | FoldEventsState
     | WhyDirtyState
+    | ResetState

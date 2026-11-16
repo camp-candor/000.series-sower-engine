@@ -12,6 +12,22 @@ import {
 } from '../fce/compile.interface.js'
 import State from '../../99.core/state.js'
 
+async function emitConsole(ste: State | undefined, src: string): Promise<void> {
+    if (ste && typeof ste.hunt === 'function') {
+        await ste
+            .hunt('[Console action] Update Console', { idx: 'cns00', src })
+            .catch(() => {})
+    }
+    const lib =
+        (globalThis as any).LIBRARY ||
+        (typeof global !== 'undefined' ? (global as any).LIBRARY : undefined)
+    if (lib && typeof lib.hunt === 'function') {
+        await lib
+            .hunt('[Console action] Update Console', { idx: 'cns00', src })
+            .catch(() => {})
+    }
+}
+
 const DEFAULT_TIMESTAMP = '2026-11-05T00:00:00.000Z'
 
 const EMPTY_CORPUS: CompileCorpusPayload = {
@@ -664,6 +680,32 @@ export const synthesizeEventFountain = (
                 },
             })
         }
+    }
+    return cpy
+}
+
+export const resetCompileAction = async (
+    cpy: CompileModel,
+    bal: CompileBit,
+    ste?: State,
+): Promise<CompileModel> => {
+    const fresh = new CompileModel()
+    for (const key of Object.keys(fresh) as Array<keyof CompileModel>) {
+        ;(cpy as any)[key] = (fresh as any)[key]
+    }
+    cpy.status = 'IDLE'
+    delete (cpy as any).validationReport
+    delete (cpy as any).catalogSummary
+    delete (cpy as any).lastError
+    delete (cpy as any).lastSynthesizedScreenplay
+    delete (cpy as any).rootMerkleHash
+    delete (cpy as any).lastSealedAt
+    await emitConsole(
+        ste,
+        '>> [COMPILE:RESET] Validation report cache cleared to void [OK]',
+    )
+    if (bal?.slv) {
+        bal.slv({ cmpBit: { idx: 'reset-compile-pass', val: 0 } })
     }
     return cpy
 }

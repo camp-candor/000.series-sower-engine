@@ -4,6 +4,7 @@ export {
     computeHorizonProgressBps,
     computeSolarDayProgressBps,
     resolveThreeActStage,
+    resetArithmeticAction,
 } from './buz/arithmetic.buzz.js'
 export type { PacingActStageLocal } from './buz/arithmetic.buzz.js'
 export {

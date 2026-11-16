@@ -12,6 +12,7 @@ export {
     serializeEntityToDbRow,
     deserializeDbRowToEntity,
     assembleCompositeEntity,
+    resetEntityAction,
 } from './buz/entity.buzz.js'
 export type {
     CompositeEntityState,

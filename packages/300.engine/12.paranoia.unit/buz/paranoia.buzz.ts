@@ -854,3 +854,25 @@ export const queryClockStateAction = (
     }
     return cpy
 }
+
+export const resetParanoiaAction = async (
+    cpy: ParanoiaModel,
+    bal?: ParanoiaBit,
+    ste?: State,
+): Promise<ParanoiaModel> => {
+    const fresh = new ParanoiaModel()
+    for (const key of Object.keys(fresh) as Array<keyof ParanoiaModel>) {
+        ;(cpy as any)[key] = (fresh as any)[key]
+    }
+    cpy.clocks.clear()
+    cpy.activeDispatchCount = 0
+    cpy.lastDispatchedClockId = ''
+    await emitConsole(
+        ste,
+        '>> [PARANOIA:RESET] Pressure clocks and tripwires cleared [OK]',
+    )
+    if (bal?.slv) {
+        bal.slv({ parBit: { idx: 'reset-paranoia-pass', val: 0 } })
+    }
+    return cpy
+}

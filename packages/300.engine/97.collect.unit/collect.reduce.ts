@@ -8,7 +8,7 @@ export function reducer(
     model: CollectModel = new CollectModel(),
     act: Act.Actions | any,
     state?: State,
-): CollectModel {
+): CollectModel | Promise<CollectModel> {
     switch (act.type) {
         case Act.UPDATE_COLLECT:
             return Buzz.updateCollect(clone(model), act.bale, state as State)
@@ -71,6 +71,13 @@ export function reducer(
         case Act.HASH_COLLECT:
         case '[Hash action] Hash Collect':
             return Buzz.hashCollect(clone(model), act.bale, state as State)
+
+        case Act.RESET_COLLECT:
+            return Buzz.resetCollectAction(
+                clone(model),
+                act.bale,
+                state as State,
+            )
 
         default:
             return model

@@ -63,11 +63,9 @@ export function reducer(
         case Act.MOUNT_REALM_DATABASE:
             return Buzz.mountRealmDatabase(clone(model), act.bale as any, state)
 
-        case Act.CLOSE_DATABASE: {
-            const cpy = clone(model)
-            Buzz.closeDatabaseConnection(cpy)
-            return cpy
-        }
+        case Act.CLOSE_DATABASE:
+            Buzz.closeDatabaseConnection(model)
+            return Buzz.closeDatabaseAction(clone(model, true), act.bale, state)
 
         case Act.ENSURE_SCHEMA:
             return Buzz.ensureSchema(clone(model), act.bale, state)

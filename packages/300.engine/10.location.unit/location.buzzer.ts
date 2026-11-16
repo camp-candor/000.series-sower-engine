@@ -16,6 +16,7 @@ export {
     bindSpatialPortAction,
     evaluateSpatialPathAction,
     evaluateSpatialPerceptionAction,
+    resetLocationAction,
 } from './buz/location.buzz.js'
 
 export { packAxial, unpackAxial } from './buz/axial-pack.buzz.js'

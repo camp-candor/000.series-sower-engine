@@ -1,10 +1,18 @@
 // apps/worker/src/rollbackEngine.ts
 import { githubRequest, PROTECTED_BRANCHES, type Env } from './tools.core.js'
-import { redactSecrets } from './redaction.js'
+import { redactSecrets, redactObject } from './redaction.js'
 
 // ============================================================================
 // :: REPO-BOT: 4-STAGE COMPENSATING SAGA ROLLBACK ENGINE
 // ============================================================================
+
+export interface RollbackVoidStateHook {
+    readonly seriesSlug: string
+    readonly confirmToken1: string
+    readonly confirmToken2: string
+    readonly confirmToken3: string
+    readonly fencingEpoch: number
+}
 
 export interface RollbackParams {
     owner: string
@@ -16,6 +24,7 @@ export interface RollbackParams {
     headSha?: string
     taskId?: string
     actor?: string
+    resetToVoidState?: RollbackVoidStateHook
 }
 
 export interface RollbackReceipt {
@@ -159,9 +168,35 @@ export async function executeSagaRollback(
     // ------------------------------------------------------------------------
     // Stage 4: Trunk Integrity Verification & Receipt Generation
     // ------------------------------------------------------------------------
+    let voidStateReset: unknown = undefined
+    if (
+        params.resetToVoidState &&
+        (params.env as any)?.SOWER_SESSION &&
+        params.resetToVoidState.confirmToken1 === 'CONFIRM_1_OF_3' &&
+        params.resetToVoidState.confirmToken2 === 'CONFIRM_2_OF_3' &&
+        params.resetToVoidState.confirmToken3 === 'CONFIRM_3_OF_3'
+    ) {
+        const doId = (params.env as any).SOWER_SESSION.idFromName(
+            params.resetToVoidState.seriesSlug,
+        )
+        const stub = (params.env as any).SOWER_SESSION.get(doId)
+        const resp = await stub.fetch(
+            new Request('https://sower-session.internal/tabula-rasa-reset', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ...params.resetToVoidState,
+                    cascadeOrigin: 'saga-rollback-stage-4',
+                }),
+            }),
+        )
+        voidStateReset = redactObject(await resp.json())
+    }
+
     stageLog.stage4 = {
         action: 'TRUNK_VERIFIED',
         status: 'S_CLEAN_PINNED',
+        voidStateReset,
         timestamp: new Date().toISOString(),
     }
 

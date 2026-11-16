@@ -20,6 +20,7 @@ export type Actions =
     | UpdateSeries
     | ResolveSeriesStorage
     | GetActiveSeries
+    | ResetSeries
 
 export const RESOLVE_SERIES_STORAGE = '[Series action] Resolve Series Storage'
 export class ResolveSeriesStorage implements Action {
@@ -31,4 +32,10 @@ export const GET_ACTIVE_SERIES = '[Series action] Get Active Series'
 export class GetActiveSeries implements Action {
     readonly type = GET_ACTIVE_SERIES
     constructor(public bale: SeriesBit) {}
+}
+
+export const RESET_SERIES = '[Series action] Reset Series'
+export class ResetSeries implements Action {
+    readonly type = RESET_SERIES
+    constructor(public bale?: SeriesBit) {}
 }

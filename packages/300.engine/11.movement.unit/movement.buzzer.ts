@@ -12,6 +12,7 @@ export {
     axialDistance,
     calculateTerrainCost,
     cellKey,
+    resetMovementAction,
 } from './buz/movement.buzz.js'
 export type {
     AxialCoord,

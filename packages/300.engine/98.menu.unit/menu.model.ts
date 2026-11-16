@@ -11,6 +11,11 @@ import type {
     SpatialProbeTelemetry,
 } from './fce/menu.interface.js'
 import type MenuBit from './fce/menu.bit.js'
+import type { EngineBlastRadiusInventory } from './fce/tabula-rasa.interface.js'
+import type { EngineTabulaRasaReceipt } from './fce/tabula-rasa.interface.js'
+
+export const RESET_ENGINE_VOID_STATE_LABEL =
+    '[99] RESET ENGINE & LEDGER TO VOID STATE'
 
 export const MAIN_MENU_CHOICES: readonly string[] = Object.freeze([
     '[01] BOOT ENGINE & ENSURE SCHEMA',
@@ -22,6 +27,7 @@ export const MAIN_MENU_CHOICES: readonly string[] = Object.freeze([
     '[18] STAGE SPATIAL HEADER WITH FOUNTAIN SCREENPLAY EDITOR',
     '[20] COMPILE FULL FOUNTAIN DRAFT TO DIALOGUE AST',
     '[21] EXPORT TO CONDUCTOR',
+    RESET_ENGINE_VOID_STATE_LABEL,
     '[ROOT MENU]',
 ])
 
@@ -52,6 +58,9 @@ export class MenuModel implements Menu {
     totalProbesDispatched: number = 0
     lastProbeTelemetry: SpatialProbeTelemetry | null = null
     statusMessage: string = 'MENU_STANDBY'
+    lastBlastRadiusInventory?: EngineBlastRadiusInventory
+    lastTabulaRasaReceipt?: EngineTabulaRasaReceipt
+    lastStagedFountainPath?: string
 }
 
 export default MenuModel

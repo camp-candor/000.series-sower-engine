@@ -1,9 +1,16 @@
 // packages/300.engine/98.menu.unit/buz/gauntlet-menu.buzz.ts
+import fs from 'node:fs'
+import path from 'node:path'
 import {
     runGauntlet,
     executeStage,
 } from '../../00.engine.unit/buz/gauntlet.buzz.js'
+import {
+    evaluateResetCoveragePure,
+    type ResetCoverageSourceEntry,
+} from '../../00.engine.unit/buz/reset-coverage.buzz.js'
 import type GauntletBit from '../../00.engine.unit/fce/gauntlet.bit.js'
+import { resolveEngineRoot } from './00.menu.buzz.js'
 import * as Align from '../../val/align.js'
 import * as Color from '../../val/console-color.js'
 
@@ -14,6 +21,122 @@ const WRITE_CONSOLE = '[Write action] Write Console'
 const UPDATE_CONSOLE = '[Console action] Update Console'
 const OPEN_CHOICE = '[Open action] Open Choice'
 const OPEN_MENU = '[Menu action] Open Menu'
+
+export const RESET_COVERAGE_MENU_LABEL = '[R] AUDIT TABULA RASA RESET COVERAGE'
+
+function collectNonTestTsFiles(dirPath: string): string[] {
+    const out: string[] = []
+    if (!fs.existsSync(dirPath)) {
+        return out
+    }
+    const entries = fs.readdirSync(dirPath, { withFileTypes: true })
+    for (const entry of entries) {
+        const full = path.join(dirPath, entry.name)
+        if (entry.isDirectory()) {
+            if (
+                entry.name === 'node_modules' ||
+                entry.name === 'dist' ||
+                entry.name.startsWith('.')
+            ) {
+                continue
+            }
+            out.push(...collectNonTestTsFiles(full))
+        } else if (
+            entry.isFile() &&
+            entry.name.endsWith('.ts') &&
+            !entry.name.includes('.test.') &&
+            !entry.name.includes('.spec.')
+        ) {
+            out.push(full)
+        }
+    }
+    return out.sort((a, b) => a.localeCompare(b))
+}
+
+function resolveEngineUnitDir(baseDir?: string): string {
+    const repoRoot = baseDir
+        ? path.resolve(baseDir)
+        : resolveEngineRoot(process.cwd())
+    if (fs.existsSync(path.join(repoRoot, 'packages', '300.engine'))) {
+        return path.join(repoRoot, 'packages', '300.engine')
+    }
+    return repoRoot
+}
+
+async function emitCoverageLines(ste: any, lines: string[]): Promise<void> {
+    const lib =
+        (globalThis as any).LIBRARY ||
+        (typeof global !== 'undefined' ? (global as any).LIBRARY : undefined)
+    for (const line of lines) {
+        if (lib && typeof lib.hunt === 'function') {
+            await lib
+                .hunt(UPDATE_CONSOLE, { idx: 'cns00', src: line })
+                .catch(() => {})
+        } else if (ste && typeof ste.hunt === 'function') {
+            await ste
+                .hunt(UPDATE_CONSOLE, { idx: 'cns00', src: line })
+                .catch(() => {})
+        }
+    }
+}
+
+export async function runResetCoverageMenuAudit(
+    cpy: any,
+    bal: any,
+    ste?: any,
+): Promise<any> {
+    const engineDir = resolveEngineUnitDir((bal?.dat as any)?.baseDir)
+    const scanRoots = [
+        path.join(engineDir, '98.menu.unit'),
+        path.join(engineDir, '02.database.unit'),
+    ]
+    const sourceFiles: ResetCoverageSourceEntry[] = []
+    for (const root of scanRoots) {
+        for (const filePath of collectNonTestTsFiles(root)) {
+            try {
+                sourceFiles.push({
+                    filePath: path
+                        .relative(engineDir, filePath)
+                        .replace(/\\/g, '/'),
+                    content: fs.readFileSync(filePath, 'utf8'),
+                })
+            } catch {
+                // Skip unreadable files without failing the audit
+            }
+        }
+    }
+
+    const report = evaluateResetCoveragePure(sourceFiles)
+
+    if (ste && typeof ste.hunt === 'function') {
+        try {
+            await ste.hunt('[Engine action] Audit Reset Coverage', {
+                idx: 'menu-reset-coverage',
+                dat: { sourceFiles },
+            })
+        } catch {
+            // Pure report remains authoritative when dispatch is unavailable
+        }
+    }
+
+    await emitCoverageLines(ste, [...report.receipts])
+
+    if (bal?.slv) {
+        bal.slv({
+            mnuBit: {
+                idx: report.valid
+                    ? 'reset-coverage-menu-pass'
+                    : 'reset-coverage-menu-fail',
+                val: report.valid ? 1 : -1,
+                src: report.valid ? 'PASS' : 'BREACH',
+                dat: report,
+                lst: [...report.receipts],
+            },
+        })
+    }
+
+    return cpy
+}
 
 async function streamLines(lib: any, lines: string[]): Promise<void> {
     for (const line of lines) {
@@ -75,6 +198,7 @@ export async function openGauntletMenu(
         '3. AUDIT AST IMPORT ISOLATION FIREWALL',
         '4. PROFILE TICK EXECUTION BUDGET',
         '5. AUDIT ANTI-GAMING OVERLAY SHIELD',
+        RESET_COVERAGE_MENU_LABEL,
         'ROOT MENU',
     ]
 
@@ -89,6 +213,8 @@ export async function openGauntletMenu(
             'Run the pure engine suite asserting the <= 2.0ms tick budget.',
         '5. AUDIT ANTI-GAMING OVERLAY SHIELD':
             'Restore the held-out test overlay and verify golden falsification traps.',
+        [RESET_COVERAGE_MENU_LABEL]:
+            'Audit every BEE unit against ENGINE_RESET_MANIFEST and scan 98.menu.unit plus 02.database.unit write paths.',
         'ROOT MENU': 'Return to the master runner switchboard.',
     }
 
@@ -195,6 +321,10 @@ export async function openGauntletMenu(
                     '>> --------------------------------------------------',
                 ]
                 await streamLines(lib, lines)
+                break
+            }
+            case RESET_COVERAGE_MENU_LABEL: {
+                await runResetCoverageMenuAudit(cpy, {}, ste)
                 break
             }
             case 'ROOT MENU':

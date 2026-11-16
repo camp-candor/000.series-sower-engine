@@ -774,3 +774,54 @@ export const resolveDual2d6Action = async (
 
     return cpy
 }
+
+export const resetLedgerAction = async (
+    cpy: LedgerModel,
+    bal?: LedgerBit,
+    ste?: State,
+): Promise<LedgerModel> => {
+    const discardedMutationsCount = cpy.stagedMutations.length
+
+    cpy.stagedMutations = []
+    cpy.sequenceCursor = 0
+    cpy.lastCommitResult = undefined
+    cpy.lastResolutionReceipt = undefined
+
+    const line =
+        '>> [LEDGER:RESET] Volatile staging accumulators and duel receipts cleared.'
+    if (ste && typeof ste.hunt === 'function') {
+        await ste
+            .hunt('[Console action] Update Console', {
+                idx: 'cns00',
+                src: line,
+            })
+            .catch(() => {})
+    }
+    const lib =
+        (globalThis as any).LIBRARY ||
+        (typeof global !== 'undefined' ? (global as any).LIBRARY : undefined)
+    if (lib && typeof lib.hunt === 'function') {
+        await lib
+            .hunt('[Console action] Update Console', {
+                idx: 'cns00',
+                src: line,
+            })
+            .catch(() => {})
+    }
+
+    if (bal?.slv) {
+        bal.slv({
+            ledgerBit: {
+                idx: 'reset-ledger-pass',
+                val: 0,
+                dat: {
+                    discardedMutationsCount,
+                    stagedMutationsRemaining: 0,
+                    sequenceCursor: 0,
+                },
+            },
+        })
+    }
+
+    return cpy
+}

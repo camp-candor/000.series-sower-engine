@@ -99,6 +99,9 @@ export function reducer(
             return model
         }
 
+        case Act.RESET_ENTITY:
+            return Buzz.resetEntityAction(clone(model), act.bale, state)
+
         default:
             return model
     }

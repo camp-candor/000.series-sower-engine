@@ -14,6 +14,7 @@ export {
     assertBasisPoints,
     deriveTripwirePhase,
     calculateCurrentSegment,
+    resetParanoiaAction,
 } from './buz/paranoia.buzz.js'
 export type {
     ParanoiaClockState,

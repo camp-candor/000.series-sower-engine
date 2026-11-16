@@ -1124,3 +1124,22 @@ export const listUnratifiedDetailsActor = (
     }
     return cpy
 }
+
+export const resetActorAction = async (
+    cpy: ActorModel,
+    bal?: ActorBit,
+    ste?: State,
+): Promise<ActorModel> => {
+    const fresh = new ActorModel()
+    for (const key of Object.keys(fresh) as Array<keyof ActorModel>) {
+        ;(cpy as any)[key] = (fresh as any)[key]
+    }
+    await emitConsole(
+        ste,
+        '>> [ACTOR:RESET] Epistemic belief horizons cleared to void state [OK]',
+    )
+    if (bal?.slv) {
+        bal.slv({ actorBit: { idx: 'reset-actor-pass', val: 0 } })
+    }
+    return cpy
+}

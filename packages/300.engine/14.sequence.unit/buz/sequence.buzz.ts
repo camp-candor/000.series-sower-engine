@@ -285,3 +285,56 @@ export const verifySequenceContinuity = async (
 
     return cpy
 }
+
+export const resetSequenceAction = async (
+    cpy: SequenceModel,
+    bal?: SequenceBit,
+    ste?: State,
+): Promise<SequenceModel> => {
+    const previousHeadSeq = cpy.currentHeadSeq
+    const previousTotalCommitted = cpy.totalCommitted
+
+    cpy.currentHeadSeq = 0
+    cpy.seriesSlug = ''
+    cpy.epochVersion = 1
+    cpy.lastCommittedEventId = ''
+    cpy.totalCommitted = 0
+
+    const line = '>> [SEQUENCE:RESET] Monotonic head restored to 0'
+    if (ste && typeof ste.hunt === 'function') {
+        await ste
+            .hunt('[Console action] Update Console', {
+                idx: 'cns00',
+                src: line,
+            })
+            .catch(() => {})
+    }
+    const lib =
+        (globalThis as any).LIBRARY ||
+        (typeof global !== 'undefined' ? (global as any).LIBRARY : undefined)
+    if (lib && typeof lib.hunt === 'function') {
+        await lib
+            .hunt('[Console action] Update Console', {
+                idx: 'cns00',
+                src: line,
+            })
+            .catch(() => {})
+    }
+
+    if (bal?.slv) {
+        bal.slv({
+            sequenceBit: {
+                idx: 'reset-sequence-pass',
+                val: 0,
+                dat: {
+                    previousHeadSeq,
+                    previousTotalCommitted,
+                    currentHeadSeq: 0,
+                    epochVersion: 1,
+                },
+            },
+        })
+    }
+
+    return cpy
+}

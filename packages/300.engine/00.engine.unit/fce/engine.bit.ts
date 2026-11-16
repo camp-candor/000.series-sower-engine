@@ -17,6 +17,9 @@ export interface EnginePayload {
     readonly report?: EngineStatusReport
     readonly receipt?: EngineAuditReceipt
     readonly timestampMs?: number
+    readonly unitsResetList?: readonly string[]
+    readonly fanOutExecuted?: boolean
+    readonly cascadeMode?: boolean
     readonly error?: string
 }
 

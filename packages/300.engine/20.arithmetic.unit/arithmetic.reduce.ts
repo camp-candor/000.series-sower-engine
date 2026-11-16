@@ -4,6 +4,7 @@
  */
 
 import clone from 'clone-deep'
+import * as Buzz from './arithmetic.buzzer.js'
 import { ArithmeticModel } from './arithmetic.model.js'
 import {
     ArithmeticCommand,
@@ -142,6 +143,9 @@ export function reducer(
             }
             return next
         }
+
+        case Act.RESET_ARITHMETIC:
+            return Buzz.resetArithmeticAction(clone(model), act.bale, _state)
 
         default:
             return model

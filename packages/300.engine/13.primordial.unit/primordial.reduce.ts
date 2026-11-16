@@ -36,6 +36,8 @@ export function reducer(
                 act.bale as any,
                 state,
             )
+        case Act.RESET_PRIMORDIAL:
+            return Buzz.resetPrimordialAction(clone(model), act.bale, state)
         default:
             return model
     }

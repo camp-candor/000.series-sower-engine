@@ -456,3 +456,26 @@ export const validateSpatialProofAction = (
     }
     return cpy
 }
+
+export const resetEnvelopeAction = async (
+    cpy: EnvelopeModel,
+    bal?: EnvelopeBit,
+    ste?: State,
+): Promise<EnvelopeModel> => {
+    const fresh = new EnvelopeModel()
+    for (const key of Object.keys(fresh) as Array<keyof EnvelopeModel>) {
+        ;(cpy as any)[key] = (fresh as any)[key]
+    }
+    cpy.genesisHash = GENESIS_HASH_64
+    cpy.lastSealedHash = GENESIS_HASH_64
+    cpy.totalSealedCount = 0
+    cpy.lastValidationReport = null
+    await emitConsole(
+        ste,
+        '>> [ENVELOPE:RESET] Hash chain restored to genesis baseline [OK]',
+    )
+    if (bal?.slv) {
+        bal.slv({ envBit: { idx: 'reset-envelope-pass', val: 0 } })
+    }
+    return cpy
+}

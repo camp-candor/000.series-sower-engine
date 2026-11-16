@@ -488,3 +488,55 @@ export const seedPrimordialAction = async (
 
     return cpy
 }
+
+export const resetPrimordialAction = async (
+    cpy: PrimordialModel,
+    bal?: PrimordialBit,
+    ste?: State,
+): Promise<PrimordialModel> => {
+    const previousSeriesSlug = cpy.activeSeriesSlug
+    const wasSeeded = cpy.genesisSeeded
+
+    cpy.hRoot = GENESIS_HASH_64
+    cpy.genesisSeeded = false
+    cpy.activeSeriesSlug = ''
+
+    const line =
+        '>> [PRIMORDIAL:RESET] Genesis state restored to unseeded Void State (S_0) [OK]'
+    if (ste && typeof ste.hunt === 'function') {
+        await ste
+            .hunt('[Console action] Update Console', {
+                idx: 'cns00',
+                src: line,
+            })
+            .catch(() => {})
+    }
+    const lib =
+        (globalThis as any).LIBRARY ||
+        (typeof global !== 'undefined' ? (global as any).LIBRARY : undefined)
+    if (lib && typeof lib.hunt === 'function') {
+        await lib
+            .hunt('[Console action] Update Console', {
+                idx: 'cns00',
+                src: line,
+            })
+            .catch(() => {})
+    }
+
+    if (bal?.slv) {
+        bal.slv({
+            primordialBit: {
+                idx: 'reset-primordial-pass',
+                val: 0,
+                dat: {
+                    previousSeriesSlug,
+                    wasSeeded,
+                    hRoot: GENESIS_HASH_64,
+                    genesisSeeded: false,
+                },
+            },
+        })
+    }
+
+    return cpy
+}

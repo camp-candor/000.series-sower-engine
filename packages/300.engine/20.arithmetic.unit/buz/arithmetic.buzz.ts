@@ -1,10 +1,12 @@
+import { ArithmeticModel } from '../arithmetic.model.js'
+import type ArithmeticBit from '../fce/arithmetic.bit.js'
+import type State from '../../99.core/state.js'
 /**
  * 20.arithmetic.unit - Arithmetic Unit Event Bus Buzz Router
  * Integrates arithmetic reduction into the engine event dispatch pipeline.
  * Pure deterministic PRNG kernel: FNV-1a + Mulberry32, zero Math.random.
  */
 
-import type { ArithmeticModel } from '../arithmetic.model.js'
 import type { ArithmeticActionBit } from '../fce/arithmetic.bit.js'
 import { reduceArithmetic } from '../arithmetic.reduce.js'
 
@@ -220,4 +222,44 @@ export const computeCombinedPacingMultiplierBps = (
         )
     }
     return Number((BigInt(actMultBps) * BigInt(diurnalMultBps)) / 10000n)
+}
+
+async function emitConsole(ste: State | undefined, src: string): Promise<void> {
+    if (ste && typeof ste.hunt === 'function') {
+        await ste
+            .hunt('[Console action] Update Console', { idx: 'cns00', src })
+            .catch(() => {})
+    }
+    const lib =
+        (globalThis as any).LIBRARY ||
+        (typeof global !== 'undefined' ? (global as any).LIBRARY : undefined)
+    if (lib && typeof lib.hunt === 'function') {
+        await lib
+            .hunt('[Console action] Update Console', { idx: 'cns00', src })
+            .catch(() => {})
+    }
+}
+
+export const resetArithmeticAction = (
+    cpy: ArithmeticModel,
+    bal?: ArithmeticBit,
+    ste?: State,
+): ArithmeticModel => {
+    const fresh = new ArithmeticModel()
+    let next: ArithmeticModel = cpy
+    if (Object.isFrozen(cpy)) {
+        next = fresh
+    } else {
+        for (const key of Object.keys(fresh) as Array<keyof ArithmeticModel>) {
+            ;(cpy as any)[key] = (fresh as any)[key]
+        }
+    }
+    void emitConsole(
+        ste,
+        '>> [ARITHMETIC:RESET] Audit counters restored to zero [OK]',
+    ).catch(() => {})
+    if (bal?.slv) {
+        bal.slv({ arthBit: { idx: 'reset-arithmetic-pass', val: 0 } })
+    }
+    return next
 }

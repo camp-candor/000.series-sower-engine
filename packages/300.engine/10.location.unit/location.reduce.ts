@@ -198,6 +198,9 @@ export function reducer(
             return model
         }
 
+        case Act.RESET_LOCATION:
+            return Buzz.resetLocationAction(clone(model), act.bale, state)
+
         default:
             return model
     }

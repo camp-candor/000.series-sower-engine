@@ -173,6 +173,12 @@ export class ResetEngine implements Action {
     constructor(public bale?: EngineBit) {}
 }
 
+export const AUDIT_RESET_COVERAGE = '[Engine action] Audit Reset Coverage'
+export class AuditResetCoverage implements Action {
+    readonly type = AUDIT_RESET_COVERAGE
+    constructor(public bale?: EngineBit) {}
+}
+
 export type Actions =
     | InitEngine
     | RunGauntlet
@@ -199,3 +205,4 @@ export type Actions =
     | StatusEngine
     | AuditEngine
     | ResetEngine
+    | AuditResetCoverage

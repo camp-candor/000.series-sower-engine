@@ -49,6 +49,12 @@ export class AuditLeverageSolvency implements Action {
     constructor(public bale?: LeverageBit) {}
 }
 
+export const RESET_LEVERAGE = '[Leverage action] Reset Leverage'
+export class ResetLeverage implements Action {
+    readonly type = RESET_LEVERAGE
+    constructor(public bale?: LeverageBit) {}
+}
+
 export type Actions =
     | InitLeverage
     | UpdateLeverage
@@ -57,3 +63,4 @@ export type Actions =
     | GetLeverageRecord
     | ListLeverageByHolder
     | AuditLeverageSolvency
+    | ResetLeverage

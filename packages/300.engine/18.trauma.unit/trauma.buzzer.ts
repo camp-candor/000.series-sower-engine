@@ -10,6 +10,7 @@ export {
     getSomaticStateAction,
     assertBasisPoint,
     deriveLocomotionTier,
+    resetTraumaAction,
 } from './buz/trauma.buzz.js'
 export type {
     LocomotionTier,

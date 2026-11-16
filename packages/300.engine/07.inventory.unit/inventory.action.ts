@@ -48,6 +48,12 @@ export class AssertMassConservation implements Action {
     constructor(public bale?: InventoryBit) {}
 }
 
+export const RESET_INVENTORY = '[Inventory action] Reset Inventory'
+export class ResetInventory implements Action {
+    readonly type = RESET_INVENTORY
+    constructor(public bale?: InventoryBit) {}
+}
+
 export type Actions =
     | InitInventory
     | UpdateInventory
@@ -56,3 +62,4 @@ export type Actions =
     | SetArmsCapacity
     | AssertHandCapacity
     | AssertMassConservation
+    | ResetInventory

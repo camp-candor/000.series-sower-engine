@@ -606,3 +606,24 @@ export const getActorPositionAction = (
     }
     return cpy
 }
+
+export const resetMovementAction = async (
+    cpy: MovementModel,
+    bal?: MovementBit,
+    ste?: State,
+): Promise<MovementModel> => {
+    const fresh = new MovementModel()
+    for (const key of Object.keys(fresh) as Array<keyof MovementModel>) {
+        ;(cpy as any)[key] = (fresh as any)[key]
+    }
+    cpy.actorPositions.clear()
+    cpy.occupiedCells.clear()
+    await emitConsole(
+        ste,
+        '>> [MOVEMENT:RESET] Axial coordinate maps cleared to void [OK]',
+    )
+    if (bal?.slv) {
+        bal.slv({ movBit: { idx: 'reset-movement-pass', val: 0 } })
+    }
+    return cpy
+}

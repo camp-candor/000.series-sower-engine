@@ -2,9 +2,9 @@ import type Primordial from './fce/primordial.interface.js'
 
 export class PrimordialModel implements Primordial {
     idx = '13.primordial'
-    hRoot = ''
+    hRoot = '0'.repeat(64)
     genesisSeeded = false
-    activeSeriesSlug = 'wiregrass-basin'
+    activeSeriesSlug = ''
 }
 
 export default PrimordialModel

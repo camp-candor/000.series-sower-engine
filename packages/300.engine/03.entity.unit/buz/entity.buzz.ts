@@ -453,3 +453,23 @@ export const hydrateAllEntitiesAction = async (
 
     return cpy
 }
+
+export const resetEntityAction = async (
+    cpy: EntityModel,
+    bal?: EntityBit,
+    ste?: State,
+): Promise<EntityModel> => {
+    const fresh = new EntityModel()
+    for (const key of Object.keys(fresh) as Array<keyof EntityModel>) {
+        ;(cpy as any)[key] = (fresh as any)[key]
+    }
+    cpy.entities.clear()
+    await emitConsole(
+        ste,
+        '>> [ENTITY:RESET] Live somatic caches flushed to void state [OK]',
+    )
+    if (bal?.slv) {
+        bal.slv({ entBit: { idx: 'reset-entity-pass', val: 0 } })
+    }
+    return cpy
+}

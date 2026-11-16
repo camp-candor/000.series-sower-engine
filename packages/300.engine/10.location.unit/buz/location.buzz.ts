@@ -537,3 +537,27 @@ export const evaluateSpatialPerceptionAction = (
     }
     return cpy
 }
+
+export const resetLocationAction = async (
+    cpy: LocationModel,
+    bal?: LocationBit,
+    ste?: State,
+): Promise<LocationModel> => {
+    const fresh = new LocationModel()
+    for (const key of Object.keys(fresh) as Array<keyof LocationModel>) {
+        ;(cpy as any)[key] = (fresh as any)[key]
+    }
+    cpy.locations.clear()
+    cpy.portals.clear()
+    cpy.occupants.clear()
+    delete (cpy as any).spatialPort
+    delete (cpy as any).topologyManifest
+    await emitConsole(
+        ste,
+        '>> [LOCATION:RESET] Topology caches cleared to void state [OK]',
+    )
+    if (bal?.slv) {
+        bal.slv({ locBit: { idx: 'reset-location-pass', val: 0 } })
+    }
+    return cpy
+}

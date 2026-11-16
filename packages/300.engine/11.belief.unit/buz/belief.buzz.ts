@@ -1,7 +1,7 @@
 /**
  * 11.belief.unit - Master Belief Buzz Business Logic
  */
-import type { BeliefModel } from '../belief.model.js'
+import { BeliefModel } from '../belief.model.js'
 import type BeliefBit from '../fce/belief.bit.js'
 import { parsePerceptCandidate } from './percept-ingest.buzz.js'
 import { evaluateSensoryFilter } from './sensory-filter.buzz.js'
@@ -238,6 +238,27 @@ export const combineBeliefsAction = (
                 },
             })
         }
+    }
+    return cpy
+}
+
+export const resetBeliefAction = async (
+    cpy: BeliefModel,
+    bal?: BeliefBit,
+    ste?: State,
+): Promise<BeliefModel> => {
+    const fresh = new BeliefModel()
+    for (const key of Object.keys(fresh) as Array<keyof BeliefModel>) {
+        ;(cpy as any)[key] = (fresh as any)[key]
+    }
+    cpy.beliefsByHolder.clear()
+    cpy.totalBeliefsRecorded = 0
+    await emitConsole(
+        ste,
+        '>> [BELIEF:RESET] Percept filter caches cleared to void state [OK]',
+    )
+    if (bal?.slv) {
+        bal.slv({ belBit: { idx: 'reset-belief-pass', val: 0 } })
     }
     return cpy
 }

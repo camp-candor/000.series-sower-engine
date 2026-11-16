@@ -52,6 +52,12 @@ export class ResolveDual2d6Ledger implements Action {
     constructor(public bale?: LedgerBit) {}
 }
 
+export const RESET_LEDGER = '[Ledger action] Reset Ledger'
+export class ResetLedger implements Action {
+    readonly type = RESET_LEDGER
+    constructor(public bale?: LedgerBit) {}
+}
+
 export type Actions =
     | InitLedger
     | UpdateLedger
@@ -61,3 +67,4 @@ export type Actions =
     | ValidateStagingLedger
     | QueryStagingState
     | ResolveDual2d6Ledger
+    | ResetLedger

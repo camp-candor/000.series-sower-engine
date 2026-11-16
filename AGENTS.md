@@ -93,6 +93,41 @@
    - Never hardcode repository identity strings in shared agent infrastructure
      (`packages/100.agent`). Resolve identity dynamically via
      [`getRepoIdentity`](file:///d:/trellis/000.series-sower-engine/packages/100.agent/src/identity.ts).
+9. **Tabula Rasa Reset & Void-State Reversibility Law
+   (`check:reset-coverage`):**
+   - All materialized state, relational tables, and generated screenplay/AST
+     projections are disposable caches that must be completely purgeable back to
+     **Posture A: Cold-Start Byte-0 Void State (`Stage T_0 = $0.00`,
+     `GENESIS_HASH_64`)** without harming immutable source code, `.env*`
+     secrets, or `apps/995.library/995.library/**`.
+   - **The Four-Domain Hookup Mandate:** Whenever a Coding Agent creates or
+     modifies state across any of the following four domains, the task is
+     structurally incomplete until wired into the Tabula Rasa reset pipeline:
+     1. **New BEE Units (`<NN>.<name>.unit`):** Every new unit mounted in
+        `packages/300.engine/BEE.ts` must implement a deterministic
+        `RESET_<UNIT>` action and `reset<Unit>` buzzer restoring `<Unit>Model`
+        to its exact primordial constructor defaults, and must be classified in
+        `ENGINE_UNIT_RESET_REGISTRY`
+        (`packages/300.engine/00.engine.unit/val/reset-manifest.val.ts`).
+     2. **New Persistent Disk Directories or Runtime Spools:** Every directory
+        or file written at runtime (`compiled/`, `drafts/`, `conductor_export/`,
+        `data/sqlite/`, or any new output spool) must be declared in
+        `ENGINE_PURGEABLE_TARGETS`
+        (`packages/300.engine/00.engine.unit/val/reset-manifest.val.ts`),
+        guarded by `assertSafeEngineResetTarget`, and ignored in `.gitignore`.
+     3. **New Relational Tables or Collection Caboodles:** Every new table added
+        to `02.database.unit` and every caboodle bucket initialized in
+        `97.collect.unit` must be declared in `ENGINE_RELATIONAL_TABLES` and
+        cleared by `resetLocalDatabase` / `resetCollect`.
+     4. **New Global or Module-Scoped Caches:** Any singleton cache or
+        `globalThis` property (`ACTIVE_SERIES_SLUG`,
+        `LAST_STAGED_FOUNTAIN_PATH`, etc.) must be scrubbed back to `null` or
+        `undefined` during the reset sequence.
+   - **Zero-IO Reset Split & Triple-Lock Interlock:** Pure simulation units
+     (`01.actor.unit` through `21.compile.unit` and `97.collect.unit`) execute
+     strictly in-memory resets; all filesystem unlinks execute inside
+     `packages/300.engine/98.menu.unit` behind the fail-closed Triple-Lock
+     confirmation gate (`CONFIRM_1_OF_3`, `CONFIRM_2_OF_3`, `CONFIRM_3_OF_3`).
 
 ---
 
@@ -169,11 +204,11 @@ Each unit follows the BEE reactive architecture without a `src/` subfolder:
 Directives in `data/directive/day-XXX/NNN.<topic>.<role>.md` enforce strict
 separation of duties:
 
-| Role Suffix                      | Persona                                | Operational Mandate & Restrictions                                                                                                                                                                                                                                                                                                     |
-| :------------------------------- | :------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `*.jules.md`                     | **Jules** (Implementer)                | Execute the pre-flight completion check first. If `>= 67%` of checklist items are already satisfied on disk, mark `[Done]` and **HALT IMMEDIATELY** without mutating code. **NEVER execute or read partner `*.ag-test.md` files.**                                                                                                     |
-| `*.ag-test.md`                   | **Antigravity** (Adversarial Verifier) | Execute the multi-level negative-control verification gauntlet (`Level 0` through `Level 4`). Follow the **In-Scope Remediation Mandate (Zero-Handoff Policy)**: proactively fix missing `run.ts` wiring, menu hooks, or `tsconfig`/`package.json` references, but NEVER weaken schemas, skip gauntlet stages, or edit held-out tests. |
-| `*.gravity.md` / `*.ag-check.md` | **Antigravity** (Architect)            | Perform architectural audits, baseline sealing, and cross-unit alignment.                                                                                                                                                                                                                                                              |
+| Role Suffix                      | Persona                                | Operational Mandate & Restrictions                                                                                                                                                                                                                                                                                                                                                                                   |
+| :------------------------------- | :------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `*.jules.md`                     | **Jules** (Implementer)                | Execute the pre-flight completion check first. If `>= 67%` of checklist items are already satisfied on disk, mark `[Done]` and **HALT IMMEDIATELY** without mutating code. Before marking any implementation `[Done]`, verify that all new units, tables, caches, and disk spools are wired into `ENGINE_RESET_MANIFEST` and the Tabula Rasa reset pipeline. **NEVER execute or read partner `*.ag-test.md` files.** |
+| `*.ag-test.md`                   | **Antigravity** (Adversarial Verifier) | Execute the multi-level negative-control verification gauntlet (`Level 0` through `Level 4`). Follow the **In-Scope Remediation Mandate (Zero-Handoff Policy)**: proactively fix missing `run.ts` wiring, menu hooks, `ENGINE_RESET_MANIFEST` registrations, or `tsconfig`/`package.json` references, but NEVER weaken schemas, skip gauntlet stages, or edit held-out tests.                                        |
+| `*.gravity.md` / `*.ag-check.md` | **Antigravity** (Architect)            | Perform architectural audits, baseline sealing, and cross-unit alignment.                                                                                                                                                                                                                                                                                                                                            |
 
 ---
 
@@ -281,3 +316,6 @@ Commits and pushes are gated by `.husky/pre-commit`, `.husky/pre-push`, and
    - Adding banned dependencies or native IO to `packages/300.engine`.
    - Weakening Zod/TypeBox schemas, disabling AST rules in
      `.dependency-cruiser.cjs`, or skipping stages in `gauntlet.buzz.ts`.
+   - Introducing unpurgeable persistent state, new stateful BEE units omitted
+     from `ENGINE_UNIT_RESET_REGISTRY`, unmanifested disk write directories, or
+     bypassing the Triple-Lock Tabula Rasa confirmation gate.

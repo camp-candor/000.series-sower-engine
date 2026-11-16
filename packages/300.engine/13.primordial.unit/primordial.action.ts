@@ -42,6 +42,12 @@ export class ComputeHrootPrimordial implements Action {
     constructor(public bale?: PrimordialBit) {}
 }
 
+export const RESET_PRIMORDIAL = '[Primordial action] Reset Primordial'
+export class ResetPrimordial implements Action {
+    readonly type = RESET_PRIMORDIAL
+    constructor(public bale?: PrimordialBit) {}
+}
+
 export type Actions =
     | InitPrimordial
     | UpdatePrimordial
@@ -49,3 +55,4 @@ export type Actions =
     | SeedGenesis
     | VerifyGenesisPrimordial
     | ComputeHrootPrimordial
+    | ResetPrimordial

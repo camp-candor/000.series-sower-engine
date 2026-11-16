@@ -54,6 +54,8 @@ import {
     compileFullFountainDraftToAst,
     exportFountainAndAstToConductor,
 } from './fountain-workflow-menu.buzz.js'
+import { runEngineTabulaRasaMenu } from './reset-menu.buzz.js'
+import { RESET_ENGINE_VOID_STATE_LABEL } from '../menu.model.js'
 import { LocationModel } from '../../10.location.unit/location.model.js'
 import {
     initLocation,
@@ -1190,6 +1192,23 @@ export const handleMenuSelection = async (
                     { dat: { baseDir } } as any,
                     ste,
                 )
+                break
+            }
+
+            case RESET_ENGINE_VOID_STATE_LABEL:
+            case '[99] RESET ENGINE & LEDGER TO VOID STATE': {
+                const cpy = model ?? new MenuModelClass()
+                await runEngineTabulaRasaMenu(
+                    cpy,
+                    { idx: 'menu-tabula-rasa', dat: { baseDir } } as any,
+                    ste,
+                )
+                if (selection.startsWith('[99]')) {
+                    await emitConsole(
+                        ste,
+                        '>> [MENU:RESET] Triple-lock tabula rasa gate resolved.',
+                    )
+                }
                 break
             }
         }

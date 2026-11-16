@@ -15,6 +15,7 @@ export {
     computeChainedEventHash,
     computeStateHash,
     verifyHashChain,
+    resetEnvelopeAction,
 } from './buz/envelope.buzz.js'
 export { GENESIS_HASH_64 } from './envelope.model.js'
 export type {

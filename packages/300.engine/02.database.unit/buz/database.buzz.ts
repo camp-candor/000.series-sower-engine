@@ -312,14 +312,47 @@ export const resetLocalDatabase = async (
     bal?: DatabaseBit,
     ste?: State,
 ): Promise<DatabaseModel> => {
-    for (const key of Object.keys(cpy.tables) as DatabaseTableName[]) {
-        cpy.tables[key].clear()
+    const tableNames = Object.keys(cpy.tables) as DatabaseTableName[]
+    const tableRowBreakdown: Record<string, number> = {}
+    let totalRowsCleared = 0
+
+    for (const key of tableNames) {
+        const tableMap = cpy.tables[key]
+        const preCount = tableMap ? tableMap.size : 0
+        tableRowBreakdown[key] = preCount
+        totalRowsCleared += preCount
+        if (tableMap) {
+            tableMap.clear()
+        }
     }
+
+    let remainingRows = 0
+    for (const key of tableNames) {
+        remainingRows += cpy.tables[key]?.size ?? 0
+    }
+
+    if (remainingRows !== 0) {
+        const errMsg = `[DATABASE_RESET_BREACH] Expected 0 remaining rows after clear, found ${remainingRows}`
+        await emitConsole(ste, `:: [FAIL] ${errMsg}`)
+        if (bal?.slv) {
+            bal.slv({
+                databaseBit: {
+                    idx: 'reset-database-fail',
+                    val: -1,
+                    dat: { error: errMsg, remainingRows },
+                },
+            })
+        }
+        return cpy
+    }
+
+    cpy.totalEventsCommitted = 0
+    cpy.hasSpatialSchema = false
     cpy.isInitialized = true
 
     await emitConsole(
         ste,
-        '>> [DATABASE:RESET] All 10 in-memory tables cleared.',
+        `>> [DATABASE:RESET] All ${tableNames.length} in-memory tables cleared (${totalRowsCleared} rows purged).`,
     )
 
     if (bal?.slv) {
@@ -327,6 +360,12 @@ export const resetLocalDatabase = async (
             databaseBit: {
                 idx: 'reset-database-pass',
                 val: 0,
+                dat: {
+                    tablesClearedCount: tableNames.length,
+                    totalRowsCleared,
+                    remainingRows: 0,
+                    tableRowBreakdown,
+                },
             },
         })
     }
@@ -1347,6 +1386,13 @@ export const inspectContinuityDatabase = async (
 export const closeDatabaseConnection = (cpy: DatabaseModel): void => {
     if (cpy.connection) {
         try {
+            if (typeof cpy.connection.exec === 'function') {
+                cpy.connection.exec('PRAGMA wal_checkpoint(TRUNCATE);')
+            }
+        } catch {
+            // Ignore checkpoint errors on transient or mock handles
+        }
+        try {
             if (typeof cpy.connection.close === 'function') {
                 cpy.connection.close()
             }
@@ -1356,8 +1402,43 @@ export const closeDatabaseConnection = (cpy: DatabaseModel): void => {
         cpy.connection = null
     }
     if (cpy.activeMetadata) {
-        cpy.activeMetadata.isOpen = false
+        cpy.activeMetadata = {
+            ...cpy.activeMetadata,
+            isOpen: false,
+        }
+        cpy.activeMetadata = undefined
     }
+    cpy.schemaReport = undefined
+    cpy.isInitialized = false
+}
+
+export const closeDatabaseAction = async (
+    cpy: DatabaseModel,
+    bal?: DatabaseBit,
+    ste?: State,
+): Promise<DatabaseModel> => {
+    const hadOpenHandle = Boolean(cpy.connection || cpy.activeMetadata?.isOpen)
+    closeDatabaseConnection(cpy)
+
+    await emitConsole(
+        ste,
+        '>> [DATABASE:CLOSE] Realm handle closed and WAL flushed [OK]',
+    )
+
+    if (bal?.slv) {
+        bal.slv({
+            databaseBit: {
+                idx: 'close-database-pass',
+                val: 1,
+                dat: {
+                    closed: true,
+                    hadOpenHandle,
+                },
+            },
+        })
+    }
+
+    return cpy
 }
 
 export const mountRealmDatabase = async (

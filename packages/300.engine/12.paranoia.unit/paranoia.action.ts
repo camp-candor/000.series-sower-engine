@@ -59,6 +59,12 @@ export class QueryClockState implements Action {
     constructor(public bale?: ParanoiaBit) {}
 }
 
+export const RESET_PARANOIA = '[Paranoia action] Reset Paranoia'
+export class ResetParanoia implements Action {
+    readonly type = RESET_PARANOIA
+    constructor(public bale?: ParanoiaBit) {}
+}
+
 export type Actions =
     | InitParanoia
     | UpdateParanoia
@@ -69,3 +75,4 @@ export type Actions =
     | DispatchClock
     | DecayClocks
     | QueryClockState
+    | ResetParanoia

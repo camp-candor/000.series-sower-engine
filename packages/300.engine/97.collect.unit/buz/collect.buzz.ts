@@ -4,6 +4,22 @@ import CollectBit from '../fce/collect.bit.js'
 import CaboodleBit from '../fce/caboodle.bit.js'
 import State from '../../99.core/state.js'
 
+async function emitConsole(ste: State | undefined, src: string): Promise<void> {
+    if (ste && typeof ste.hunt === 'function') {
+        await ste
+            .hunt('[Console action] Update Console', { idx: 'cns00', src })
+            .catch(() => {})
+    }
+    const lib =
+        (globalThis as any).LIBRARY ||
+        (typeof global !== 'undefined' ? (global as any).LIBRARY : undefined)
+    if (lib && typeof lib.hunt === 'function') {
+        await lib
+            .hunt('[Console action] Update Console', { idx: 'cns00', src })
+            .catch(() => {})
+    }
+}
+
 function canonicalize(obj: any): string {
     if (obj === null || typeof obj !== 'object') {
         return JSON.stringify(obj)
@@ -215,5 +231,26 @@ export const hashCollect = (
     const json = canonicalize(cpy.caboodleBits)
     const hash = createHash('sha256').update(json, 'utf8').digest('hex')
     if (bal?.slv) bal.slv({ clcBit: { idx: 'hash-collect', src: hash } })
+    return cpy
+}
+
+export const resetCollectAction = async (
+    cpy: CollectModel,
+    bal: CollectBit,
+    ste?: State,
+): Promise<CollectModel> => {
+    const fresh = new CollectModel()
+    for (const key of Object.keys(fresh) as Array<keyof CollectModel>) {
+        ;(cpy as any)[key] = (fresh as any)[key]
+    }
+    cpy.caboodleBitList = []
+    cpy.caboodleBits = {}
+    await emitConsole(
+        ste,
+        '>> [COLLECT:RESET] Caboodle registry cleared to void state [OK]',
+    )
+    if (bal?.slv) {
+        bal.slv({ clcBit: { idx: 'reset-collect-pass', val: 0 } })
+    }
     return cpy
 }

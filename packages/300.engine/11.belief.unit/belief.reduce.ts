@@ -40,6 +40,9 @@ export function reducer(
                 state,
             )
 
+        case Act.RESET_BELIEF:
+            return Buzz.resetBeliefAction(clone(model), act.bale, state)
+
         default:
             return model
     }

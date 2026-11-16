@@ -393,3 +393,24 @@ export const assertKineticVerbsWoundsAction = async (
 
     return cpy
 }
+
+export const resetWoundsAction = async (
+    cpy: WoundsModel,
+    bal?: WoundsBit,
+    ste?: State,
+): Promise<WoundsModel> => {
+    const fresh = new WoundsModel()
+    for (const key of Object.keys(fresh) as Array<keyof WoundsModel>) {
+        ;(cpy as any)[key] = (fresh as any)[key]
+    }
+    cpy.woundsByEntity = {}
+    cpy.masksByEntity = {}
+    await emitConsole(
+        ste,
+        '>> [WOUNDS:RESET] Wound timers and masks cleared to void [OK]',
+    )
+    if (bal?.slv) {
+        bal.slv({ wndBit: { idx: 'reset-wounds-pass', val: 0 } })
+    }
+    return cpy
+}

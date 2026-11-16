@@ -4,6 +4,10 @@
  */
 import type Model from '../../99.core/interface/model.interface.js'
 import type MenuBit from './menu.bit.js'
+import type {
+    EngineBlastRadiusInventory,
+    EngineTabulaRasaReceipt,
+} from './tabula-rasa.interface.js'
 
 export type MenuMode =
     | 'ROOT'
@@ -84,6 +88,9 @@ export default interface Menu extends MenuModelDescriptor {
     isHeadless?: boolean
     menuBits?: Record<string, MenuBit>
     pacingOverrides?: PacingOverrideState
+    lastTabulaRasaReceipt?: EngineTabulaRasaReceipt
+    lastBlastRadiusInventory?: EngineBlastRadiusInventory
+    lastStagedFountainPath?: string
     lst?: string[]
     geoJsonNow?: any
     atlasNow?: any

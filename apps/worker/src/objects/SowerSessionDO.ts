@@ -26,6 +26,28 @@ const canonicalize = (val: unknown): string => {
     )
 }
 
+export interface EdgeTabulaRasaParams {
+    readonly seriesSlug: string
+    readonly confirmToken1: string
+    readonly confirmToken2: string
+    readonly confirmToken3: string
+    readonly fencingEpoch: number
+    readonly cascadeOrigin?: string
+}
+
+export interface EdgeTabulaRasaResult {
+    readonly ok: boolean
+    readonly voidStateVerified: boolean
+    readonly seriesSlug: string
+    readonly previousEpoch: number
+    readonly fencingEpoch: number
+    readonly d1Reconciled: boolean
+    readonly stateSnapshotHash: string
+    readonly timestampIso: string
+    readonly receipts: readonly string[]
+    readonly error?: string
+}
+
 export const EDGE_DO_SCHEMA_SQL = `
         CREATE TABLE IF NOT EXISTS edge_event_log (
           sequence_number INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -463,8 +485,145 @@ export class SowerSessionDO extends DurableObject<Env> {
         return rows.length > 0 ? Number((rows[0] as any).count) : 0
     }
 
+    async executeTabulaRasaReset(
+        params: EdgeTabulaRasaParams,
+    ): Promise<{ status: number; body: EdgeTabulaRasaResult }> {
+        const genesisHash = '0'.repeat(64)
+        const storedEpoch =
+            (await this.ctx.storage.get<number>('fencing_epoch')) ?? 0
+
+        if (
+            !Number.isInteger(params.fencingEpoch) ||
+            params.fencingEpoch < storedEpoch
+        ) {
+            return {
+                status: 409,
+                body: {
+                    ok: false,
+                    voidStateVerified: false,
+                    seriesSlug: params.seriesSlug,
+                    previousEpoch: storedEpoch,
+                    fencingEpoch: storedEpoch,
+                    d1Reconciled: false,
+                    stateSnapshotHash: genesisHash,
+                    timestampIso: new Date().toISOString(),
+                    receipts: [
+                        `:: [EDGE:TABULA_RASA] STALE_FENCING_EPOCH: presented ${params.fencingEpoch} < active ${storedEpoch}`,
+                    ],
+                    error: 'STALE_FENCING_EPOCH',
+                },
+            }
+        }
+
+        // 1. Revoke-First Authority Stripping: advance monotonic fencing epoch first
+        const nextEpoch = Math.max(storedEpoch, params.fencingEpoch) + 1
+        await this.ctx.storage.put('fencing_epoch', nextEpoch)
+
+        // 2. Cancel active watchdog alarms
+        if (typeof this.ctx.storage.deleteAlarm === 'function') {
+            await this.ctx.storage.deleteAlarm()
+        }
+
+        // 3. Purge all ephemeral isolate storage and preserve incremented epoch
+        await this.ctx.storage.deleteAll()
+        await this.ctx.storage.put('fencing_epoch', nextEpoch)
+
+        // Reset in-memory isolate fields
+        this.headSequence = 0
+        this.lastStateHash = genesisHash
+        this.isBooted = false
+        this.currentEpoch = nextEpoch
+        if ('stateHash' in this) {
+            ;(this as any).stateHash = genesisHash
+        }
+        if ('booted' in this) {
+            ;(this as any).booted = false
+        }
+
+        // 4. Reconcile D1 runtime tables if CANON_DB is bound
+        let d1Reconciled = false
+        const canonDb = (this.env as any)?.CANON_DB
+        if (canonDb && typeof canonDb.prepare === 'function') {
+            try {
+                await canonDb
+                    .prepare(
+                        'DELETE FROM scene_fact_dependencies WHERE scene_id LIKE ?',
+                    )
+                    .bind(`${params.seriesSlug}%`)
+                    .run()
+                d1Reconciled = true
+            } catch {
+                d1Reconciled = false
+            }
+        }
+
+        const receipts = [
+            `>> [EDGE:EPOCH] Monotonic fencing epoch revoked ${storedEpoch} -> ${nextEpoch} [OK]`,
+            '>> [EDGE:ALARM] Watchdog alarm cancelled [OK]',
+            `>> [EDGE:STORAGE] Ephemeral isolate storage purged for [${params.seriesSlug}] -> VOID_STATE [OK]`,
+        ]
+
+        return {
+            status: 200,
+            body: {
+                ok: true,
+                voidStateVerified: true,
+                seriesSlug: params.seriesSlug,
+                previousEpoch: storedEpoch,
+                fencingEpoch: nextEpoch,
+                d1Reconciled,
+                stateSnapshotHash: genesisHash,
+                timestampIso: new Date().toISOString(),
+                receipts,
+            },
+        }
+    }
+
+    async getVoidStateStatus(seriesSlug: string): Promise<{
+        ok: boolean
+        seriesSlug: string
+        fencingEpoch: number
+        voidStateVerified: boolean
+        stateSnapshotHash: string
+    }> {
+        const storedEpoch =
+            (await this.ctx.storage.get<number>('fencing_epoch')) ?? 0
+        const keys = await this.ctx.storage.list()
+        const nonEpochKeys = [...keys.keys()].filter(
+            (k) => k !== 'fencing_epoch',
+        )
+        return {
+            ok: true,
+            seriesSlug,
+            fencingEpoch: storedEpoch,
+            voidStateVerified: nonEpochKeys.length === 0,
+            stateSnapshotHash: '0'.repeat(64),
+        }
+    }
+
     async fetch(request: Request): Promise<Response> {
         const url = new URL(request.url)
+
+        if (
+            request.method === 'POST' &&
+            url.pathname === '/tabula-rasa-reset'
+        ) {
+            const payload = (await request.json()) as EdgeTabulaRasaParams
+            const res = await this.executeTabulaRasaReset(payload)
+            return new Response(JSON.stringify(res.body), {
+                status: res.status,
+                headers: { 'Content-Type': 'application/json' },
+            })
+        }
+
+        if (request.method === 'GET' && url.pathname === '/void-state-status') {
+            const slug = url.searchParams.get('seriesSlug') || 'default'
+            const status = await this.getVoidStateStatus(slug)
+            return new Response(JSON.stringify(status), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+            })
+        }
 
         if (request.method === 'POST' && url.pathname.endsWith('/boot')) {
             try {

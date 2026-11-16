@@ -27,6 +27,7 @@ import {
     type SimulationClockState,
 } from '../../17.tick.unit/fce/tick.interface.js'
 import { extractLoreChronology } from '../../17.tick.unit/tick.reduce.js'
+import { normalizeLoreChronology } from '../../17.tick.unit/fce/tick.interface.js'
 import { assertBasisPoint } from '../../20.arithmetic.unit/fce/arithmetic.interface.js'
 import type {
     PacingBudgetPolicy,
@@ -1667,30 +1668,77 @@ export const auditEngine = async (
     return cpy
 }
 
+export const ENGINE_COMPANION_RESET_ACTIONS: readonly string[] = Object.freeze([
+    '[Database action] Close Database',
+    '[Database action] Reset Local Database',
+    '[Sequence action] Reset Sequence',
+    '[Ledger action] Reset Ledger',
+    '[Primordial action] Reset Primordial',
+    '[Series action] Reset Series',
+    '[State action] Reset State',
+    '[Tick action] Reset Tick',
+    '[Actor action] Reset Actor',
+    '[Entity action] Reset Entity',
+    '[Envelope action] Reset Envelope',
+    '[Event action] Reset Event',
+    '[Grievance action] Reset Grievance',
+    '[Inventory action] Reset Inventory',
+    '[Leverage action] Reset Leverage',
+    '[Location action] Reset Location',
+    '[Belief action] Reset Belief',
+    '[Movement action] Reset Movement',
+    '[Paranoia action] Reset Paranoia',
+    '[Trauma action] Reset Trauma',
+    '[Wounds action] Reset Wounds',
+    '[Compile action] Reset Compile',
+    '[Collect action] Reset Collect',
+])
+
 export const resetEngine = async (
     cpy: EngineModel,
-    bal: EngineBit,
+    bal?: EngineBit,
     ste?: State,
 ): Promise<EngineModel> => {
     cpy.status = 'OFFLINE'
     cpy.booted = false
+    cpy.seriesSlug = ''
+    cpy.activeSeriesSlug = undefined
+    cpy.headSequence = 0
     cpy.lastBootMs = 0
     cpy.lastStateHash = '0'.repeat(64)
     cpy.lastAuditReceipt = undefined
     cpy.lastStatusReport = undefined
+    cpy.activeChronology = normalizeLoreChronology(null)
+
+    const unitsResetList: string[] = ['[Engine action] Reset Engine']
+    const shouldFanOut =
+        Boolean(ste && typeof ste.hunt === 'function') &&
+        bal?.dat?.cascadeMode !== false
+
+    if (shouldFanOut && ste) {
+        for (const actionType of ENGINE_COMPANION_RESET_ACTIONS) {
+            await ste.hunt(actionType, {}).catch(() => {})
+            unitsResetList.push(actionType)
+        }
+    }
 
     await emitConsole(
         ste,
-        '>> [ENGINE:RESET] Simulation engine master orchestrator reset to OFFLINE [OK]',
+        '>> [ENGINE:RESET] Core boot posture restored to OFFLINE (VOID STATE T0=$0.00) [OK]',
     )
 
-    if (bal.slv) {
+    if (bal?.slv) {
         bal.slv({
             status: cpy.status,
             engBit: {
                 idx: 'reset-engine-pass',
                 val: 1,
                 src: 'OFFLINE',
+                dat: {
+                    status: cpy.status,
+                    unitsResetList,
+                    fanOutExecuted: shouldFanOut,
+                },
             },
         })
     }

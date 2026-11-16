@@ -10,6 +10,7 @@ export {
     streamEvents,
     evaluateEventSignificance,
     detectSignificantEvent,
+    resetEventAction,
 } from './buz/event.buzz.js'
 export { createDefaultUpcasterRegistry } from './event.model.js'
 export type {

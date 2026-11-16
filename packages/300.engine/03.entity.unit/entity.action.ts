@@ -59,6 +59,12 @@ export class ValidateHandCapacity implements Action {
     constructor(public bale?: EntityBit) {}
 }
 
+export const RESET_ENTITY = '[Entity action] Reset Entity'
+export class ResetEntity implements Action {
+    readonly type = RESET_ENTITY
+    constructor(public bale?: EntityBit) {}
+}
+
 export type Actions =
     | InitEntity
     | UpdateEntity
@@ -69,3 +75,4 @@ export type Actions =
     | HydrateAllEntities
     | DeriveSomaticBudget
     | ValidateHandCapacity
+    | ResetEntity

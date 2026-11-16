@@ -35,9 +35,16 @@ export class CombineBeliefs implements Action<BeliefBit> {
     constructor(public bale?: BeliefBit) {}
 }
 
+export const RESET_BELIEF = '[Belief action] Reset Belief'
+export class ResetBelief implements Action<BeliefBit> {
+    readonly type = RESET_BELIEF
+    constructor(public bale?: BeliefBit) {}
+}
+
 export type Actions =
     | InitBelief
     | UpdateBelief
     | ProcessPerceptCandidate
     | EvaluateSensoryGate
     | CombineBeliefs
+    | ResetBelief

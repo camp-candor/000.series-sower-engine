@@ -10,6 +10,7 @@ export {
     compileSomaticMask,
     VERB_FAMILIES,
     CONDITION_VERB_ROLLUP,
+    resetWoundsAction,
 } from './buz/wounds.buzz.js'
 export type {
     VerbFamilyKey,

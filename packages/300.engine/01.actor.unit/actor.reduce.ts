@@ -83,6 +83,9 @@ export function reducer(
                 state,
             )
 
+        case Act.RESET_ACTOR:
+            return Buzz.resetActorAction(clone(model), act.bale, state)
+
         default:
             return model
     }

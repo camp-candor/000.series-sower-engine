@@ -23,6 +23,7 @@ export {
     probeDialogueSubtextLeak,
     enforceCurtnessBudget,
     compileDialogueBeat,
+    resetActorAction,
 } from './buz/actor.buzz.js'
 export type {
     BeliefSourceType,

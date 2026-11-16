@@ -61,6 +61,9 @@ export function reducer(
                 state,
             )
 
+        case Act.RESET_LEDGER:
+            return Buzz.resetLedgerAction(clone(model), act.bale, state)
+
         default:
             return model
     }
